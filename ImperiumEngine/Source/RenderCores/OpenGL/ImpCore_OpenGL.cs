@@ -39,7 +39,7 @@ internal class ImpGL_Window : GameWindow
         base.OnLoad();
 
         //Title += ": OpenGL Version: " + GL.GetString(StringName.Version);
-        Title = ImpConfig.AppName;
+        Title = ImpApp.AppName;
 
         _controller = new ImGuiController(ClientSize.X, ClientSize.Y);
     }

@@ -1,6 +1,7 @@
 ﻿using System;
 using ImperiumEngine.Source.Renderers;
-
+using System.Numerics;
+using ImperiumEngine.Source.Resources;
 
 
 namespace ImperiumEngine
@@ -17,15 +18,18 @@ namespace ImperiumEngine
     // ####################################################################################################################################
     // IMPERIUM APP
     // ####################################################################################################################################
+    
     // An application process (Editor, Game, etc.)
     public class ImpApp
     {
+        public static string AppName = "Imperium Engine";
+        public static ImpRes_Config config = new ImpRes_Config();
         
         // ================================================================================
         // Objects
         // ================================================================================
         private static List<ImpObject> impObj_toStart = new List<ImpObject>();
-        private List<ImpObject> impObj_active = new List<ImpObject>();
+        private static List<ImpObject> impObj_active = new List<ImpObject>();
         private ImpObject root_object=new ImpObject();
         public static T Object_Create<T>(string name, ImpObject owner) where T : ImpObject, new()
         {
@@ -38,6 +42,12 @@ namespace ImperiumEngine
             Console.WriteLine("Create new Object: "+obj);
             return obj;
         }
+
+        public static List<ImpObject> GetObjects_Active()
+        {
+            return impObj_active;
+        }
+
 
         // ================================================================================
         // Lifetime
@@ -90,9 +100,9 @@ namespace ImperiumEngine
             // TODO release managed resources here
         }
     }
-    
+
     // ####################################################################################################################################
-    // IMPERIUM RENDER COR
+    // IMPERIUM RENDER CORE
     // ####################################################################################################################################
 
     //The render core used for this app (OpenGl, Vulkan, etc.)
@@ -114,52 +124,7 @@ namespace ImperiumEngine
         }
     }
     
-    public static class ImpConfig
-    {
-        public static string AppName = "Imperium Engine";
-    }
+
     
-    // ####################################################################################################################################
-    // IMPERIUM OBJECTS
-    // ####################################################################################################################################
-    
-    
-    // ========================================================================================
-    // Object (Basic)
-    // ========================================================================================
-    public class ImpObject
-    {
-        public ImpObject owner;
-        public string name;
-        public virtual void OnBegin()
-        {
-            
-        }
-        public virtual void OnEnd()
-        {
-            
-        }
-        public virtual void OnUpdate(double delta)
-        {
-            
-        }
-        public virtual void OnDraw(double delta)
-        {
-            
-        }
-    }
-    
-    // ========================================================================================
-    // Object (Basic)
-    // ========================================================================================
-    public class ImpObject2D : ImpObject
-    {
-        
-    }
-    
-    public class ImpObject3D : ImpObject
-    {
-        
-    }
 }
 

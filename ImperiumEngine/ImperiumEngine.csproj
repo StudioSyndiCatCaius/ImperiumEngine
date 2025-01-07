@@ -18,6 +18,7 @@
       <Folder Include="Content\glb\" />
       <Folder Include="Content\lua\" />
       <Folder Include="Content\sound\" />
+      <Folder Include="Plugins\GameplayCore\" />
     </ItemGroup>
 
 </Project>
