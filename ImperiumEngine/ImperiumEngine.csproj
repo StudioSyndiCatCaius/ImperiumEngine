@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="ClickableTransparentOverlay" Version="11.0.1" />
+      <PackageReference Include="OpenTK" Version="4.9.3" />
+      <PackageReference Include="StbImageSharp" Version="2.30.15" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Content\glb\" />
+      <Folder Include="Content\lua\" />
+      <Folder Include="Content\sound\" />
+    </ItemGroup>
+
+</Project>
