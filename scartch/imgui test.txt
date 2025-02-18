@@ -1,8 +1,0 @@
-        //ImGui.ShowDemoWindow();
-        ImGui.Begin("Outliner");
-        ImGui.Text("Hello There");
-        ImGui.End();
-        
-        ImGui.Begin("Assets");
-        ImGui.Text("Come here my little friend");
-        ImGui.End();

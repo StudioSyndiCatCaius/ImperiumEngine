@@ -1,92 +1,51 @@
-﻿using Silk.NET.Input;
-using Silk.NET.OpenGL;
-using Silk.NET.Maths;
-using Silk.NET.Windowing;
-using Silk.NET.OpenGL.Extensions.ImGui;
-using ImGuiNET;
-using System.Drawing;
+﻿
+
+using System;
 using System.Numerics;
+using ImGuiNET;
 using ImperiumEngine.Source;
-using ImperiumEngine.Source.Libs;
 using ImperiumEngine.Source.Objects._2D;
+using ImperiumEngine.Source.RHI;
 
 namespace ImperiumEngine;
 
-public class Program
+public class Program()
 {
-    public static IWindow         window;
-    public static  GL              gl;
-    public static  IInputContext   input;
-    public static  ImGuiController imgui;
-    private static ImpObject       object_root;
-
+    private static ImpRHI       RHI;
+    private static ImpComponent RootObject;
+    
     static void Main(string[] args)
     {
-        // ------------------------------------------------------------------------------
-        // CREATE WINDOW
-        var options = WindowOptions.Default;
-        options.Size = new Vector2D<int>(1280, 720);
-        options.Title = "Imperium Engine";
+        RHI = new ImpRHI_Raylib("Imperium Engine", new Vector2(1280f,720f));
         
-        window = Window.Create(options);
-        
-        window.Load += OnLoad;
-        window.Update += OnUpdate;
-        window.Render += OnRender;
-        window.Resize += OnResize;
-        window.Closing += OnClose;
-        
-        window.Run();
-        window.Dispose();
-    }
+        RHI.Begin += App_Begin;
+        RHI.Update += App_Update;
+        RHI.Render += App_Render;
+        RHI.End += App_End;
 
-    private static void OnLoad()
+        RootObject = new ImpComponent1D();
+        RootObject.Child_Add(new O2D_SceneView());
+        RHI.Run();
+    }
+    private static void App_Begin()
     {
-        imgui = new ImGuiController(
-            gl = window.CreateOpenGL(), 
-            window, 
-            input = window.CreateInput());
-        
-        //INITIALIZE ROOT OBJECT
-        object_root = new ImpObject(); 
-        object_root.Native_Begin();
-        
-        //TESTING SCENE ============
-        object_root.Add_Child(new O2D_SceneViewer());
+        ImGui.GetIO().ConfigFlags |= ImGuiConfigFlags.DockingEnable;
+        RootObject.Native_Begin();
     }
     
-    private static void OnResize(Vector2D<int> s)
+    private static void App_Update(double delta)
     {
-        gl.Viewport(s);
+        RootObject.Native_Update(delta);
     }
-
-    private static void OnUpdate(double deltaTime)
+    
+    private static void App_Render(double delta)
     {
-        object_root.Native_Update((float)deltaTime);
+        ImGui.DockSpaceOverViewport(ImGui.GetMainViewport().ID);
+        RootObject.Native_Draw(delta);
     }
-
-    private static void OnRender(double deltaTime)
+    
+    private static void App_End()
     {
-        imgui.Update((float)deltaTime);
-        
-        object_root.Native_Draw((float)deltaTime);
-        
-        // Switch back to default framebuffer for ImGui
-        gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-        gl.Viewport(0, 0, (uint)window.Size.X, (uint)window.Size.Y);
-        gl.ClearColor(Color.DarkGray);
-        gl.Clear((uint)ClearBufferMask.ColorBufferBit);
-        
-        ImGui.ShowDemoWindow();
-        
-        imgui.Render();
-    }
-
-    private static void OnClose()
-    {
-        imgui?.Dispose();
-        input?.Dispose();
-        gl?.Dispose();
-        object_root.Dispose();
+        RootObject?.Dispose();
     }
 }

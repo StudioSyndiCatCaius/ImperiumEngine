@@ -1,156 +1,136 @@
-using ImperiumEngine.Source.Assets;
-using ImperiumEngine.Source.Objects.Assets;
-using Silk.NET.OpenGL;
+using System.Numerics;
 
 namespace ImperiumEngine.Source;
+
 public class ImpObject : IDisposable
 {
-    public        FGuid GUID;
-    public int   lifetime_state=0; //0= creating, 1=lifetime, 2=destroying
-
-    public List<string> Tags = new();
-
-    private List<ImpObject> _children = new List<ImpObject>();
+    public static bool AddChildToObject(ImpObject parent, ImpObject child)
+    {
+        return false;
+    }
     
-    public void Native_Begin()
-    {
-        On_Begin();
-    }
-
-    public void Native_Update(float d)
-    {
-        foreach (var c in _children.ToList())
-        {
-            if (c.lifetime_state == 0)
-            {
-                c.lifetime_state = 1;
-                c.Native_Begin();
-            }
-            else if(c.lifetime_state==2)
-            {
-                _children.Remove(c);
-                c.Dispose();
-            }
-            else
-            {
-                c.Native_Update(d);
-            }
-        }
-        On_Update(d);
-    }
-
-    public void Native_Draw(float d)
-    {
-        foreach (var c in _children)
-        {
-            if (c.lifetime_state == 1)
-            {
-                c.Native_Draw(d);
-            }
-        }
-        On_Draw(d);
-    }
-
-    public void Native_End()
+    public int LifetimeState=0;
+    public Guid GUID=Guid.NewGuid();
+    
+    public void Dispose()
     {
         On_End();
     }
-
-    public void DestroyObject()
-    {
-        if (!IsBeingDestroyed())
-        {
-            lifetime_state = 2;
-        }
-    }
-
-    public bool IsBeingDestroyed()
-    {
-        return lifetime_state==2;
-    }
     
-    //Overidable
     public virtual void On_Begin() { }
+    public virtual void On_Update(double delta) { }
+    public virtual void On_Draw(double delta) { }
     public virtual void On_End() { }
-    public virtual void On_Update(float delta) { }
-    public virtual void On_Draw(float delta) { }
-    
-    // ----------------------------------------------------------------------------------------------------------------
-    // CHILDREN
-    // ----------------------------------------------------------------------------------------------------------------
-    public bool Add_Child(ImpObject child)
+
+    // Native
+    public virtual void Native_Begin()
     {
-        if (child != this && !_children.Contains(child))
+        On_Begin();
+    }
+    public virtual void Native_Update(double delta)
+    {
+        On_Update(delta);
+    }
+    public virtual void Native_Draw(double delta)
+    {
+        On_Draw(delta);
+    }
+
+}
+
+// ==============================================================================================================================
+// Imp Asset
+// ==============================================================================================================================
+public abstract class ImpAsset : ImpObject
+{
+    private string url = "";
+    private bool   bIsDirty;
+}
+
+// ==============================================================================================================================
+// Imp Component
+// ==============================================================================================================================
+public abstract class ImpComponent : ImpObject
+{
+    public ImpComponent       _parent   = null;
+    public List<ImpComponent> _children =new List<ImpComponent>();
+    
+    public List<string>       Labels = new();
+
+    public List<ImpComponent> GetChildren(bool bAllDescendents)
+    {
+        return _children;
+    }
+
+    public bool Child_Add(ImpComponent child)
+    {
+        if (!_children.Contains(child))
         {
             _children.Add(child);
+            child._parent = this;
+            if (child.LifetimeState== 0)
+            {
+                child.Native_Begin();
+            }
             return true;
         }
         return false;
     }
     
-    public List<ImpObject> GetChildren(bool bAllDescendants=false)
+    public override void Native_Begin()
     {
-        if (bAllDescendants)
+        LifetimeState = 1;
+        base.Native_Begin();
+    }
+
+    public override void On_Update(double delta)
+    {
+        foreach (var c in _children)
         {
-            List<ImpObject>? output = null;
-            foreach (var c in _children)
-            {
-                output.Concat(c.GetChildren(bAllDescendants));
-            }
+            c?.On_Update(delta);
         }
-        return _children;
+        base.On_Update(delta);
     }
 
-    public void Dispose()
-    {
-        Native_End();
+    public override void On_Draw(double delta)
+    {    foreach (var c in _children)
+        {
+            c?.On_Draw(delta);
+        }
+        base.On_Draw(delta);
     }
 }
 
-// ========================================================================================================================
-// Components
-// ========================================================================================================================
-public class ImpComponent1D : ImpObject
+public class ImpComponent1D : ImpComponent { }
+
+public class ImpComponent2D : ImpComponent
 {
-    public bool bCanTick = true;
-    public float TickFrequency;
-    public IA_Script IaScript;
+    
+    public bool         bFocused = false;
+    public FTransform2D LocalTransform;
 }
 
-public class ImpComponent2D: ImpObject
+public class ImpComponent3D : ImpComponent
 {
-    public FTransform2D Transform=new FTransform2D();
-    public bool Visible=false;
-}
+    public FTransform3D LocalTransform;
 
-public class ImpComponent3D: ImpObject
-{
-    public FTransform3D Transform =new FTransform3D();
-    public bool         Visible=false;
-    public GL           _gl;
-
-    public ImpComponent3D()
+    public Vector3 Location_Get()
     {
-        _gl = Program.gl;
+        Vector3 extra = Vector3.Zero;
+        if (_parent is ImpComponent3D _parent3D)
+        {
+            extra = _parent3D.Location_Get();
+        }
+        return LocalTransform.Location+extra;
     }
 
-    public override void On_Begin()
+    public void Location_Set(Vector3 location)
     {
-        _gl = Program.gl;
-        base.On_Begin();
+        LocalTransform.Location = location;
     }
-
-    public virtual void On_Draw3D(float delta, uint shader)
+    
+    public virtual void On_Draw3D(double delta)
     {
         
     }
-}
-
-// ========================================================================================================================
-// Assets
-// ========================================================================================================================
-public class ImpAsset: ImpObject
-{
-    private bool _isDirty = false;
-    private string linked_file = "";
 }

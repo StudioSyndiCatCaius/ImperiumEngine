@@ -1,2 +1,0 @@
-namespace ImperiumEngine.Source;
-

@@ -1,8 +1,12 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImperiumEngine", "ImperiumEngine\ImperiumEngine.csproj", "{9E309267-430B-4DFB-80DF-AEB319573937}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImperiumEngine", "ImperiumEngine\ImperiumEngine.csproj", "{2CB1F3C2-BAFF-4EEC-A3DC-2CAE7FECDFE2}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Templates", "Templates", "{F25E77A9-2280-427D-8FF2-A80E0126A5EA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImperiumEditor", "ImperiumEditor\ImperiumEditor.csproj", "{BD91B264-C058-4CE5-A91D-379572D32588}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImperiumDemo", "ImperiumDemo\ImperiumDemo.csproj", "{A6616DBB-2526-492E-8DCD-098AA0F91951}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImperiumLauncher", "ImperiumLauncher\ImperiumLauncher.csproj", "{69FC1C63-51DC-4418-B279-94C2A6FB26E3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -10,9 +14,21 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{9E309267-430B-4DFB-80DF-AEB319573937}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{9E309267-430B-4DFB-80DF-AEB319573937}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{9E309267-430B-4DFB-80DF-AEB319573937}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{9E309267-430B-4DFB-80DF-AEB319573937}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2CB1F3C2-BAFF-4EEC-A3DC-2CAE7FECDFE2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2CB1F3C2-BAFF-4EEC-A3DC-2CAE7FECDFE2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2CB1F3C2-BAFF-4EEC-A3DC-2CAE7FECDFE2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2CB1F3C2-BAFF-4EEC-A3DC-2CAE7FECDFE2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BD91B264-C058-4CE5-A91D-379572D32588}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BD91B264-C058-4CE5-A91D-379572D32588}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BD91B264-C058-4CE5-A91D-379572D32588}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BD91B264-C058-4CE5-A91D-379572D32588}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A6616DBB-2526-492E-8DCD-098AA0F91951}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A6616DBB-2526-492E-8DCD-098AA0F91951}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A6616DBB-2526-492E-8DCD-098AA0F91951}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A6616DBB-2526-492E-8DCD-098AA0F91951}.Release|Any CPU.Build.0 = Release|Any CPU
+		{69FC1C63-51DC-4418-B279-94C2A6FB26E3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{69FC1C63-51DC-4418-B279-94C2A6FB26E3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{69FC1C63-51DC-4418-B279-94C2A6FB26E3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{69FC1C63-51DC-4418-B279-94C2A6FB26E3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

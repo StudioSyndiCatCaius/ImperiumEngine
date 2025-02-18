@@ -1,6 +1,6 @@
-namespace ImperiumEngine.Source.Assets;
+namespace ImperiumEngine.Source.Objects.Assets;
 
-public class IA_Scene: ImpAsset
+public class IA_Scene
 {
     
 }
