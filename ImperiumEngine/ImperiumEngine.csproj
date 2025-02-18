@@ -10,15 +10,16 @@
 
     <ItemGroup>
       <PackageReference Include="ClickableTransparentOverlay" Version="11.0.1" />
-      <PackageReference Include="OpenTK" Version="4.9.3" />
+      <PackageReference Include="Silk.NET" Version="2.22.0" />
+      <PackageReference Include="Silk.NET.Assimp" Version="2.22.0" />
+      <PackageReference Include="Silk.NET.OpenGL.Extensions.ImGui" Version="2.22.0" />
       <PackageReference Include="StbImageSharp" Version="2.30.15" />
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Content\glb\" />
-      <Folder Include="Content\lua\" />
-      <Folder Include="Content\sound\" />
-      <Folder Include="Plugins\GameplayCore\" />
+      <Folder Include="Apps\" />
+      <Folder Include="Plugins\CommonGame\Source\" />
+      <Folder Include="Source\Shaders\" />
     </ItemGroup>
 
 </Project>
