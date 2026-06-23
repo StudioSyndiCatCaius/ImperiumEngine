@@ -5,21 +5,13 @@
 > anything you don't need.
 
 ## Project Overview
-<!-- What ImperiumEngine is, what it's for, high-level architecture. -->
+
+Imperium Engine is Open-Source modern 3D Game Engine. Archetecture is HEAVILY inspired by Unreal Engine & Godot (as well as elements of Wicked, Stride, and Octave engines).
 
 
 ## Dictionary
 - **ImperiumEngine**: the engine
 - **Pulse**: Visual Scripting language for Imperium Engine. Inspired by UE blueprints
-
-
-## Build & Run
-<!-- How to build, run, and test. Exact commands are best.
-e.g.
-- Build:   dotnet build
-- Run:     dotnet run --project ...
-- Test:    dotnet test
--->
 
 
 ## Project Structure
@@ -28,6 +20,33 @@ e.g.
 
 ## Conventions
 <!-- Code style, naming, patterns to follow or avoid. -->
+
+# Engine References
+
+### Unreal Engine 5.8
+```toml
+Path = "D:/Games/EpicGames/UnrealEngine/UE_5.8/Engine/Source/"
+```
+Mainly for its UI, blueprints, and user friendly structure
+
+### GODOT
+```toml
+Path = "D:/PROJECTS/ImperiumEngine/RefRepos/godot/"
+```
+Mainly for its node/scene architecture, UI elements, ana
+
+### Wicked Engine
+```toml
+Path = "D:/PROJECTS/ImperiumEngine/RefRepos/Wicked/"
+```
+This one is especially used for its modern 3D rendering techniques.
+
+### Stride Engine
+```toml
+Path = "D:/PROJECTS/ImperiumEngine/RefRepos/stride/"
+```
+Mainly used for its C# architecture.
+
 
 
 ## Gotchas / Notes
