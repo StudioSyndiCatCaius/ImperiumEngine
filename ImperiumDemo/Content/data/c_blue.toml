@@ -1,6 +1,0 @@
-[config]
-class="DA_Character"
-
-[params]
-name={raw="Blue",key=''}
-tags=['Character.Sex.Male']
