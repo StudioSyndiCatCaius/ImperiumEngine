@@ -1,5 +1,6 @@
 ﻿using System.Drawing;
 using ImperiumCore.Classes;
+using ImperiumCore.Classes.Components;
 
 namespace ImperiumEngine.Objects._2D;
 

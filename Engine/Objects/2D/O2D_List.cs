@@ -1,4 +1,5 @@
 ﻿using ImperiumCore.Classes;
+using ImperiumCore.Classes.Components;
 using ImperiumCore.Enums;
 
 namespace ImperiumEngine.Objects._2D;
@@ -13,14 +14,14 @@ public abstract class ListStyle
 public class O2D_List : ImpComponent2D
 {
     public ListStyle style; // the default style is array
-    
+
     public Action<O2D_List,ImpComponent2D,int> OnItemSelect;
     public Action<O2D_List,ImpComponent2D,int,bool> OnItemHover;
     public Action<O2D_List,ImpComponent2D,int,bool> OnItemHighlight;
 
     public O2D_List()
     {
-        
+        layout_mode = ELayoutMode.Vertical;
     }
 }
 

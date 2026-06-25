@@ -1,5 +1,7 @@
-﻿using ImperiumCore.Classes;
-using ImperiumEngine.Assets;
+﻿using ImperiumCore.Assets;
+using ImperiumCore.Classes;
+using ImperiumCore.Classes.Components;
+
 
 namespace ImperiumEngine.Objects._2D;
 

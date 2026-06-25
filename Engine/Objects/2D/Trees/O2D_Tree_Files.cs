@@ -1,4 +1,4 @@
-﻿using ImperiumEngine.Assets;
+﻿using ImperiumCore.Assets;
 
 namespace ImperiumEngine.Objects._2D.Trees;
 

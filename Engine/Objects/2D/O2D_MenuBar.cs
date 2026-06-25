@@ -1,4 +1,5 @@
 ﻿using ImperiumCore.Classes;
+using ImperiumCore.Classes.Components;
 using ImperiumEngine.Structs;
 
 namespace ImperiumEngine.Objects._2D;

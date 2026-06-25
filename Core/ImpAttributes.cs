@@ -27,7 +27,7 @@ public sealed class CategoryAttribute(string name) : Attribute
 /// Optional. The in-editor display name of the property.
 /// When omitted the property uses the name of the field or property.
 /// </summary>
-[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Method | AttributeTargets.Class | AttributeTargets.Struct)]
 public sealed class TitleAttribute(string name) : Attribute
 {
     public string Name { get; } = name;
@@ -38,7 +38,39 @@ public sealed class TitleAttribute(string name) : Attribute
 // Property
 // --------------------------------------------------------------------------------------------------------------------
 
+/// <summary>
+/// Marks a property as "advanced" — shown in a collapsed Advanced sub-section
+/// at the bottom of its category in the property editor.
+/// </summary>
 
+[Flags]
+public enum Pulse
+{
+    None  = 0,
+    Read  = 1 << 0,   // 1
+    Write = 1 << 1,   // 2
+    BindSet = 1 << 2, // 4
+    // Add more as needed
+}
+
+
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
+public sealed class AdvancedDisplayAttribute : Attribute { }
+
+[AttributeUsage(AttributeTargets.Property | 
+                AttributeTargets.Field | 
+                AttributeTargets.Parameter, 
+    AllowMultiple = false, 
+    Inherited = true)]
+public class PulseAttribute : Attribute
+{
+    public Pulse Permissions { get; }
+
+    public PulseAttribute(Pulse permissions)
+    {
+        Permissions = permissions;
+    }
+}
 
 // --------------------------------------------------------------------------------------------------------------------
 // Function

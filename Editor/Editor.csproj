@@ -9,14 +9,16 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="RayGUI-cs" Version="2.0.5" />
-      <PackageReference Include="Raylib-cs" Version="8.0.0" />
       <PackageReference Include="Silk.NET" Version="2.23.0" />
     </ItemGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\Core\Core.csproj" />
       <ProjectReference Include="..\Engine\Engine.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Assets\" />
     </ItemGroup>
 
 </Project>
