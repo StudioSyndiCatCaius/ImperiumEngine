@@ -43,7 +43,16 @@ public class O2D_Tree : ImpComponent2D
     public Action<TreeItem>?    OnItemSelect;
     public Action<TreeItem,bool>? OnItemExpand;
 
+    public A_Texture2D t_ico_drop_closed = null;
+    public A_Texture2D t_ico_drop_open = null;
+
     private readonly List<O2D_TreeRow> _rows = new();
+    
+    public O2D_Tree()
+    {
+        t_ico_drop_closed=ImpAsset.Load<A_Texture2D>("T_ico_Drop_0");
+        t_ico_drop_open=ImpAsset.Load<A_Texture2D>("T_ico_Drop_1");
+    }
 
     // Call after modifying roots/children to rebuild the visible flat row list.
     public void Items_Refresh()
@@ -148,12 +157,27 @@ internal class O2D_TreeRow : ImpComponent2D
         float x  = _rect.position.X + _depth * _tree.indent_size + leftShift + Pad;
         float cy = _rect.position.Y + h * 0.5f;
 
-        // expander arrow
+        // Dropdown icon
         if (item.children.Count > 0)
         {
-            string arrow = item.expanded ? "▾" : "▸";
-            rhi.Draw2D_Text(new TVector2i((int)x, (int)(cy - 7)), arrow, 11, Color.FromArgb(160, 160, 170));
+            const int dropIconSize = 14;
+
+            var dropIcon = item.expanded
+                ? _tree.t_ico_drop_open
+                : _tree.t_ico_drop_closed;
+
+            if (dropIcon != null)
+            {
+                rhi.Draw2D_Texture(
+                    dropIcon,
+                    new TVector2i(
+                        (int)x,
+                        (int)(cy - dropIconSize * 0.5f)),
+                    new TVector2i(dropIconSize, dropIconSize),
+                    Color.FromArgb(160, 160, 170));
+            }
         }
+
         x += ExpandW;
 
         // icon

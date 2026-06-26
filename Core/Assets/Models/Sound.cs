@@ -6,9 +6,12 @@ namespace ImperiumCore.Assets;
 // BASE
 // ---------------------------------------------------------------------------------------------------------------------
 
-public class A_Sound : ImpAsset
+public class A_Sound : ModelRef
 {
-    
+    public A_Sound()
+    {
+        ModelType = EModelRefType.Sound;
+    }
 }
 
 // ---------------------------------------------------------------------------------------

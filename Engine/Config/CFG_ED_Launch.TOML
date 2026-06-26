@@ -1,5 +1,5 @@
 autoloadLastProject = true
-AdditionalProjectDirectories = ["hjgtd ", "hghjgj", "ujdytj  sdgsdg  sdgsg "]
+AdditionalProjectDirectories = ["hjgtd ", "ujdytj  sdgsdg  sdgsg ", "hghjgj"]
 Test_Dic = {new_key = 0, new_key_1 = 12, new_key_2 = 9878, new_key_3 = 0, new_key_4 = 0}
 [Test_Transform.position]
 x = 4.099999904632568

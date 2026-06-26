@@ -10,9 +10,14 @@ namespace ImperiumCore.Assets;
 
 
 
-public abstract class A_Texture : ImpAsset
+public abstract class A_Texture : ModelRef
 {
-    [ImpVar][Exposed] public TTextureData textureData;
+    [ImpVar][Exposed] public TModel_Texture ModelTexture;
+    
+    public A_Texture()
+    {
+        ModelType = EModelRefType.Texture;
+    }
 }
 
 // ---------------------------------------------------------------------------------------
@@ -28,9 +33,9 @@ public class A_Texture2D : A_Texture
         using var _stream = File.OpenRead(filepath);
         var _img = ImageResult.FromStream(_stream, ColorComponents.RedGreenBlueAlpha);
 
-        textureData.width = _img.Width;
-        textureData.height = _img.Height;
-        textureData.pixels = _img.Data;
+        ModelTexture.width = _img.Width;
+        ModelTexture.height = _img.Height;
+        ModelTexture.pixels = _img.Data;
         return true;
     }
 }

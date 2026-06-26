@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Numerics;
 using ImperiumCore;
+using ImperiumCore.Assets;
 using ImperiumCore.Classes;
 using ImperiumCore.Classes.Components;
 using ImperiumCore.Enums;
@@ -18,8 +19,12 @@ public class O2D_DragHandle : ImpComponent2D
     private static readonly Color C_Hovered = Color.FromArgb(130, 130, 150);
     private static readonly Color C_Active  = Color.FromArgb(100, 160, 255);
 
+    public A_Texture2D? t_ico_handle;
+
     public O2D_DragHandle(object? payload)
     {
+        t_ico_handle = ImpAsset.Load<A_Texture2D>("T_ico_DragHandle");
+
         _payload            = payload;
         mouse_filter        = EMouseFilter.Stop;
         custom_minimum_size = new Vector2(20, 0);
@@ -38,15 +43,18 @@ public class O2D_DragHandle : ImpComponent2D
 
         var color = active ? C_Active : hovered ? C_Hovered : C_Normal;
 
-        float cx = _rect.position.X + _rect.size.X * 0.5f;
-        float cy = _rect.position.Y + _rect.size.Y * 0.5f;
+        if (t_ico_handle == null)
+            return;
 
-        // Three horizontal grip dots stacked vertically (⠿-style)
-        for (int row = -1; row <= 1; row++)
-        {
-            float y = cy + row * 5f - 1f;
-            rhi.Draw2D_Rect(new TVector2i((int)(cx - 4), (int)y), new TVector2i(2, 2), color);
-            rhi.Draw2D_Rect(new TVector2i((int)(cx + 2), (int)y), new TVector2i(2, 2), color);
-        }
+        const int iconSize = 14;
+
+        float x = _rect.position.X + (_rect.size.X - iconSize) * 0.5f;
+        float y = _rect.position.Y + (_rect.size.Y - iconSize) * 0.5f;
+
+        rhi.Draw2D_Texture(
+            t_ico_handle,
+            new TVector2i((int)x, (int)y),
+            new TVector2i(iconSize, iconSize),
+            color);
     }
 }

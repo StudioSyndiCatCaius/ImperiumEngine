@@ -16,9 +16,14 @@ using ImperiumEngine.Renderers;
 
 ImpApp App = new ImpApp("Imperium Editor",1280,720,
     new RHI_OpenGL(),
-    new EditorLevel_Projects(),new EditorProject());
+    null,new EditorProject());
 
-ImpAsset.Import<A_Texture2D>("{Engine}/Content/2D/icons/T_ico_barsHorizontal.png", true);
+foreach (var _file in ImpFile.ListFiles("{Engine}/_Resources/icons/", "png"))
+{
+    ImpAsset.Import<A_Texture2D>(_file, true);    
+}
+
+App.Level_Current = new EditorLevel_Projects();
 
 App.Run();
 

@@ -69,6 +69,14 @@ public class ImpComponent : ImpObject
         foreach (var c in _children) c.Component_Draw(rhi, dt);
     }
 
+    private bool _destroyed=false;
+    public bool Component_Destroy()
+    {
+        if (_destroyed) return false;
+        //removes this component from the tree and queus it for deletion from memory
+        return true;
+    }
+
     // -------------------------------------------------------
     // Parent
     // -------------------------------------------------------

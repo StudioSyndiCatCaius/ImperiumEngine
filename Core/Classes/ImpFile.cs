@@ -8,6 +8,8 @@ public class ImpFile
     {
         string result = path;
 
+        result=result.Replace("//","/");
+        result=result.Replace("/",@"\");
         result = result.Replace("{project}", Dir_Project());
         result = result.Replace("{Project}", Dir_Project());
         result = result.Replace("{engine}", Dir_Engine());
@@ -15,7 +17,38 @@ public class ImpFile
 
         return result;
     }
+    // -------------------------------------------------------------------------------------------
+    // Files
+    // -------------------------------------------------------------------------------------------
+    public static string[] ListFiles(string path, string extension = "", SearchOption searchOption = SearchOption.TopDirectoryOnly)
+    {
+        string resolvedPath = CorrectPath(path);
+        
+        if (string.IsNullOrWhiteSpace(resolvedPath) || !Directory.Exists(resolvedPath))
+        {
+            return Array.Empty<string>();
+        }
+        Console.WriteLine($"Resolved path: {resolvedPath}");
+        string searchPattern = "*.*";
 
+        if (!string.IsNullOrWhiteSpace(extension))
+        {
+            string normalizedExtension = extension.Trim();
+
+            if (normalizedExtension.StartsWith('.'))
+            {
+                normalizedExtension = normalizedExtension[1..];
+            }
+
+            searchPattern = string.IsNullOrWhiteSpace(normalizedExtension)
+                ? "*.*"
+                : "*." + normalizedExtension;
+        }
+
+        return Directory.GetFiles(resolvedPath, searchPattern, searchOption);
+    }
+    
+    
     // -------------------------------------------------------------------------------------------
     // Project
     // -------------------------------------------------------------------------------------------

@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Numerics;
 using System.Reflection;
 using ImperiumCore;
+using ImperiumCore.Assets;
 using ImperiumCore.Classes;
 using ImperiumCore.Classes.Components;
 using ImperiumCore.Enums;
@@ -221,7 +222,8 @@ public class O2D_PropertyEdit : ImpComponent2D
 
         row.Child_Add(new O2D_Button
         {
-            text                = "×",
+            //text                = "×",
+            icon = ImpAsset.Load<A_Texture2D>("T_ico_delete"),
             custom_minimum_size = new Vector2(24, 22),
             OnPressed           = _ =>
             {
@@ -283,6 +285,7 @@ public class O2D_PropertyEdit : ImpComponent2D
             var removeBtn = new O2D_Button
             {
                 text                = "×",
+                icon = ImpAsset.Load<A_Texture2D>("T_ico_delete"),
                 custom_minimum_size = new Vector2(24, 22),
                 OnPressed           = _ =>
                 {

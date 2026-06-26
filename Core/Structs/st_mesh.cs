@@ -3,7 +3,7 @@ using ImperiumCore.Classes;
 
 namespace ImperiumCore.Structs;
 
-public struct TMeshModel
+public struct TModel_Mesh
 {
     //im still learning 3D. Mesh matrix/vertex data goes in a param here
     // public TMatrix4x4 Matrix;

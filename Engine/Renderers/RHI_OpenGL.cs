@@ -268,16 +268,16 @@ public class RHI_OpenGL : ImpRender
     private uint Texture_Get(A_Texture2D texture)
     {
         if (_texCache.TryGetValue(texture, out uint id)) return id;
-        if (texture.textureData.pixels == null || texture.textureData.width <= 0 || texture.textureData.height <= 0) return 0;
+        if (texture.ModelTexture.pixels == null || texture.ModelTexture.width <= 0 || texture.ModelTexture.height <= 0) return 0;
 
         id = _gl!.GenTexture();
         _gl.BindTexture(TextureTarget.Texture2D, id);
         _gl.PixelStore(PixelStoreParameter.UnpackAlignment, 1);
         unsafe
         {
-            fixed (byte* p = texture.textureData.pixels)
+            fixed (byte* p = texture.ModelTexture.pixels)
                 _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8,
-                    (uint)texture.textureData.width, (uint)texture.textureData.height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, p);
+                    (uint)texture.ModelTexture.width, (uint)texture.ModelTexture.height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, p);
         }
         _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Linear);
         _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);

@@ -45,6 +45,7 @@ public class ImpAsset : ImpObject, I_Saveable
         var _app = ImpApp.Active;
         if (_app != null && _app.AssetRegistry.TryGetValue(id, out var _asset) && _asset is T _typed)
             return _typed;
+        Console.WriteLine($"Asset '{id}' not found in registry.");
         return null;
     }
 
@@ -59,11 +60,17 @@ public class ImpAsset : ImpObject, I_Saveable
     {
         var _resolved = ImpFile.CorrectPath(path);
 
+
         var _asset = new T();
         if (!_asset.Import_Try(_resolved)) return null;
+        _asset.SourceFile = _resolved;
 
         if (AddToRegistry)
-            Register(_asset, Path.GetFileNameWithoutExtension(_resolved));
+        {
+            string _id = Path.GetFileNameWithoutExtension(_resolved);
+            Console.WriteLine($"Registering asset '{_id}'");
+            Register(_asset, _id);
+        }
 
         return _asset;
     }

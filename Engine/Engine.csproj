@@ -28,8 +28,8 @@
       <Folder Include="Content\3D\" />
       <Folder Include="Content\Audio\" />
       <Folder Include="Content\Shaders\" />
-      <Folder Include="_Resouces\icons_enum\" />
-      <Folder Include="_Resouces\thumbnails\" />
+      <Folder Include="_Resources\icons_enum\" />
+      <Folder Include="_Resources\thumbnails\" />
     </ItemGroup>
 
 </Project>

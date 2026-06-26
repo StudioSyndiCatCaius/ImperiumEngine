@@ -24,11 +24,41 @@ public class ImpApp
     
     public List<ImpPlayer> players = new();
 
+    // ------------------------------------------------------------
+    // LEVELS
+    // ------------------------------------------------------------
+    
     public ImpLevel Level_Current; //level that that can be changed and transitioned between
     public ImpLevel Level_Load; //level activated only when transiting between current levels
     public ImpLevel Level_Global; //level that is kept loaded the entire app lifetime
     
+    // ------------------------------------------------------------
+    // SAVE
+    // ------------------------------------------------------------
+    
+    public ImpSave_Game Save_Game;
+    public ImpSave_Global Save_Global;
+    
+    // ------------------------------------------------------------
+    // ASSETS
+    // ------------------------------------------------------------
+    
+    public Dictionary<string,Guid> model_links = new();
+    
+    //asset type models
+    public Dictionary<Guid,TModel_Mesh> models_mesh = new();
+    public Dictionary<Guid,TModel_Texture> models_texture = new();
+    public Dictionary<Guid,TModel_Sound> models_sound = new();
+    
+    
     public Dictionary<string, ImpAsset> AssetRegistry = new();
+    
+    
+    // ============================================================================================================
+    // ============================================================================================================
+    // APP LIFECYCLE
+    // ============================================================================================================
+    // ============================================================================================================
     
     public List<ImpLevel> Levels_GetAll()
     {

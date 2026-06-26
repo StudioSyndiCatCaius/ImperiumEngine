@@ -1,8 +1,7 @@
 ﻿using ImperiumCore.Classes;
 
 namespace ImperiumCore.Assets;
-
-public class Mesh : ImpAsset
+public class ImpEntity : ImpAsset
 {
     
 }

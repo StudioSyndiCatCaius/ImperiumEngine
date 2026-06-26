@@ -15,7 +15,7 @@ public enum ETextureFilter
     Anisotropic,
 }
 
-public struct TTextureData
+public struct TModel_Texture
 {
     public int width, height;
     public byte[]? pixels; // RGBA8, row-major, top-down. Uploaded to the GPU lazily by the RHI.

@@ -2,7 +2,9 @@ using System.Collections;
 using System.Drawing;
 using System.Numerics;
 using System.Reflection;
+using ImperiumCore.Structs;
 using ImperiumEngine.Interfaces;
+using ImperiumEngine.Structs;
 using Tomlyn;
 using Tomlyn.Model;
 
@@ -20,8 +22,54 @@ namespace ImperiumCore.Classes;
 // Struct/object [ImpVar] fields:
 //   If the type implements I_PropertyType, Savable_ToToml/Savable_FromToml are called first.
 //   Otherwise, if the type itself has [ImpVar] members they are recursed into as a sub-table.
-public static class ImpSave
+public class ImpSave
 {
+    [ImpVar] public TGlobalVars Vars;
+    [ImpVar] public TCreatureSet creatures;
+    [ImpVar] public DateTime time_created;
+    [ImpVar] public DateTime time_lastSaved;
+    
+    // ----------------------------------------------------------------------------------------------------
+    // STATICS
+    // ----------------------------------------------------------------------------------------------------
+
+    
+    // -------------------------------------------------------
+    // Save game
+    // -------------------------------------------------------
+    public static ImpSave_Game Game_Create() //creates a new save game
+    {
+        return new ImpSave_Game();
+    }
+
+    public static bool Game_Start(ImpSave_Game save, bool loadSavedLevel) //loads a save game
+    {
+        return true;
+    }
+    
+    public static bool Game_Save(int slot) // saves the current game to the specified slot
+    {
+        return true;
+    }
+    
+    // -------------------------------------------------------
+    // Save global
+    // -------------------------------------------------------
+
+    public static bool Global_Reload(bool createIfMissing) //loads the global save file, creating it if missing
+    {
+        return true;
+    }
+    
+    public static bool Global_Save()
+    {
+        return true;
+    }
+    
+    // ################################################################################################################
+    // SERIALIZATION - should eventually be moved out, probably into ImpParse
+    // ################################################################################################################
+    
     private static readonly TomlModelOptions _opts = new()
     {
         IncludeFields = true,
@@ -302,3 +350,14 @@ public static class ImpSave
                 yield return new Member(_pi.Name, _pi.PropertyType, _pi.GetValue, _pi.SetValue);
     }
 }
+
+
+public class ImpSave_Game : ImpSave
+{
+    
+};
+
+public class ImpSave_Global : ImpSave
+{
+    
+};

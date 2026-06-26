@@ -42,7 +42,7 @@ public class ImpRender
     public virtual void Draw2D_Rect(TVector2i pos, TVector2i size, Color color) {}
     public virtual void Draw2D_RectRounded(TVector2i pos, TVector2i size, Color color, float radius) {}
     
-    public virtual void Draw2D_RectComplex(TVector2i pos, TVector2i size, TComplexRectData data) {}
+    public virtual void Draw2D_RectComplex(TVector2i pos, TVector2i size, TBrush_Shape data) {}
     public virtual void Draw2D_Texture(A_Texture2D texture, TVector2i pos, TVector2i size, Color tint) {}
 
     public virtual bool Draw2D_Button(TVector2i pos, TVector2i size, string text, Color color) { return false;}
@@ -59,5 +59,5 @@ public class ImpRender
     public virtual bool Draw3D_DebugBox(Vector3 start, Quaternion rot, Color color, float thickness = 1) { return false; }
     public virtual bool Draw3D_DebugCone(Vector3 start, Quaternion rot, Color color, float thickness = 1) { return false; }
     
-    public virtual bool Draw3D_MeshFast(TTransform3D transform, TMeshModel mesh) { return false; }
+    public virtual bool Draw3D_MeshFast(TTransform3D transform, TModel_Mesh modelMesh) { return false; }
 }

@@ -81,3 +81,23 @@ public class PulseAttribute : Attribute
 // --------------------------------------------------------------------------------------------------------------------
 // Struct
 // --------------------------------------------------------------------------------------------------------------------
+
+
+// --------------------------------------------------------------------------------------------------------------------
+// Class
+// --------------------------------------------------------------------------------------------------------------------
+
+
+//marks this as having a Pulse Dictionary of global constants (as a TClass)
+[AttributeUsage( AttributeTargets.Class )]
+public sealed class ConstClassAttribute(string name) : Attribute
+{
+    public string Name { get; } = name;
+}
+
+//marks this as having a Pulse Dictionary of global constants (as an ImpAsset)
+[AttributeUsage( AttributeTargets.Class )]
+public sealed class ConstAssetAttribute(string name) : Attribute
+{
+    public string Name { get; } = name;
+}
