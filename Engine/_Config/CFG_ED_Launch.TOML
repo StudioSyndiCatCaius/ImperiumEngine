@@ -1,0 +1,16 @@
+autoloadLastProject = true
+AdditionalProjectDirectories = ["hjgtd ", "ujdytj  sdgsdg  sdgsg ", "", "", "", "", "", ""]
+Test_Dic = {new_key = 0, new_key_1 = 12, new_key_2 = 9878, new_key_3 = 24, new_key_4 = -1}
+[Test_Transform.position]
+x = 4.349999904632568
+y = 3.839999914169312
+z = 1.950000047683716
+[Test_Transform.rotation]
+x = 0.9968487620353699
+y = 0.03405432775616646
+z = 0.03463238105177879
+w = -0.06271763145923615
+[Test_Transform.scale]
+x = 7.639999866485596
+y = 3.380000114440918
+z = 2.519999980926514

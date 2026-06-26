@@ -1,8 +1,9 @@
-﻿using ImperiumEngine.Objects._2D;
+﻿using ImperiumCore.Classes.Components;
+using ImperiumEngine.Objects._2D;
 
 namespace ImperiumEditor;
 
-public class EditorWindow : O2D_Window
+public class EditorWindow : ImpComponent2D
 {
     bool singleton = true;
 }

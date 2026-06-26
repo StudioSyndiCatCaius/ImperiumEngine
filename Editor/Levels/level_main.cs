@@ -9,7 +9,6 @@ public class EditorLevel_Main : ImpLevel
     // ------------------------------
     // main elements
     // ------------------------------
-    public O2D_MenuBar menu_bar;
     
     // ------------------------------
     // windows
