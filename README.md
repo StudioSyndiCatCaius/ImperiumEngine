@@ -6,6 +6,22 @@
 
 ## CORE FREATURES
 * Merge of Actor/Component style system into a single object heirarchy system
+* Game Engine first, meaning many common features (attributes, abilities, level/entity state saving, menus, async systems) are included out of the box, so especially small teams & solo devs can get up and running quickly. This is to contrast engines sucha s godot which provide minimal foundation to build your own systems on top of.
+* Built in 2-part save system:
+    * GAME SAVE: saves a particular instance of a game to disk. New one created on game start.
+    * GLOBAL SAVE: single file saved to disk and reloaded everytime the game is started again.    
+
+### Examples of Out-Of-The-Box systems
+* Menus
+    * Confirmation (Text with a YES/NO option)
+    * Info (Text with only a NEXT option)
+    * Generic (text with a list of multiple scripted options)
+    * Tutorial (struct array with a TEXT and IMAGE. By default played once per save)
+* Abilities
+    * Jump
+    * Crouch
+    * Sprint
+    * SimpleAttack (probabyl old zelda-style, play a single animation with a notfy to check and damage overlapped targets)
 
 ### Considerations:
 * Merge `Core` & `Engine` into the same project/module
