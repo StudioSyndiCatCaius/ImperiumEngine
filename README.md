@@ -8,12 +8,14 @@
 * Merge of Actor/Component style system into a single object heirarchy system
 
 ### Considerations:
+* Merge `Core` & `Engine` into the same project/module
 * IMGUI for Editor only OR Editor + Game UI
 * OGRE for 3D rendering (WOuld need some c++ implementation. Current Graphics use Claude-Code implementation of Open GL, but this should be removed and written by a proper graphics programmer)
 * Posibly rewrite CORE systems in c++ (as minimal as possible) with C# for the whole engine/editor implementation
 * Look into some sort of 'parameter welding' system so components can strip undeed/duplicate variables. E.G. if a mesh component always uses its parent's transform, it should not have its OWN transform taking up memory.
 
-NOTE: The following remainder of the readme was written by Claude Code. SHould be rewritten from scratch later when Engine+Editor are in a far more stable place.
+---
+#### NOTE: The following remainder of the readme was written by Claude Code. Should be rewritten from scratch later when Engine+Editor are in a far more stable place.
 ---
 
 ## Architecture
