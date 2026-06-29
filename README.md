@@ -2,7 +2,11 @@
 
 > An open-source modern 3D game engine built with C# and [Silk.NET](https://github.com/dotnet/Silk.NET), targeting .NET 10.
 
-**NOTE**: Imperium is currently in a very early design & architecture phase. No systems are complete — Claude Code was used for placeholder low-level code (rendering backends, serialization) while the architecture and editor are being built out.
+**NOTE**: Imperium is currently in a *very early design & architecture phase*. No systems are complete — Claude Code was used for placeholder low-level code (rendering backends, serialization) while the architecture and editor are being built out.
+
+Considerations
+* IMGUI for Editor only OR Editor + Game UI
+* OGRE for 3D rendering
 
 ---
 
