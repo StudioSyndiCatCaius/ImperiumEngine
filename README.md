@@ -4,10 +4,14 @@
 
 **NOTE**: Imperium is currently in a *very early design & architecture phase*. No systems are complete - Claude Code was used for placeholder for the OpenGL graphics rendering while the architecture and editor are being built out manually.
 
+## CORE FREATURES
+* Merge of Actor/Component style system into a single object heirarchy system
+
 ### Considerations:
 * IMGUI for Editor only OR Editor + Game UI
 * OGRE for 3D rendering (WOuld need some c++ implementation. Current Graphics use Claude-Code implementation of Open GL, but this should be removed and written by a proper graphics programmer)
-* Posibbly rewrite CORE systems in c++ (as minimal as possible) with C# for the whole engine/editor implementation
+* Posibly rewrite CORE systems in c++ (as minimal as possible) with C# for the whole engine/editor implementation
+* Look into some sort of 'parameter welding' system so components can strip undeed/duplicate variables. E.G. if a mesh component always uses its parent's transform, it should not have its OWN transform taking up memory.
 
 NOTE: The following remainder of the readme was written by Claude Code. SHould be rewritten from scratch later when Engine+Editor are in a far more stable place.
 ---
@@ -30,6 +34,9 @@ The tree is split by dimension:
 - `ImpComponent` - base node (dimension-agnostic)
 - `ImpComponent2D` - 2D/UI node: anchor/offset layout, built-in box container, mouse & drag-drop
 - `ImpComponent3D` - 3D node with a `TTransform3D`
+
+Components can be bundled together in an `Entity`, a form a prefab with a script that can be reused. (Levels are just a special subclass of Entity)
+
 
 ### Solution Layout
 
