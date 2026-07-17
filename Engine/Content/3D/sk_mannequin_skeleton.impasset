@@ -1,0 +1,7 @@
+{
+    "class":"A_Skeleton",
+    "param":{
+        "file_source":"sk_mannequin.glb",
+        "skeleton_index":0,
+    }
+}

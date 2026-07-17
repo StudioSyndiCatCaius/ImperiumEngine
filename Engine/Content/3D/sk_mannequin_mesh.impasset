@@ -1,0 +1,7 @@
+﻿{
+    "class":"A_Mesh",
+    "param":{
+        "file_source":"sk_mannequin.glb",
+        "mesh_index":0,
+    }
+}

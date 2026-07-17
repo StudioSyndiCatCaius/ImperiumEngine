@@ -1,0 +1,76 @@
+using System.Numerics;
+using ImperiumEngine.Classes;
+using ImperiumEngine.Enums;
+using ImperiumEngine.Objects.Assets;
+using R3D_cs;
+using Tomlyn.Model;
+
+namespace ImperiumEngine.Objects._3D;
+
+public enum ECharacterType : byte
+{
+    Default, //uses the default character type from the settings
+    _2D,
+    _3D,
+}
+
+public class O3D_Character : O3D_Collider
+{
+    public O3D_Mesh c_mesh = new();
+    public O3D_Skeleton c_skeleton = new();
+    public O3D_Sprite c_sprite = new();
+
+    public ECharacterType type;
+
+    public A_MoveMode move_mode = new();
+
+    public static O3D_Character FromToml(TomlTable entity)
+    {
+        var obj = new O3D_Character();
+        if (entity.TryGetValue("transform", out object? tr) && tr is TomlTable trt)
+            obj.transform = A_Level.ParseTransform(trt);
+        return obj;
+    }
+
+    R3D_cs.Model? _model;
+    R3D_cs.Mesh?  _fallback;
+
+    public override void OnInit()
+    {
+        string glbPath = Path.Combine(ImpAsset.s_engineContentDir, "3D", "sk_mannequin.glb");
+
+        if (File.Exists(glbPath))
+        {
+            try { _model = R3D.LoadModel(glbPath); }
+            catch
+            {
+                Console.WriteLine($"[O3D_Character] Failed to load mannequin — using placeholder");
+                _fallback = R3D.GenMeshCylinder(0.4f, 1.8f, 12);
+            }
+        }
+        else
+        {
+            _fallback = R3D.GenMeshCylinder(0.4f, 1.8f, 12);
+        }
+    }
+
+    public override void OnDraw(double delta, EDrawFlags flags)
+    {
+        var rot = Quaternion.CreateFromYawPitchRoll(
+            transform.Rotation.Y * (MathF.PI / 180f),
+            transform.Rotation.X * (MathF.PI / 180f),
+            transform.Rotation.Z * (MathF.PI / 180f));
+
+        if (_model is R3D_cs.Model model)
+            R3D.DrawModelEx(model, transform.Position, rot, transform.Scale);
+        else if (_fallback is R3D_cs.Mesh mesh)
+            R3D.DrawMeshEx(mesh, R3D.GetDefaultMaterial(), transform.Position, rot, transform.Scale);
+    }
+
+    public override void OnEnd()
+    {
+        if (_model is R3D_cs.Model m) R3D.UnloadModel(m, true);
+        _model    = null;
+        _fallback = null;
+    }
+}

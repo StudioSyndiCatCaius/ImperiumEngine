@@ -1,9 +1,12 @@
-﻿using ImperiumEngine.Structs;
+﻿using ImperiumEngine.Objects.Assets;
+using ImperiumEngine.Structs;
 
 namespace ImperiumEngine.Interfaces;
 
-public class I_General
+public interface I_General
 {
-    virtual public TText General_GetText() { return new TText();}
-    virtual public TText General_GetDescription() { return new TText();}
+    public virtual TText getTitle() { return new TText("");}
+    public virtual TText getDescription() { return new TText("");}
+    public virtual A_Texture2D getIcon() { return null;}
+    public virtual TTags getTags() { return new TTags(); }
 }

@@ -1,0 +1,20 @@
+# Test Level — DevTest project default level
+
+[[entity]]
+type = "O3D_Mesh"
+name = "Ground Plane"
+
+[entity.transform]
+position = [0.0, 0.0, 0.0]
+scale    = [10.0, 1.0, 10.0]
+
+[entity.mesh]
+source = "builtin:plane"
+
+[[entity]]
+type = "O3D_Character"
+name = "Mannequin"
+
+[entity.transform]
+position = [0.0, 1.0, 0.0]
+scale    = [1.0, 1.0, 1.0]

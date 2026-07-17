@@ -1,106 +1,39 @@
-﻿using ImperiumCore.Const;
-using ImperiumEngine.Interfaces;
+using Raylib_cs;
 
-namespace ImperiumCore.Classes;
+namespace ImperiumEngine.Classes;
 
-public class ImpAsset : ImpObject, I_Saveable
+//An asset that can be save & loaded to and from disk. (.impasset). Similar to Resources in Godot (Or to a lesser extent, DataAssets in UE)
+public class ImpAsset
 {
-    // id under which this asset lives in the app registry (null if unregistered)
-    public string? RegistryId { get; private set; }
+    public string file_link = "";   // the filepath to the asset on disk
+    public string file_source = ""; // the filepath to the asset this will use if importing data (e.g texture, 3d model, sound, etc)
+
+    // Set once at startup by the engine entry point
+    public static string s_projectDir = "";
+    public static string s_engineContentDir = "";
 
     /*
-     * optional and not every asset will have a source file. Used for things like textures, meshes, sound, etc.
-     * a saved ImpAsset with a source file will look something like this:
-     *      - T_Pingo.png               - source file
-     *      - T_Pingo.ImpAsset          - ImpAsset file
+     * Resolve path keywords to absolute paths:
+     *      {editor} / {Editor} : the Engine "Content" directory
+     *      {game}              : the Game/Project's "Content" directory.
+     *          NOTE: if `CFG_Modding.modding_enabled` is true, will load from the game's Mod directory by matching file path
+     *          Mod files are ONLY loaded at runtime, NOT editor. Editor will always use native game Content assets.
      */
-    public string? SourceFile { get; set; }
-
-    // When true, this asset has been saved to its own file at serialPath.
-    // ImpSave uses these two flags to decide how to write an ImpAsset [ImpVar] field:
-    //   serialized = true  → store the path string (external reference)
-    //   serialized = false → embed all [ImpVar] fields as an inline sub-table
-    public bool    serialized { get; set; }
-    public string? serialPath { get; set; }
-    
-    // ----------------------------------------------------------------------------------------------------
-    // STATICS
-    // ----------------------------------------------------------------------------------------------------
-
-    //Add a new asset to the asset registry (found in ImpApp)
-    static public bool Register(ImpAsset asset, string id, bool Override=false)
+    public static string ResolvePath(string source)
     {
-        var _app = ImpApp.Active;
-        if (_app == null || asset == null || string.IsNullOrEmpty(id)) return false;
-        if (_app.AssetRegistry.ContainsKey(id) && !Override) return false;
-
-        asset.RegistryId = id;
-        _app.AssetRegistry[id] = asset;
-        return true;
+        if (string.IsNullOrEmpty(source)) return source;
+        return source
+            .Replace("{game}",   Path.Combine(s_projectDir, "Content"))
+            .Replace("{editor}", s_engineContentDir)
+            .Replace("{Editor}", s_engineContentDir);
     }
 
-    //fetch an already-registered asset by its id
-    static public T? Load<T>(string id) where T : ImpAsset
+    virtual protected Color Editor_GetThumbnailColor() => Color.White;
+    virtual protected string Editor_GetExtension() => ".impasset";
+
+    public virtual bool Load(string path)
     {
-        var _app = ImpApp.Active;
-        if (_app != null && _app.AssetRegistry.TryGetValue(id, out var _asset) && _asset is T _typed)
-            return _typed;
-        Console.WriteLine($"Asset '{id}' not found in registry.");
-        return null;
-    }
-
-    static public Task<T?> Load_Async<T>(string id) where T : ImpAsset
-        => Task.FromResult(Load<T>(id));
-
-    // When importing a new asset with "AddToRegistry", the registry id will be the same as the filename with NO extension
-    // E.G. "D:/Images/T_Pingo.png" id would be "T_Pingo" (This MAY change longterm)
-    // Per-type import logic lives in each asset's Import_Try override (e.g. A_Texture2D loads pixels there).
-
-    static public T? Import<T>(string path, bool AddToRegistry=false) where T : ImpAsset, new()
-    {
-        var _resolved = ImpFile.CorrectPath(path);
-
-
-        var _asset = new T();
-        if (!_asset.Import_Try(_resolved)) return null;
-        _asset.SourceFile = _resolved;
-
-        if (AddToRegistry)
-        {
-            string _id = Path.GetFileNameWithoutExtension(_resolved);
-            Console.WriteLine($"Registering asset '{_id}'");
-            Register(_asset, _id);
-        }
-
-        return _asset;
-    }
-
-    static public Task<T?> Import_Async<T>(string path, bool AddToRegistry=false) where T : ImpAsset, new()
-        => Task.Run(() => Import<T>(path, AddToRegistry));
-
-    // ----------------------------------------------------------------------------------------------------
-    // IMPLEMENTATION
-    // ----------------------------------------------------------------------------------------------------
-
-    //reruns the import logic for this asset from its SourceFile.
-    public bool Reimport()
-    {
-        if(string.IsNullOrWhiteSpace(SourceFile)) return false;
-        return Import_Try(SourceFile);
-    }
-    
-    public string GetSaveExtension()
-    {
-        return ImpC_String.EXT_ASSET;
-    }
-
-    //what happens when trying to import an asset?
-    public virtual bool Import_Try(string filepath)
-    {
+        file_link = path;
         return false;
     }
-    
-    public void Savable_OnRead(string path)  => ImpSave.Read(this, path);
-    public void Savable_OnWrite(string path) => ImpSave.Write(this, path);
 }
-

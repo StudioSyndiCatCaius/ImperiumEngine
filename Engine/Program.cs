@@ -1,0 +1,137 @@
+using System.Numerics;
+using ImperiumEngine.Classes;
+using ImperiumEngine.Enums;
+using ImperiumEngine.Objects.Assets;
+using ImperiumEngine.Objects.Config;
+using R3D_cs;
+using Raylib_cs;
+using static Raylib_cs.Raylib;
+
+namespace ImperiumEngine;
+
+public static class Program
+{
+    public static int Main(string[] args)
+    {
+        string projectDir = FindProjectDir();
+        string engineContentDir = FindEngineContentDir();
+
+        Console.WriteLine($"[Engine] Project dir:        {projectDir}");
+        Console.WriteLine($"[Engine] Engine content dir: {engineContentDir}");
+
+        ImpAsset.s_projectDir = projectDir;
+        ImpAsset.s_engineContentDir = engineContentDir;
+
+        var cfg = new CFG_Graphics();
+
+        if (cfg.enable_window_resize)
+            SetConfigFlags(ConfigFlags.ResizableWindow);
+
+        InitWindow(cfg.resolution_width, cfg.resolution_height, "Imperium Engine");
+        SetTargetFPS(cfg.enable_vsync ? 60 : 0);
+
+        R3D.Init(GetScreenWidth(), GetScreenHeight());
+
+        var level = new A_Level();
+        level.Load(Path.Combine(projectDir, "Content", "Levels", "test.ImpLvl"));
+
+        var player = new ImpPlayer();
+
+        foreach (var e in level.components)
+        {
+            e.OnInit();
+            e.OnBegin();
+        }
+
+        bool isFullscreen = false;
+
+        while (!WindowShouldClose())
+        {
+            double delta = GetFrameTime();
+
+            // F11 — borderless fullscreen toggle
+            if (cfg.enable_fullscreen_toggle && IsKeyPressed(KeyboardKey.F11))
+            {
+                isFullscreen = !isFullscreen;
+                ToggleBorderlessWindowed();
+            }
+
+            if (IsWindowResized())
+                R3D.SetResolution(GetScreenWidth(), GetScreenHeight());
+
+            UpdateCamera(ref player.camera, CameraMode.Orbital);
+            foreach (var e in level.components)
+                if (e.is_active) e.OnUpdate(delta);
+
+            BeginDrawing();
+            ClearBackground(Color.Black);
+
+            R3D.Begin(player.camera);
+            foreach (var e in level.components)
+                if (e.is_visible) e.OnDraw(delta, (EDrawFlags)0);
+            R3D.End();
+
+            EndDrawing();
+        }
+
+        foreach (var e in level.components) e.OnEnd();
+        R3D.Close();
+        CloseWindow();
+
+        return 0;
+    }
+
+    // Walk up from the exe directory looking for an .ImpGame file.
+    // In dev, also checks Templates/ subdirectories so `dotnet run` from Engine/ finds DevTest.
+    static string FindProjectDir()
+    {
+        string dir = AppContext.BaseDirectory;
+
+        for (int i = 0; i < 10; i++)
+        {
+            if (Directory.GetFiles(dir, "*.ImpGame").Length > 0)
+                return dir;
+
+            string templatesPath = Path.Combine(dir, "Templates");
+            if (Directory.Exists(templatesPath))
+            {
+                foreach (string sub in Directory.GetDirectories(templatesPath))
+                {
+                    if (Directory.GetFiles(sub, "*.ImpGame").Length > 0)
+                        return sub;
+                }
+            }
+
+            string? parent = Directory.GetParent(dir)?.FullName;
+            if (parent == null || parent == dir) break;
+            dir = parent;
+        }
+
+        Console.WriteLine("[Engine] WARNING: No .ImpGame found — using current directory");
+        return Directory.GetCurrentDirectory();
+    }
+
+    // Walk up from the exe looking for Engine/Content (solution layout) or Content/3D (inside Engine/).
+    static string FindEngineContentDir()
+    {
+        string dir = AppContext.BaseDirectory;
+
+        for (int i = 0; i < 10; i++)
+        {
+            string viaSolution = Path.Combine(dir, "Engine", "Content");
+            if (Directory.Exists(viaSolution))
+                return viaSolution;
+
+            string viaDirect = Path.Combine(dir, "Content");
+            if (Directory.Exists(Path.Combine(viaDirect, "3D")))
+                return viaDirect;
+
+            string? parent = Directory.GetParent(dir)?.FullName;
+            if (parent == null || parent == dir) break;
+            dir = parent;
+        }
+
+        Console.WriteLine("[Engine] WARNING: Engine content directory not found");
+        return "";
+    }
+}

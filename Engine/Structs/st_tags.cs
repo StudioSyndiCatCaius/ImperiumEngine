@@ -1,33 +1,11 @@
-using ImperiumEngine.Interfaces;
+﻿namespace ImperiumEngine.Structs;
 
-namespace ImperiumEngine.Structs;
-
-public struct TTag : I_PropertyType
+public struct TTag 
 {
-    //this is a string for now but later look into some sort of bit reference.
-    public string tagString { get; set; }
-    
-    public TTag(string tag)
-    {
-        tagString = tag;
-    }
+    TLabel tagname;
 }
 
-public struct TTagSet : I_PropertyType
+public struct TTags 
 {
-    List<TTag> tags;
-
-    public bool Add(TTag tag)
-    {
-        return false;
-    }
-}
-
-
-public abstract class TagCollection
-{
-    public virtual List<string> DefineTags()
-    {
-        return new List<string>();
-    }
+    TTag[] tags;
 }
