@@ -23,7 +23,7 @@ foreach (var _file in ImpFile.ListFiles("{Engine}/_Resources/icons/", "png"))
     ImpAsset.Import<A_Texture2D>(_file, true);    
 }
 
-App.Level_Current = new EditorLevel_Projects();
+App.Level_Current = new EditorLevel_Main();
 
 App.Run();
 

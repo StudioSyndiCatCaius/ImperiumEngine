@@ -33,7 +33,7 @@ public class EditorLevel_Projects : ImpLevel
     // -------------------------------------------------------------------------------------------
 
     public ImpComponent2D uiTab_config;
-    public O2D_PropertyEdit ui_Config_pEdit = new O2D_PropertyEdit();
+    public O2D_Inspector ui_Config_pEdit = new O2D_Inspector();
 
 
     // -------------------------------------------------------------------------------------------
@@ -148,7 +148,7 @@ public class O2D_ED_Project : O2D_ListItem
         Child_Add(button);
     }
 
-    public override void OnBegin()
+    protected  override void OnBegin()
     {
         button.icon = ImpAsset.Load<A_Texture2D>("T_ico_barsHorizontal");
     }
