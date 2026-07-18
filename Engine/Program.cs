@@ -1,6 +1,7 @@
 using System.Numerics;
 using ImperiumEngine.Classes;
 using ImperiumEngine.Enums;
+using ImperiumEngine.Objects._3D;
 using ImperiumEngine.Objects.Assets;
 using ImperiumEngine.Objects.Config;
 using R3D_cs;
@@ -31,11 +32,13 @@ public static class Program
         SetTargetFPS(cfg.enable_vsync ? 60 : 0);
 
         R3D.Init(GetScreenWidth(), GetScreenHeight());
+        R3D.SetAntiAliasingMode(cfg.antialiasing_mode);
 
         var level = new A_Level();
         level.Load(Path.Combine(projectDir, "Content", "Levels", "test.ImpLvl"));
 
         var player = new ImpPlayer();
+        ImpPlayer.s_active = player;
 
         foreach (var e in level.components)
         {
@@ -48,7 +51,8 @@ public static class Program
         while (!WindowShouldClose())
         {
             double delta = GetFrameTime();
-
+            
+            
             // F11 — borderless fullscreen toggle
             if (cfg.enable_fullscreen_toggle && IsKeyPressed(KeyboardKey.F11))
             {
@@ -59,17 +63,25 @@ public static class Program
             if (IsWindowResized())
                 R3D.SetResolution(GetScreenWidth(), GetScreenHeight());
 
-            UpdateCamera(ref player.camera, CameraMode.Orbital);
+            player.OnUpdate(delta);
             foreach (var e in level.components)
                 if (e.is_active) e.OnUpdate(delta);
 
             BeginDrawing();
             ClearBackground(Color.Black);
 
-            R3D.Begin(player.camera);
+            var camera = O3D_Camera.active?.raycamera ?? player.camera;
+
+            R3D.Begin(camera);
             foreach (var e in level.components)
-                if (e.is_visible) e.OnDraw(delta, (EDrawFlags)0);
+                if (e.is_visible) e.OnDraw(delta, EDrawFlags.NONE);
             R3D.End();
+
+            // Debug/gizmo pass — raylib 3D mode (required by e.g. R3D.DrawLightShape)
+            BeginMode3D(camera);
+            foreach (var e in level.components)
+                if (e.is_visible) e.OnDrawDebug(delta);
+            EndMode3D();
 
             EndDrawing();
         }

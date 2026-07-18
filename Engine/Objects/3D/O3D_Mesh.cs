@@ -3,7 +3,6 @@ using ImperiumEngine.Classes;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Objects.Assets;
 using R3D_cs;
-using Tomlyn.Model;
 
 namespace ImperiumEngine.Objects._3D;
 
@@ -12,27 +11,22 @@ public class O3D_Mesh : ImpPhysic3D
     public A_Mesh mesh = new();
     public List<A_Material> override_materials = new();
 
-    public static O3D_Mesh FromToml(TomlTable entity)
-    {
-        var obj = new O3D_Mesh();
-        if (entity.TryGetValue("transform", out object? tr) && tr is TomlTable trt)
-            obj.transform = A_Level.ParseTransform(trt);
-        if (entity.TryGetValue("mesh", out object? m) && m is TomlTable mt &&
-            mt.TryGetValue("source", out object? src))
-            obj.mesh.file_source = src!.ToString()!;
-        return obj;
-    }
+    // Serialized source path — applied to mesh.file_source in OnInit
+    [ImpVar] public string mesh_source = "";
 
-    R3D_cs.Mesh?  _mesh;   // for builtin generated shapes
-    R3D_cs.Model? _model;  // for file-loaded models
+    R3D_cs.Mesh?  _mesh;
+    R3D_cs.Model? _model;
 
     public override void OnInit()
     {
+        // [ImpVar] fields are set before OnInit, so mesh_source is already populated
+        mesh.file_source = mesh_source;
+
         string source = ImpAsset.ResolvePath(mesh.file_source);
 
         if (source == "builtin:plane")
         {
-            _mesh = R3D.GenMeshPlane(1f, 1f, 1, 1);
+            _mesh = R3D.GenMeshPlane(1f, 1f, 8, 8);
         }
         else if (!string.IsNullOrEmpty(source) && File.Exists(source))
         {
@@ -51,8 +45,8 @@ public class O3D_Mesh : ImpPhysic3D
             transform.Rotation.X * (MathF.PI / 180f),
             transform.Rotation.Z * (MathF.PI / 180f));
 
-        if (_mesh is R3D_cs.Mesh mesh)
-            R3D.DrawMeshEx(mesh, R3D.GetDefaultMaterial(), transform.Position, rot, transform.Scale);
+        if (_mesh is R3D_cs.Mesh m)
+            R3D.DrawMeshEx(m, R3D.GetDefaultMaterial(), transform.Position, rot, transform.Scale);
         else if (_model is R3D_cs.Model model)
             R3D.DrawModelEx(model, transform.Position, rot, transform.Scale);
     }

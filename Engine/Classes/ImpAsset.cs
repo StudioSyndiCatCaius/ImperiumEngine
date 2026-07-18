@@ -14,6 +14,7 @@ public class ImpAsset
 
     /*
      * Resolve path keywords to absolute paths:
+     *      {engine} / {Engine} : the Engine "Content" directory
      *      {editor} / {Editor} : the Engine "Content" directory
      *      {game}              : the Game/Project's "Content" directory.
      *          NOTE: if `CFG_Modding.modding_enabled` is true, will load from the game's Mod directory by matching file path
@@ -24,6 +25,8 @@ public class ImpAsset
         if (string.IsNullOrEmpty(source)) return source;
         return source
             .Replace("{game}",   Path.Combine(s_projectDir, "Content"))
+            .Replace("{engine}", s_engineContentDir)
+            .Replace("{Engine}", s_engineContentDir)
             .Replace("{editor}", s_engineContentDir)
             .Replace("{Editor}", s_engineContentDir);
     }

@@ -3,34 +3,27 @@ using ImperiumEngine.Classes;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Objects.Assets;
 using R3D_cs;
-using Tomlyn.Model;
+using Raylib_cs;
+using static Raylib_cs.Raylib;
 
 namespace ImperiumEngine.Objects._3D;
 
 public enum ECharacterType : byte
 {
-    Default, //uses the default character type from the settings
+    Default,
     _2D,
     _3D,
 }
 
 public class O3D_Character : O3D_Collider
 {
-    public O3D_Mesh c_mesh = new();
+    public O3D_Mesh     c_mesh     = new();
     public O3D_Skeleton c_skeleton = new();
-    public O3D_Sprite c_sprite = new();
+    public O3D_Sprite   c_sprite   = new();
 
-    public ECharacterType type;
+    [ImpVar] public ECharacterType type = ECharacterType.Default;
 
     public A_MoveMode move_mode = new();
-
-    public static O3D_Character FromToml(TomlTable entity)
-    {
-        var obj = new O3D_Character();
-        if (entity.TryGetValue("transform", out object? tr) && tr is TomlTable trt)
-            obj.transform = A_Level.ParseTransform(trt);
-        return obj;
-    }
 
     R3D_cs.Model? _model;
     R3D_cs.Mesh?  _fallback;
@@ -44,7 +37,7 @@ public class O3D_Character : O3D_Collider
             try { _model = R3D.LoadModel(glbPath); }
             catch
             {
-                Console.WriteLine($"[O3D_Character] Failed to load mannequin — using placeholder");
+                Console.WriteLine("[O3D_Character] Failed to load mannequin — using placeholder");
                 _fallback = R3D.GenMeshCylinder(0.4f, 1.8f, 12);
             }
         }

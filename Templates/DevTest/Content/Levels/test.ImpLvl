@@ -1,6 +1,29 @@
 # Test Level — DevTest project default level
 
 [[entity]]
+type = "O3D_Camera_RotTest"
+name = "Test Camera"
+
+[entity.transform]
+position = [0.0, 0.0, 0.0]
+
+[entity.params]
+boom_length = 14.0
+pitch       = 20.0
+
+[[entity]]
+type = "O3D_Environment"
+name = "Level Environment"
+
+[entity.params]
+sun_direction  = [0.5, 0.8, 1.0]
+sun_color      = [1.0, 0.95, 0.8]
+sun_energy     = 1.5
+ambient_color  = [0.15, 0.15, 0.2]
+ambient_energy = 0.3
+sky_hdri       = "{Engine}/2D/HDRI/sky_1.hdr"
+
+[[entity]]
 type = "O3D_Mesh"
 name = "Ground Plane"
 
@@ -8,8 +31,8 @@ name = "Ground Plane"
 position = [0.0, 0.0, 0.0]
 scale    = [10.0, 1.0, 10.0]
 
-[entity.mesh]
-source = "builtin:plane"
+[entity.params]
+mesh_source = "builtin:plane"
 
 [[entity]]
 type = "O3D_Character"
@@ -18,3 +41,27 @@ name = "Mannequin"
 [entity.transform]
 position = [0.0, 1.0, 0.0]
 scale    = [1.0, 1.0, 1.0]
+
+[[entity]]
+type = "O3D_LightPoint"
+name = "Red Light"
+
+[entity.transform]
+position = [-3.0, 4.0, 0.0]
+
+[entity.params]
+color     = [1.0, 0.05, 0.05]
+intensity = 3.0
+range     = 12.0
+
+[[entity]]
+type = "O3D_LightPoint"
+name = "Blue Light"
+
+[entity.transform]
+position = [3.0, 4.0, 0.0]
+
+[entity.params]
+color     = [0.05, 0.15, 1.0]
+intensity = 3.0
+range     = 12.0

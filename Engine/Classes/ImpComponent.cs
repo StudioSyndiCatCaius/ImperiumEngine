@@ -9,13 +9,13 @@ namespace ImperiumEngine.Classes;
 // the main class for composing scene/entities. A fusion of Nodes (Godot) & Actors/Components (in uE)
 public class ImpComponent
 {
-    public Guid guid = Guid.NewGuid();
+    [ImpVar] public Guid guid = Guid.NewGuid();
 
     //allows drawing
-    public bool is_visible = true;
+    [ImpVar] public bool is_visible = true;
 
     //allows update ticking
-    public bool is_active = true;
+    [ImpVar] public bool is_active = true;
 
     // --------------------------------------
     // Hierarchy
@@ -58,6 +58,10 @@ public class ImpComponent
     //On drawn in runtime or editor
     public virtual void OnDraw(double delta, EDrawFlags flags) { }
 
+    //Debug/gizmo pass — runs in raylib's BeginMode3D (after R3D.End), where raylib
+    //shape drawing works. Used for light shapes, bounding boxes, etc.
+    public virtual void OnDrawDebug(double delta) { }
+
     // --------------------------------------
     // Config
     // --------------------------------------
@@ -72,7 +76,7 @@ public class ImpComponent
 
 public class ImpComponent2D : ImpComponent
 {
-    public TTransform2D transform;
+    [ImpVar] public TTransform2D transform;
 }
 
 // ============================================================================================================
@@ -81,7 +85,7 @@ public class ImpComponent2D : ImpComponent
 
 public class ImpComponent3D : ImpComponent
 {
-    public TTransform3D transform;
+    [ImpVar] public TTransform3D transform;
 }
 
 // ============================================================================================================
