@@ -1,0 +1,5 @@
+_type = "A_MoveMode"
+acceleration = 8.0
+deceleration = 6.0
+max_speed = 30.0
+gravity_scale = 1.0

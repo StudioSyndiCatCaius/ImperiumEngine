@@ -1,0 +1,7 @@
+last_level = "{game}/Levels/test.ImpLvl"
+cam_yaw = -0.8625035881996155
+cam_pitch = -0.1454984992742538
+side_width = 342.0
+side_split = 0.4830968677997589
+cam_position = [-7.22233247756958, 5.234135150909424, 11.5297737121582]
+open_windows = ["WND_FileExplorer"]

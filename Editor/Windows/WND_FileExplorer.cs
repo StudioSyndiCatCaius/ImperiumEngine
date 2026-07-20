@@ -185,10 +185,7 @@ public class WND_FileExplorer : EditorWindow
         RefreshCache();
 
         if (_cache_dirs.Length == 0 && _cache_files.Length == 0)
-        {
             ImGui.TextDisabled("(empty)");
-            return;
-        }
 
         float label_h = ImGui.GetTextLineHeight() * 2f + 6f;
         float tile_h = _tile_size + label_h;
@@ -206,6 +203,35 @@ public class WND_FileExplorer : EditorWindow
             if (i++ % columns != 0) ImGui.SameLine();
             DrawTile(file, tile_h, is_dir: false);
         }
+
+        //right-click empty space (not on a tile): create menu for the current folder
+        if (ImGui.BeginPopupContextWindow("empty_ctx", ImGuiPopupFlags.MouseButtonRight | ImGuiPopupFlags.NoOpenOverItems))
+        {
+            DrawEmptyContextMenu();
+            ImGui.EndPopup();
+        }
+    }
+
+    void DrawFolderContextMenu(string path)
+    {
+        ImGui.MenuItem("Delete");
+        ImGui.MenuItem("Set Color");
+    }
+
+    void DrawAssetContextMenu(string path)
+    {
+        ImGui.MenuItem("Copy");
+        ImGui.MenuItem("Rename");
+        ImGui.MenuItem("Delete");
+    }
+
+    void DrawEmptyContextMenu()
+    {
+        ImGui.MenuItem("New Folder");
+        ImGui.MenuItem("New Asset");
+        ImGui.MenuItem("New Entity");
+        ImGui.MenuItem("New Level");
+        ImGui.MenuItem("New Script");
     }
 
     void DrawTile(string path, float tile_h, bool is_dir)
@@ -222,6 +248,23 @@ public class WND_FileExplorer : EditorWindow
         {
             if (is_dir) Navigate(Path.Combine(_rel_path, name));
             //TODO: double-clicking an asset should open it in the asset editor
+        }
+
+        //files are draggable onto inspector asset slots (creates a reference to this file)
+        if (!is_dir && ImGui.BeginDragDropSource())
+        {
+            EditorDragDrop.SetAsset(path);
+            ImGui.TextUnformatted(name);
+            ImGui.EndDragDropSource();
+        }
+
+        //right-click a tile: select it, then show the folder/asset context menu
+        if (ImGui.BeginPopupContextItem("tile_ctx"))
+        {
+            _selected = path;
+            if (is_dir) DrawFolderContextMenu(path);
+            else DrawAssetContextMenu(path);
+            ImGui.EndPopup();
         }
 
         //resolve thumbnail: folders always use the folder thumb; assets ask their

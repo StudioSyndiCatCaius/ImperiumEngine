@@ -1,61 +1,62 @@
-﻿using System.Numerics;
+using System.Numerics;
+using ImperiumEngine.Classes;
+using ImperiumEngine.Interfaces;
+using Tomlyn.Model;
 
 namespace ImperiumEngine.Structs;
 
-public struct TTransform3D
+public struct TTransform3D : I_Serialize
 {
-    public Vector3 Position;
-    public Vector3 Rotation;
-    public Vector3 Scale= Vector3.One;
+    [ImpVar] public Vector3 Position;
+    [ImpVar] public Vector3 Rotation;
+    [ImpVar] public Vector3 Scale= Vector3.One;
 
     public TTransform3D()
     {
         Position = default;
         Rotation = default;
     }
-}
 
-// rotation conversions matching how components build their rotation:
-// Quaternion.CreateFromYawPitchRoll(Y, X, Z) with degrees stored in transform.Rotation
-public static class ImpMath
-{
-    public static Quaternion EulerDegToQuat(Vector3 euler_deg)
+    // Custom serialization (via I_Serialize) keeps the compact, hand-editable
+    // position/rotation/scale form and omits axes left at their identity value.
+    public readonly void File_WriteTo(TomlTable t)
     {
-        const float d2r = MathF.PI / 180f;
-        return Quaternion.CreateFromYawPitchRoll(euler_deg.Y * d2r, euler_deg.X * d2r, euler_deg.Z * d2r);
+        if (Position != Vector3.Zero) t["position"] = ImpToml.Vec3Array(Position);
+        if (Rotation != Vector3.Zero) t["rotation"] = ImpToml.Vec3Array(Rotation);
+        if (Scale    != Vector3.One)  t["scale"]    = ImpToml.Vec3Array(Scale);
     }
 
-    public static Vector3 QuatToEulerDeg(Quaternion q)
+    public void File_ReadFrom(TomlTable t)
     {
-        var m = Matrix4x4.CreateFromQuaternion(q);
-        const float r2d = 180f / MathF.PI;
-        float sx = -m.M32;
-        float pitch = MathF.Asin(Math.Clamp(sx, -1f, 1f));
-        float yaw, roll;
-        if (MathF.Abs(sx) < 0.9999f)
-        {
-            yaw = MathF.Atan2(m.M31, m.M33);
-            roll = MathF.Atan2(m.M12, m.M22);
-        }
-        else
-        {
-            // gimbal lock: fold roll into yaw
-            yaw = MathF.Atan2(-m.M13, m.M11);
-            roll = 0;
-        }
-        return new Vector3(pitch * r2d, yaw * r2d, roll * r2d);
+        if (t.TryGetValue("position", out object? p)) Position = ImpToml.ToVec3(p);
+        if (t.TryGetValue("rotation", out object? r)) Rotation = ImpToml.ToVec3(r);
+        if (t.TryGetValue("scale",    out object? s)) Scale    = ImpToml.ToVec3(s, Vector3.One);
     }
 }
 
-public struct TTransform2D
+public struct TTransform2D : I_Serialize
 {
-    public Vector2 Position;
-    public float Rotation;
-    public Vector2 Scale= Vector2.One;
+    [ImpVar] public Vector2 Position;
+    [ImpVar] public float Rotation;
+    [ImpVar] public Vector2 Scale= Vector2.One;
 
     public TTransform2D()
     {
         Position = default;
         Rotation = default;
+    }
+
+    public readonly void File_WriteTo(TomlTable t)
+    {
+        if (Position != Vector2.Zero) t["position"] = ImpToml.Vec2Array(Position);
+        if (Rotation != 0f)           t["rotation"] = (double)Rotation;
+        if (Scale    != Vector2.One)  t["scale"]    = ImpToml.Vec2Array(Scale);
+    }
+
+    public void File_ReadFrom(TomlTable t)
+    {
+        if (t.TryGetValue("position", out object? p)) Position = ImpToml.ToVec2(p);
+        if (t.TryGetValue("rotation", out object? r)) Rotation = Convert.ToSingle(r);
+        if (t.TryGetValue("scale",    out object? s)) Scale    = ImpToml.ToVec2(s, Vector2.One);
     }
 }

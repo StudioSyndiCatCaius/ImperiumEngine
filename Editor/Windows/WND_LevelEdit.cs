@@ -5,6 +5,12 @@ using ImperiumEngine.Objects.Assets;
 
 namespace Editor.Windows;
 
+public enum EPlayInEditorType
+{
+    NORMAL,     //normal game play mode. creat and posses new pawn and run level's GameMode states
+    SIMULATE, //same as normal, BUT instead of possession of pawn, we simply keep the camera at the current editor camera position, so we can see a smiulation
+}
+
 
 public class WND_LevelEdit : EditorWindow
 {
@@ -18,8 +24,22 @@ public class WND_LevelEdit : EditorWindow
     float _side_width = 340f; //width of the right-hand column
     float _side_split = 0.45f; //outliner fraction of the right column height
 
-    public override string Title => "Level Editor";
+    // exposed so editor session state (EditorConfig) can persist/restore the layout
+    public float SideWidth { get => _side_width; set => _side_width = value; }
+    public float SideSplit { get => _side_split; set => _side_split = value; }
+
+    // tab shows the open level's file name, e.g. "Level: test"; unsaved shows a leading "*"
+    public override string Title => $"Level: {LevelName}";
+    // fixed docking id so retitling the tab (on level change) never resets the layout
+    public override string WindowId => "Level Editor";
     public override bool CanClose => false; //the LevelEdit window is always open
+
+    // the level is this window's document — Save hotkeys target it and the tab shows its dirty "*"
+    public override ImperiumEngine.Classes.ImpAsset? DocumentAsset => level;
+
+    string LevelName => level is { IsReference: true }
+        ? Path.GetFileNameWithoutExtension(level.file_link)
+        : "Untitled";
 
     public WND_LevelEdit()
     {
@@ -29,6 +49,17 @@ public class WND_LevelEdit : EditorWindow
         pnl_level_hierarchy.selection = pnl_world.selection;
         pnl_level_hierarchy.on_selection_changed = OnSelectionChanged;
         pnl_world.on_selection_changed = OnSelectionChanged;
+
+        // any edit (inspector fields, gizmo drags, hierarchy restructures) dirties the level
+        pnl_object_inspector.on_changed = MarkDirty;
+        pnl_level_inspector.on_changed = MarkDirty;
+        pnl_world.on_edited = MarkDirty;
+        pnl_level_hierarchy.on_edited = MarkDirty;
+    }
+
+    void MarkDirty()
+    {
+        if (level != null) level.is_dirty = true;
     }
 
     void OnSelectionChanged()
@@ -49,6 +80,8 @@ public class WND_LevelEdit : EditorWindow
 
     protected override void OnDraw(double delta, EEditorWidgetDrawFlags flags)
     {
+        DrawPlayToolbar();
+
         var avail = ImGui.GetContentRegionAvail();
         _side_width = Math.Clamp(_side_width, 150f, Math.Max(150f, avail.X - 200f));
 
@@ -95,6 +128,32 @@ public class WND_LevelEdit : EditorWindow
             ImGui.EndChild();
         }
         ImGui.EndChild();
+    }
+
+    //top-right toolbar: green Play / Simulate buttons that start a Play-In-Editor session
+    void DrawPlayToolbar()
+    {
+        float button_w = 90f;
+        float total = button_w * 2 + ImGui.GetStyle().ItemSpacing.X;
+        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + Math.Max(0, ImGui.GetContentRegionAvail().X - total));
+
+        ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.20f, 0.60f, 0.20f, 1f));
+        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.26f, 0.72f, 0.26f, 1f));
+        ImGui.PushStyleColor(ImGuiCol.ButtonActive, new Vector4(0.16f, 0.50f, 0.16f, 1f));
+
+        if (ImGui.Button("Play", new Vector2(button_w, 0)))
+            PlayInEditor(EPlayInEditorType.NORMAL);
+        ImGui.SameLine();
+        if (ImGui.Button("Simulate", new Vector2(button_w, 0)))
+            PlayInEditor(EPlayInEditorType.SIMULATE);
+
+        ImGui.PopStyleColor(3);
+    }
+
+    //starts a Play-In-Editor session in the given mode
+    void PlayInEditor(EPlayInEditorType type)
+    {
+        //TODO: implement Play-In-Editor
     }
 
     //draggable vertical bar — dragging right shrinks the right column

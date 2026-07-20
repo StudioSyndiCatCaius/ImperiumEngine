@@ -1,90 +1,59 @@
-# Test Level — DevTest project default level
-
 [[entity]]
 type = "C3_Camera_RotTest"
-name = "Test Camera"
-
-[entity.transform]
-position = [0.0, 0.0, 0.0]
-
 [entity.params]
-boom_length = 14.0
-pitch       = 20.0
-
+pitch = -2.0
+boom_length = 12.5
+[entity.params.boom_lag_position]
+weight = [0.0, 0.0, 0.0]
+[entity.params.boom_lag_rotation]
+weight = [0.0, 0.0, 0.0]
 [[entity]]
 type = "C3_Environment"
-name = "Level Environment"
-
 [entity.params]
-sun_direction  = [0.5, 0.8, 1.0]
-sun_color      = [1.0, 0.95, 0.8]
-sun_energy     = 1.5
-ambient_color  = [0.15, 0.15, 0.2]
-ambient_energy = 0.3
-sky_hdri       = "{Engine}/2D/HDRI/sky_1.hdr"
-
+sun_energy = 1.5
+sky_hdri = "{Engine}/2D/HDRI/sky_1.hdr"
+sun_direction = [0.5, 0.800000011920929, 1.0]
+ambient_color = [0.1490196078431373, 0.1490196078431373, 0.2]
 [[entity]]
 type = "C3_Mesh"
-name = "Ground Plane"
-
-[entity.transform]
-position = [0.0, 0.0, 0.0]
-scale    = [10.0, 1.0, 10.0]
-
 [entity.params]
 mesh_source = "builtin:plane"
-
+[entity.params.transform]
+scale = [10.0, 1.0, 10.0]
 [[entity]]
 type = "C3_Character"
-name = "Mannequin"
-
-[entity.transform]
+[entity.params.move_mode]
+_type = "A_MoveMode"
+[entity.params.transform]
 position = [0.0, 1.0, 0.0]
-scale    = [1.0, 1.0, 1.0]
-
 [[entity]]
 type = "C3_Mesh"
-name = "AO Test Cube A"
-
-[entity.transform]
-position = [2.0, 0.8, 2.5]
-scale    = [2.0, 2.0, 2.0]
-
 [entity.params]
 mesh_source = "builtin:cube"
-
+[entity.params.transform]
+position = [2.0, 1.419206261634827, 2.5]
+scale = [2.0, 2.0, 2.0]
 [[entity]]
 type = "C3_Mesh"
-name = "AO Test Cube B"
-
-[entity.transform]
-position = [3.1, 0.5, 3.2]
-rotation = [0.0, 30.0, 0.0]
-scale    = [1.5, 1.5, 1.5]
-
 [entity.params]
 mesh_source = "builtin:cube"
-
+[entity.params.transform]
+position = [3.099999904632568, 0.7899489998817444, 3.200000047683716]
+rotation = [-0.0, 30.0, 0.0]
+scale = [1.5, 1.5, 1.5]
 [[entity]]
 type = "C3_LightPoint"
-name = "Red Light"
-
-[entity.transform]
+[entity.params]
+intensity = 3.0
+range = 12.0
+color = [1.0, 0.04705882352941176, 0.04705882352941176]
+[entity.params.transform]
 position = [-3.0, 4.0, 0.0]
-
-[entity.params]
-color     = [1.0, 0.05, 0.05]
-intensity = 3.0
-range     = 12.0
-
 [[entity]]
 type = "C3_LightPoint"
-name = "Blue Light"
-
-[entity.transform]
-position = [3.0, 4.0, 0.0]
-
 [entity.params]
-color     = [0.05, 0.15, 1.0]
 intensity = 3.0
-range     = 12.0
+range = 12.0
+color = [0.04705882352941176, 0.1490196078431373, 1.0]
+[entity.params.transform]
+position = [3.0, 4.0, 0.0]

@@ -4,10 +4,10 @@ using ImperiumEngine.Structs;
 namespace ImperiumEngine.Objects._1D;
 
 //A base gameplay state
-public class C1_State : ImpComponent
+public abstract class C1_GameState : ImpComponent
 {
     protected override bool IsSingleton() => true;
     
-    public TTags state_tags;
-    public TTags blocked_states;
+    [ImpVar] public TTags state_tags;
+    [ImpVar] public TTags blocked_states;
 }

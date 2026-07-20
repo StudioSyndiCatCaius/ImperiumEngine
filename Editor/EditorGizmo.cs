@@ -36,6 +36,10 @@ public class EditorGizmo
 
     ImpComponent3D? Primary => targets.Count > 0 ? targets[^1] : null;
 
+    //set true on any frame a drag actually applies a transform; the world panel polls & clears
+    //it to mark the level dirty. (A plain click that never drags leaves it false.)
+    public bool made_edit;
+
     //true while the user is dragging a handle (camera/selection should not react to LMB)
     public bool IsDragging => _active != EHandle.None;
 
@@ -240,6 +244,7 @@ public class EditorGizmo
 
     void UpdateDrag(Ray ray, Vector2 mouse)
     {
+        made_edit = true;   // reaching here means a handle is held and being dragged
         switch (mode)
         {
             case EGizmoMode.Translate:

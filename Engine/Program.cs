@@ -25,6 +25,8 @@ public static class Program
 
         var cfg = new CFG_Graphics();
 
+        SetConfigFlags(ConfigFlags.MaximizedWindow);
+        
         if (cfg.enable_window_resize)
             SetConfigFlags(ConfigFlags.ResizableWindow);
 
@@ -35,7 +37,7 @@ public static class Program
         R3D.SetAntiAliasingMode(cfg.antialiasing_mode);
 
         var level = new A_Level();
-        level.Load(Path.Combine(projectDir, "Content", "Levels", "test.ImpLvl"));
+        level.File_Load(Path.Combine(projectDir, "Content", "Levels", "test.ImpLvl"));
 
         var player = new ImpPlayer();
         ImpPlayer.s_active = player;

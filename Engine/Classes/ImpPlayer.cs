@@ -15,6 +15,8 @@ public class ImpPlayer
 
     public ImpDevice[] devices = [];
 
+    public ImpComponent? current_pawn;
+    
     // Objects that receive dispatched input each frame. Only I_InputTarget implementors allowed.
     public List<I_InputTarget> input_targets = new();
 

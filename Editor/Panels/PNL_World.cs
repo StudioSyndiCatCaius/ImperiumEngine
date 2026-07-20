@@ -48,6 +48,9 @@ public class PNL_World : EditorPanel
     public List<ImpComponent> selection = new();
     public Action? on_selection_changed;
 
+    //fired when a gizmo drag edits an entity's transform, so the level can be marked dirty
+    public Action? on_edited;
+
     public ECameraViewMode view_mode;
     public ECameraRenderMode render_mode;
     public EWorldViewMode world_view_mode; //mainly used for the level editor, but lets you toggle between 3d and 2d, editing 3d objects or 2d widgets
@@ -151,6 +154,8 @@ public class PNL_World : EditorPanel
 
         gizmo.Update(cam, _mouse_local, _content_size,
             _viewport_hovered && !IsMouseButtonDown(MouseButton.Right));
+
+        if (gizmo.made_edit) { gizmo.made_edit = false; on_edited?.Invoke(); }
 
         // click-picking — only when the click isn't grabbing a gizmo handle or flying
         if (_viewport_hovered && !gizmo.IsDragging && !gizmo.IsHovered

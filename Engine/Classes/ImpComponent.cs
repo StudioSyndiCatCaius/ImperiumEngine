@@ -117,7 +117,9 @@ public class ImpComponent
 
 public class ImpComponent2D : ImpComponent
 {
-    [ImpVar] public TTransform2D transform;
+    // `= new()` runs the struct's parameterless ctor so Scale starts at One; a bare
+    // `TTransform2D transform;` would leave Scale at 0 (field initializers don't run then).
+    [ImpVar] public TTransform2D transform = new();
 }
 
 // ============================================================================================================
@@ -127,7 +129,8 @@ public class ImpComponent2D : ImpComponent
 public class ImpComponent3D : ImpComponent
 {
     //local — relative to the nearest ImpComponent3D ancestor (world-space when unparented)
-    [ImpVar] public TTransform3D transform;
+    // `= new()` runs the struct ctor so Scale starts at One (see ImpComponent2D.transform).
+    [ImpVar] public TTransform3D transform = new();
 
     //local-space bounds (before scale/rotation/position) — used by the editor for
     //click-picking and selection outlines. Defaults to a unit cube.

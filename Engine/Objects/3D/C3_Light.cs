@@ -48,7 +48,17 @@ public abstract class C3_Light : ImpComponent3D
     public override void OnDraw(double delta, Camera3D cam, EDrawFlags flags)
     {
         base.OnDraw(delta, cam, flags);
-        Raylib.DrawBillboard(cam,_billboard,WorldPosition,1.0f,Color.White);
+
+        if (flags.HasFlag(EDrawFlags.EDITOR_DEBUG))
+        {
+            Raylib.DrawBillboard(cam,_billboard,WorldPosition,1.0f,Color.White);
+        }
+        if (flags.HasFlag(EDrawFlags.EDITOR_SELECTED))
+        {
+            Raylib.DrawSphereWires(WorldPosition, range, 8,8,color);
+        }
+        
+        
     }
 
     public override void OnEnd()

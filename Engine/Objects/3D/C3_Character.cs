@@ -23,7 +23,7 @@ public class C3_Character : C3_Collider
 
     [ImpVar] public ECharacterType type = ECharacterType.Default;
 
-    public A_MoveMode move_mode = new();
+    [ImpVar] public A_MoveMode move_mode = new();
 
     R3D_cs.Model? _model;
     R3D_cs.Mesh?  _fallback;

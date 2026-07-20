@@ -23,6 +23,9 @@ public class PNL_ComponentTree : EditorPanel
     public List<ImpComponent> selection = new();
     public Action? on_selection_changed;
 
+    //fired when the hierarchy is restructured (reparent/reorder), so the level can be marked dirty
+    public Action? on_edited;
+
     const string DragPayloadType = "IMP_COMPONENT";
 
     //active drag state — static so it survives across frames; source panel is checked
@@ -242,5 +245,7 @@ public class PNL_ComponentTree : EditorPanel
             c3?.SetWorldTRS(wpos, wrot, wscale);
             prev = item;
         }
+
+        on_edited?.Invoke();
     }
 }

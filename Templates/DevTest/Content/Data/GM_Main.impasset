@@ -1,0 +1,3 @@
+_type = "A_GameMode"
+[custom_camera_config]
+_type = "A_CameraConfig"
