@@ -7,7 +7,7 @@ using Raylib_cs;
 
 namespace ImperiumEngine.Objects._3D;
 
-public class O3D_Mesh : ImpPhysic3D
+public class C3_Mesh : ImpPhysic3D
 {
     public A_Mesh mesh = new();
     public List<A_Material> override_materials = new();
@@ -43,7 +43,7 @@ public class O3D_Mesh : ImpPhysic3D
         }
         else if (!string.IsNullOrEmpty(source))
         {
-            Console.WriteLine($"[O3D_Mesh] Source not found: {source}");
+            Console.WriteLine($"[C3_Mesh] Source not found: {source}");
         }
     }
 

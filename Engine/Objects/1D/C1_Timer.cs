@@ -2,7 +2,7 @@
 
 namespace ImperiumEngine.Objects._1D;
 
-public class O1D_Timer : ImpComponent
+public class C1_Timer : ImpComponent
 {
     private double current_time;
     private bool is_running;

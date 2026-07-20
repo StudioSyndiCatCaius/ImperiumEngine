@@ -1,6 +1,6 @@
 ﻿namespace ImperiumEngine.Objects._1D.States;
 
-public class State_Dialogue : O1D_State
+public class State_Dialogue : C1_State
 {
     
 }

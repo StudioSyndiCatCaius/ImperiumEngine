@@ -5,7 +5,7 @@ using Raylib_cs;
 
 namespace ImperiumEngine.Objects._3D;
 
-public class O3D_Environment : ImpComponent3D
+public class C3_Environment : ImpComponent3D
 {
     // -----------------------------------------------------------------
     // Fog
@@ -51,7 +51,7 @@ public class O3D_Environment : ImpComponent3D
     Cubemap?    _sky;
     AmbientMap? _skyAmbient;
 
-    public O3D_Environment()
+    public C3_Environment()
     {
         _sunLight = R3D.CreateLight(LightType.Dir);
     }
@@ -70,7 +70,7 @@ public class O3D_Environment : ImpComponent3D
         string path = ImpAsset.ResolvePath(sky_hdri);
         if (!File.Exists(path))
         {
-            Console.WriteLine($"[O3D_Environment] Sky HDRI not found: {path}");
+            Console.WriteLine($"[C3_Environment] Sky HDRI not found: {path}");
             return;
         }
 

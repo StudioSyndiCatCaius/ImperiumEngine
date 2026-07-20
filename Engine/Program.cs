@@ -70,7 +70,7 @@ public static class Program
             BeginDrawing();
             ClearBackground(Color.Black);
 
-            var camera = O3D_Camera.active?.raycamera ?? player.camera;
+            var camera = C3_Camera.active?.raycamera ?? player.camera;
 
             R3D.Begin(camera);
             foreach (var e in level.components)

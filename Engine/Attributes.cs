@@ -11,3 +11,12 @@ public class ExposedAttribute : Attribute { }
 // Supported types: float, int, bool, string, Vector2, Vector3, Color, enum
 [AttributeUsage(AttributeTargets.Field)]
 public class ImpVarAttribute : Attribute { }
+
+
+// Custom attribute to hold a hex color code
+[AttributeUsage(AttributeTargets.Field)]
+public class ColorHexAttribute : Attribute
+{
+    public string HexValue { get; }
+    public ColorHexAttribute(string hexValue) => HexValue = hexValue;
+}

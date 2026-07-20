@@ -4,7 +4,7 @@ using Raylib_cs;
 
 namespace ImperiumEngine.Objects._2D;
 
-public class O2D_Quad : ImpComponent2D
+public class C2_Quad : ImpComponent2D
 {
     [Exposed] public A_Texture2D texture;
     [Exposed] public Color tint;

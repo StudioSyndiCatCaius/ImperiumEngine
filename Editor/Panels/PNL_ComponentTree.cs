@@ -1,8 +1,16 @@
 using System.Numerics;
 using ImGuiNET;
+using ImperiumEngine;
 using ImperiumEngine.Classes;
 
 namespace Editor.Panels;
+
+[Flags]
+public enum EComponentTreeItemEditorFlags : byte
+{
+    [ColorHex("#FFA500")] Hidden, //if true, the entity is not rendered in the level editor
+    [ColorHex("#FF0000")] Locked, //if true the entity will not be selectable in the level editor AND all its children will be hidden from the tree.
+}
 
 // a tree view of the components of an input Component
 public class PNL_ComponentTree : EditorPanel

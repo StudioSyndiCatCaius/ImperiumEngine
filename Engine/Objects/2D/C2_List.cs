@@ -4,7 +4,7 @@ using ImperiumEngine.Enums;
 namespace ImperiumEngine.Objects._2D;
 
 //display children as an array list of widgets on some custom layout manner
-public class O2D_List : ImpComponent2D
+public class C2_List : ImpComponent2D
 {
     public List2DStyle style;
 }

@@ -7,10 +7,10 @@ using static Raylib_cs.Raylib;
 
 namespace ImperiumEngine.Objects._3D;
 
-public class O3D_Camera : ImpComponent3D
+public class C3_Camera : ImpComponent3D
 {
     // The camera currently used for rendering — set by OnBegin so Program.cs can read it.
-    public static O3D_Camera? active;
+    public static C3_Camera? active;
 
     public Camera3D raycamera = new()
     {
@@ -27,7 +27,7 @@ public class O3D_Camera : ImpComponent3D
 
 
 // Orbits around transform.Position. Right-mouse drag = orbit, scroll = zoom.
-public class O3D_Camera_RotTest : O3D_Camera, I_InputTarget
+public class C3_Camera_RotTest : C3_Camera, I_InputTarget
 {
     [ImpVar] public float sensitivity = 0.25f;
     [ImpVar] public float zoom_speed  = 1.5f;
@@ -35,7 +35,7 @@ public class O3D_Camera_RotTest : O3D_Camera, I_InputTarget
 
     float _yaw = 0f;
 
-    public O3D_Camera_RotTest() => boom_length = 14f;
+    public C3_Camera_RotTest() => boom_length = 14f;
 
     public override void OnBegin()
     {

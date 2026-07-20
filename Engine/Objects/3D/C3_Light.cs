@@ -6,7 +6,7 @@ using Raylib_cs;
 
 namespace ImperiumEngine.Objects._3D;
 
-public abstract class O3D_Light : ImpComponent3D
+public abstract class C3_Light : ImpComponent3D
 {
     [ImpVar] public Color color        = Color.White;
     [ImpVar] public float intensity    = 1.0f;
@@ -19,7 +19,7 @@ public abstract class O3D_Light : ImpComponent3D
     
     Texture2D _billboard;
     
-    public O3D_Light()
+    public C3_Light()
     {
         _light = R3D.CreateLight(GetLightType());
         _billboard=Raylib.LoadTexture("D:\\PROJECTS\\ImperiumEngine\\GitRepo\\Engine\\Content\\2D\\icons\\t_ico_lightbulb.png");
@@ -62,7 +62,7 @@ public abstract class O3D_Light : ImpComponent3D
 // Point / Omni
 // ============================================================
 
-public class O3D_LightPoint : O3D_Light
+public class C3_LightPoint : C3_Light
 {
     
     public override void OnUpdate(double delta)
@@ -74,17 +74,17 @@ public class O3D_LightPoint : O3D_Light
 }
 
 // ============================================================
-// Directional — handled by O3D_Environment's sun.
+// Directional — handled by C3_Environment's sun.
 // Stub kept for editor/asset compatibility.
 // ============================================================
 
-public class O3D_LightDirectional : O3D_Light { }
+public class C3_LightDirectional : C3_Light { }
 
 // ============================================================
 // Spot
 // ============================================================
 
-public class O3D_LightSpot : O3D_Light
+public class C3_LightSpot : C3_Light
 {
     [ImpVar] public float   inner_angle = 20f;
     [ImpVar] public float   outer_angle = 35f;

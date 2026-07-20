@@ -15,11 +15,11 @@ public enum ECharacterType : byte
     _3D,
 }
 
-public class O3D_Character : O3D_Collider
+public class C3_Character : C3_Collider
 {
-    public O3D_Mesh     c_mesh     = new();
-    public O3D_Skeleton c_skeleton = new();
-    public O3D_Sprite   c_sprite   = new();
+    public C3_Mesh     c_mesh     = new();
+    public C3_Skeleton c_skeleton = new();
+    public C3_Sprite   c_sprite   = new();
 
     [ImpVar] public ECharacterType type = ECharacterType.Default;
 
@@ -37,7 +37,7 @@ public class O3D_Character : O3D_Collider
             try { _model = R3D.LoadModel(glbPath); }
             catch
             {
-                Console.WriteLine("[O3D_Character] Failed to load mannequin — using placeholder");
+                Console.WriteLine("[C3_Character] Failed to load mannequin — using placeholder");
                 _fallback = R3D.GenMeshCylinder(0.4f, 1.8f, 12);
             }
         }

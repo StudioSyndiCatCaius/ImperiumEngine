@@ -3,7 +3,7 @@ using ImperiumEngine.Objects.Assets;
 
 namespace ImperiumEngine.Objects._3D;
 
-public class O3D_Skeleton : ImpPhysic3D
+public class C3_Skeleton : ImpPhysic3D
 {
     public A_Skeleton skeleton;
     

@@ -1,7 +1,7 @@
 # Test Level — DevTest project default level
 
 [[entity]]
-type = "O3D_Camera_RotTest"
+type = "C3_Camera_RotTest"
 name = "Test Camera"
 
 [entity.transform]
@@ -12,7 +12,7 @@ boom_length = 14.0
 pitch       = 20.0
 
 [[entity]]
-type = "O3D_Environment"
+type = "C3_Environment"
 name = "Level Environment"
 
 [entity.params]
@@ -24,7 +24,7 @@ ambient_energy = 0.3
 sky_hdri       = "{Engine}/2D/HDRI/sky_1.hdr"
 
 [[entity]]
-type = "O3D_Mesh"
+type = "C3_Mesh"
 name = "Ground Plane"
 
 [entity.transform]
@@ -35,7 +35,7 @@ scale    = [10.0, 1.0, 10.0]
 mesh_source = "builtin:plane"
 
 [[entity]]
-type = "O3D_Character"
+type = "C3_Character"
 name = "Mannequin"
 
 [entity.transform]
@@ -43,7 +43,7 @@ position = [0.0, 1.0, 0.0]
 scale    = [1.0, 1.0, 1.0]
 
 [[entity]]
-type = "O3D_Mesh"
+type = "C3_Mesh"
 name = "AO Test Cube A"
 
 [entity.transform]
@@ -54,7 +54,7 @@ scale    = [2.0, 2.0, 2.0]
 mesh_source = "builtin:cube"
 
 [[entity]]
-type = "O3D_Mesh"
+type = "C3_Mesh"
 name = "AO Test Cube B"
 
 [entity.transform]
@@ -66,7 +66,7 @@ scale    = [1.5, 1.5, 1.5]
 mesh_source = "builtin:cube"
 
 [[entity]]
-type = "O3D_LightPoint"
+type = "C3_LightPoint"
 name = "Red Light"
 
 [entity.transform]
@@ -78,7 +78,7 @@ intensity = 3.0
 range     = 12.0
 
 [[entity]]
-type = "O3D_LightPoint"
+type = "C3_LightPoint"
 name = "Blue Light"
 
 [entity.transform]
