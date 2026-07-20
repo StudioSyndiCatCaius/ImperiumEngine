@@ -17,10 +17,12 @@ public abstract class O3D_Light : ImpComponent3D
     
     protected virtual LightType GetLightType() => LightType.Omni;
     
+    Texture2D _billboard;
     
     public O3D_Light()
     {
         _light = R3D.CreateLight(GetLightType());
+        _billboard=Raylib.LoadTexture("D:\\PROJECTS\\ImperiumEngine\\GitRepo\\Engine\\Content\\2D\\icons\\t_ico_lightbulb.png");
     }
 
     bool? _shadowsApplied;
@@ -28,12 +30,12 @@ public abstract class O3D_Light : ImpComponent3D
     public override void OnUpdate(double delta)
     {
         base.OnUpdate(delta);
-        R3D.SetLightPosition(_light, transform.Position);
+        R3D.SetLightPosition(_light, WorldPosition);
         R3D.SetLightColor(_light, color);
         R3D.SetLightEnergy(_light, intensity);
         R3D.SetLightRange(_light, range);
         R3D.SetLightActive(_light, is_visible);
-
+        
         // Shadow maps are allocated on enable — only toggle on change.
         if (_shadowsApplied != cast_shadows)
         {
@@ -41,6 +43,12 @@ public abstract class O3D_Light : ImpComponent3D
             else              R3D.DisableShadow(_light);
             _shadowsApplied = cast_shadows;
         }
+    }
+
+    public override void OnDraw(double delta, Camera3D cam, EDrawFlags flags)
+    {
+        base.OnDraw(delta, cam, flags);
+        Raylib.DrawBillboard(cam,_billboard,WorldPosition,1.0f,Color.White);
     }
 
     public override void OnEnd()

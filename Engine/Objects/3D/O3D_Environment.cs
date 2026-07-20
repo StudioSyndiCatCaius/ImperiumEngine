@@ -32,6 +32,14 @@ public class O3D_Environment : ImpComponent3D
     [ImpVar] public float  ambient_energy   = 0.3f;
 
     // -----------------------------------------------------------------
+    // SSAO
+    // -----------------------------------------------------------------
+    [ImpVar] public bool  ssao_enabled      = true;
+    [ImpVar] public float ssao_intensity    = 1.0f;
+    [ImpVar] public float ssao_radius       = 1.0f; // sampling radius, world units
+    [ImpVar] public float ssao_power        = 1.0f; // exponential falloff, sharper darkening
+
+    // -----------------------------------------------------------------
     // Sky — equirectangular HDR panorama used as skybox + image-based
     // ambient light/reflections. Empty = flat background color.
     // -----------------------------------------------------------------
@@ -87,6 +95,11 @@ public class O3D_Environment : ImpComponent3D
             env.Fog.Density    = fog_density;
             env.Fog.Start      = fog_start;
             env.Fog.End        = fog_end;
+
+            env.Ssao.Enabled   = ssao_enabled;
+            env.Ssao.Intensity = ssao_intensity;
+            env.Ssao.Radius    = ssao_radius;
+            env.Ssao.Power     = ssao_power;
 
             if (_sky        is Cubemap sky)    env.Background.Sky = sky;
             if (_skyAmbient is AmbientMap map) env.Ambient.Map    = map;

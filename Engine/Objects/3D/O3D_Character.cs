@@ -47,17 +47,16 @@ public class O3D_Character : O3D_Collider
         }
     }
 
-    public override void OnDraw(double delta, EDrawFlags flags)
+    public override void OnDraw(double delta, Camera3D cam, EDrawFlags flags)
     {
-        var rot = Quaternion.CreateFromYawPitchRoll(
-            transform.Rotation.Y * (MathF.PI / 180f),
-            transform.Rotation.X * (MathF.PI / 180f),
-            transform.Rotation.Z * (MathF.PI / 180f));
+        if (flags.HasFlag(EDrawFlags.DEBUG_PASS)) return;
+
+        GetWorldTRS(out var pos, out var rot, out var scale);
 
         if (_model is R3D_cs.Model model)
-            R3D.DrawModelEx(model, transform.Position, rot, transform.Scale);
+            R3D.DrawModelEx(model, pos, rot, scale);
         else if (_fallback is R3D_cs.Mesh mesh)
-            R3D.DrawMeshEx(mesh, R3D.GetDefaultMaterial(), transform.Position, rot, transform.Scale);
+            R3D.DrawMeshEx(mesh, R3D.GetDefaultMaterial(), pos, rot, scale);
     }
 
     public override void OnEnd()

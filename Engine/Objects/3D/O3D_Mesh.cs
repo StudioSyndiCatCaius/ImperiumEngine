@@ -3,6 +3,7 @@ using ImperiumEngine.Classes;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Objects.Assets;
 using R3D_cs;
+using Raylib_cs;
 
 namespace ImperiumEngine.Objects._3D;
 
@@ -28,6 +29,14 @@ public class O3D_Mesh : ImpPhysic3D
         {
             _mesh = R3D.GenMeshPlane(1f, 1f, 8, 8);
         }
+        else if (source == "builtin:cube")
+        {
+            _mesh = R3D.GenMeshCube(1f, 1f, 1f);
+        }
+        else if (source == "builtin:sphere")
+        {
+            _mesh = R3D.GenMeshSphere(0.5f, 32, 32);
+        }
         else if (!string.IsNullOrEmpty(source) && File.Exists(source))
         {
             _model = R3D.LoadModel(source);
@@ -38,17 +47,23 @@ public class O3D_Mesh : ImpPhysic3D
         }
     }
 
-    public override void OnDraw(double delta, EDrawFlags flags)
+    public override void OnDraw(double delta, Camera3D cam, EDrawFlags flags)
     {
-        var rot = Quaternion.CreateFromYawPitchRoll(
-            transform.Rotation.Y * (MathF.PI / 180f),
-            transform.Rotation.X * (MathF.PI / 180f),
-            transform.Rotation.Z * (MathF.PI / 180f));
+        if (flags.HasFlag(EDrawFlags.DEBUG_PASS)) return;
+
+        GetWorldTRS(out var pos, out var rot, out var scale);
 
         if (_mesh is R3D_cs.Mesh m)
-            R3D.DrawMeshEx(m, R3D.GetDefaultMaterial(), transform.Position, rot, transform.Scale);
+            R3D.DrawMeshEx(m, R3D.GetDefaultMaterial(), pos, rot, scale);
         else if (_model is R3D_cs.Model model)
-            R3D.DrawModelEx(model, transform.Position, rot, transform.Scale);
+            R3D.DrawModelEx(model, pos, rot, scale);
+    }
+
+    public override Raylib_cs.BoundingBox GetLocalBounds()
+    {
+        if (_model is R3D_cs.Model model) return model.Aabb;
+        if (_mesh is R3D_cs.Mesh m) return m.Aabb;
+        return base.GetLocalBounds();
     }
 
     public override void OnEnd()

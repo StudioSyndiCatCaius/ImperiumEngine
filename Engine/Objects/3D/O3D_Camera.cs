@@ -72,8 +72,9 @@ public class O3D_Camera_RotTest : O3D_Camera, I_InputTarget
             MathF.Sin(pitchRad),
             MathF.Cos(yawRad) * MathF.Cos(pitchRad));
 
-        raycamera.Position   = transform.Position + dir * boom_length;
-        raycamera.Target     = transform.Position;
+        var world_pos = WorldPosition;
+        raycamera.Position   = world_pos + dir * boom_length;
+        raycamera.Target     = world_pos;
         raycamera.Up         = Vector3.UnitY;
         raycamera.FovY       = fov;
         raycamera.Projection = CameraProjection.Perspective;

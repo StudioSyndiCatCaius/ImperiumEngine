@@ -1,73 +1,163 @@
-﻿using System.Numerics;
-using Editor;
+using Editor.Windows;
+using ImGuiNET;
 using ImperiumEngine.Classes;
+using ImperiumEngine.Objects.Assets;
 using R3D_cs;
 using Raylib_cs;
+using rlImGui_cs;
 using static Raylib_cs.Raylib;
 
-namespace ImperiumEditor;
+namespace Editor;
 
-public static class Basic
+public static class Program
 {
+    public static WND_LevelEdit window_main = null!; //the main window (which is the level editor). Closing this will close the program.
+    public static List<EditorWindow> windows_open = new(); //all the windows that are open. Closing these will NOT close the program (asides from the main window)
 
-    public static EditorWindow window_main; //the main window (which is the level editor). Closing this will close the program.
-    public static EditorWindow[] windows_open; //all the windows that are open. Closing these will NOT close the program (asides from the main window) 
-    
+    static bool _exit_requested;
+
     public static int Main()
     {
-        // Initialize window
-        InitWindow(800, 450, "[r3d] - Basic example");
+        string projectDir = ImperiumEngine.Program.FindProjectDir();
+        string engineContentDir = ImperiumEngine.Program.FindEngineContentDir();
+
+        Console.WriteLine($"[Editor] Project dir:        {projectDir}");
+        Console.WriteLine($"[Editor] Engine content dir: {engineContentDir}");
+
+        ImpAsset.s_projectDir = projectDir;
+        ImpAsset.s_engineContentDir = engineContentDir;
+
+        SetConfigFlags(ConfigFlags.ResizableWindow);
+        InitWindow(1600, 900, "Imperium Editor");
         SetTargetFPS(60);
 
-        // Initialize R3D
         R3D.Init(GetScreenWidth(), GetScreenHeight());
+        rlImGui.Setup(darkTheme: true, enableDocking: true);
+        ApplyEditorTheme();
 
-        // Create meshes
-        var plane = R3D.GenMeshPlane(1000, 1000, 1, 1);
-        var sphere = R3D.GenMeshSphere(0.5f, 64, 64);
-        var material = R3D.GetDefaultMaterial();
+        var level = new A_Level();
+        level.Load(Path.Combine(projectDir, "Content", "Levels", "test.ImpLvl"));
 
-        // Setup environment
-        R3D.SetEnvironmentEx((ref env) => env.Ambient.Color = new Color(10, 10, 10, 255));
-
-        // Create light
-        var light = R3D.CreateLight(LightType.Spot);
-        R3D.LightLookAt(light, new Vector3(0, 10, 5), Vector3.Zero);
-        R3D.EnableShadow(light);
-        R3D.SetLightActive(light, true);
-
-        // Setup camera
-        var camera = new Camera3D
+        // The editor previews the level live for now: init + begin so environment/
+        // lights apply, and tick OnUpdate so R3D light state stays in sync.
+        foreach (var c in level.components)
         {
-            Position = new Vector3(0, 2, 2),
-            Target = Vector3.Zero,
-            Up = new Vector3(0, 1, 0),
-            FovY = 60
-        };
+            c.OnInit();
+            c.OnBegin();
+        }
 
-        // Main loop
-        while (!WindowShouldClose())
+        window_main = new WND_LevelEdit();
+        window_main.SetLevel(level);
+        window_main.Open();
+        windows_open.Add(window_main);
+
+        while (!WindowShouldClose() && !_exit_requested)
         {
-            UpdateCamera(ref camera, CameraMode.Orbital);
+            double delta = GetFrameTime();
+
+            foreach (var c in level.components)
+                if (c.is_active) c.OnUpdate(delta);
+
+            foreach (var w in windows_open)
+                w.Update(delta);
 
             BeginDrawing();
-            ClearBackground(Color.RayWhite);
+            ClearBackground(new Color(25, 25, 28, 255));
 
-            R3D.Begin(camera);
-            R3D.DrawMesh(plane, material, new Vector3(0, -0.5f, 0), 1.0f);
-            R3D.DrawMesh(sphere, material, Vector3.Zero, 1.0f);
-            R3D.End();
+            // 3D world renders into the viewport texture before the ImGui pass
+            window_main.pnl_world.RenderWorld(delta);
 
+            rlImGui.Begin();
+
+            DrawMainMenuBar();
+            uint dock_id = ImGui.DockSpaceOverViewport();
+
+            foreach (var w in windows_open.ToArray())
+                w.DrawWindow(delta, dock_id);
+            windows_open.RemoveAll(w => !w.is_open);
+
+            rlImGui.End();
             EndDrawing();
         }
 
-        // Cleanup
-        R3D.UnloadMesh(sphere);
-        R3D.UnloadMesh(plane);
-        R3D.Close();
+        foreach (var c in level.components) c.OnEnd();
 
+        rlImGui.Shutdown();
+        R3D.Close();
         CloseWindow();
 
         return 0;
+    }
+
+    // retints the stock dark theme: every blue-hued accent color (tabs, headers,
+    // buttons, checkmarks, docking preview...) is remapped to pinkish-red,
+    // preserving saturation/brightness. Grays are untouched.
+    static void ApplyEditorTheme()
+    {
+        var colors = ImGui.GetStyle().Colors;
+        for (int i = 0; i < (int)ImGuiCol.COUNT; i++)
+        {
+            var c = colors[i];
+            ImGui.ColorConvertRGBtoHSV(c.X, c.Y, c.Z, out float h, out float s, out float v);
+            if (s > 0.15f && h > 0.5f && h < 0.75f)
+            {
+                ImGui.ColorConvertHSVtoRGB(0.97f, s, v, out float r, out float g, out float b);
+                colors[i] = new System.Numerics.Vector4(r, g, b, c.W);
+            }
+        }
+    }
+
+    static void DrawMainMenuBar()
+    {
+        if (!ImGui.BeginMainMenuBar()) return;
+
+        if (ImGui.BeginMenu("File"))
+        {
+            //TODO: wire up level/project file management
+            ImGui.MenuItem("New Level", "Ctrl+N", false, false);
+            ImGui.MenuItem("Open Level...", "Ctrl+O", false, false);
+            ImGui.MenuItem("Save Level", "Ctrl+S", false, false);
+            ImGui.Separator();
+            if (ImGui.MenuItem("Exit", "Alt+F4"))
+                _exit_requested = true;
+            ImGui.EndMenu();
+        }
+
+        if (ImGui.BeginMenu("Edit"))
+        {
+            //TODO: undo/redo stack
+            ImGui.MenuItem("Undo", "Ctrl+Z", false, false);
+            ImGui.MenuItem("Redo", "Ctrl+Y", false, false);
+            ImGui.EndMenu();
+        }
+
+        if (ImGui.BeginMenu("Window"))
+        {
+            if (ImGui.MenuItem("File Explorer")) OpenWindow<WND_FileExplorer>();
+            if (ImGui.MenuItem("Asset Editor")) OpenWindow<WND_AssetEdit>();
+            ImGui.EndMenu();
+        }
+
+        if (ImGui.BeginMenu("Help"))
+        {
+            ImGui.MenuItem("Imperium Engine Editor", null, false, false);
+            ImGui.EndMenu();
+        }
+
+        ImGui.EndMainMenuBar();
+    }
+
+    static void OpenWindow<T>() where T : EditorWindow, new()
+    {
+        var existing = windows_open.OfType<T>().FirstOrDefault();
+        if (existing != null)
+        {
+            ImGui.SetWindowFocus(existing.Title);
+            return;
+        }
+
+        var w = new T();
+        w.Open();
+        windows_open.Add(w);
     }
 }

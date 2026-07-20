@@ -42,8 +42,8 @@ public static class Program
 
         foreach (var e in level.components)
         {
-            e.OnInit();
-            e.OnBegin();
+            e.Init();
+            e.Begin();
         }
 
         bool isFullscreen = false;
@@ -65,7 +65,7 @@ public static class Program
 
             player.OnUpdate(delta);
             foreach (var e in level.components)
-                if (e.is_active) e.OnUpdate(delta);
+                e.Update(delta);
 
             BeginDrawing();
             ClearBackground(Color.Black);
@@ -74,19 +74,19 @@ public static class Program
 
             R3D.Begin(camera);
             foreach (var e in level.components)
-                if (e.is_visible) e.OnDraw(delta, EDrawFlags.NONE);
+                e.Draw(delta, camera, EDrawFlags.NONE);
             R3D.End();
 
             // Debug/gizmo pass — raylib 3D mode (required by e.g. R3D.DrawLightShape)
             BeginMode3D(camera);
             foreach (var e in level.components)
-                if (e.is_visible) e.OnDrawDebug(delta);
+                e.Draw(delta, camera, EDrawFlags.DEBUG_PASS);
             EndMode3D();
 
             EndDrawing();
         }
 
-        foreach (var e in level.components) e.OnEnd();
+        foreach (var e in level.components) e.End();
         R3D.Close();
         CloseWindow();
 
@@ -95,7 +95,7 @@ public static class Program
 
     // Walk up from the exe directory looking for an .ImpGame file.
     // In dev, also checks Templates/ subdirectories so `dotnet run` from Engine/ finds DevTest.
-    static string FindProjectDir()
+    public static string FindProjectDir()
     {
         string dir = AppContext.BaseDirectory;
 
@@ -124,7 +124,7 @@ public static class Program
     }
 
     // Walk up from the exe looking for Engine/Content (solution layout) or Content/3D (inside Engine/).
-    static string FindEngineContentDir()
+    public static string FindEngineContentDir()
     {
         string dir = AppContext.BaseDirectory;
 
