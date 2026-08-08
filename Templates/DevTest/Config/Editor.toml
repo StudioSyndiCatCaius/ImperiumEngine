@@ -1,7 +1,0 @@
-last_level = "{game}/Levels/test.ImpLvl"
-cam_yaw = -0.9045019745826721
-cam_pitch = -0.4674959480762482
-side_width = 360.0
-side_split = 0.4830968677997589
-cam_position = [-5.712156295776367, 8.865232467651367, 14.91872692108154]
-open_windows = ["WND_FileExplorer", "WND_SettingsProject", "WND_SettingsEditor", "WND_Build", "WND_AssetEdit"]

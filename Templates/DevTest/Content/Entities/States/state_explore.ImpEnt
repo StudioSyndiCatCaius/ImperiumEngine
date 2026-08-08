@@ -1,4 +1,0 @@
-_type = "A_Entity"
-parent_type = "C1_GameState"
-[[entity]]
-type = "C1_GameState"

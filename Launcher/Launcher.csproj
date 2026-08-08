@@ -11,7 +11,6 @@
       <PackageReference Include="JoltPhysicsSharp" Version="2.22.0" />
       <PackageReference Include="R3D-cs" Version="0.10.0" />
       <PackageReference Include="Raylib-cs" Version="8.0.0" />
-      <PackageReference Include="rlImgui-cs" Version="3.2.0" />
     </ItemGroup>
 
 </Project>

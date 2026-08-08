@@ -1,0 +1,28 @@
+{
+  "_class": "ImpUITheme",
+  "vars": {
+    "display_name": "Dark",
+
+    "font_file": "{engine}/Fonts/FNT_Arial.ImpAsset",
+    "font_size": 16,
+    "font_spacing": 1.0,
+
+    "col_background": "#1E1E22",
+    "col_panel": "#2A2A30",
+    "col_panel_alt": "#36363E",
+    "col_accent": "#4076C8",
+    "col_hover": "#484854",
+    "col_pressed": "#1C1C22",
+    "col_disabled": "#2E2E32",
+    "col_text": "#DCDCE2",
+    "col_text_dim": "#8C8C96",
+    "col_line": "#484852",
+
+    "menubar_height": 28,
+    "tab_height": 30,
+    "item_height": 26,
+    "padding": 8,
+    "scrollbar_width": 12,
+    "menu_min_width": 180
+  }
+}

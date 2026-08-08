@@ -1,83 +1,49 @@
 using System.Numerics;
-using ImperiumEngine.Classes;
+using ImperiumEngine.Comps._2D;
 using ImperiumEngine.Interfaces;
-using Tomlyn.Model;
 
 namespace ImperiumEngine.Structs;
 
-public struct TTransform3D : I_Serialize
+public struct TTransform3 : I_Property
 {
-    [ImpVar] public Vector3 Position;
-    [ImpVar] public Vector3 Rotation;
-    [ImpVar] public Vector3 Scale= Vector3.One;
+    public Vector3 position;
+    public Vector3 rotation; //euler degrees, applied yaw/pitch/roll - see Imp3D
+    public Vector3 scale=Vector3.One;
 
-    public TTransform3D()
+    public TTransform3()
     {
-        Position = default;
-        Rotation = default;
+        position = default;
+        rotation = default;
     }
 
-    // Custom serialization (via I_Serialize) keeps the compact, hand-editable
-    // position/rotation/scale form and omits axes left at their identity value.
-    public readonly void File_WriteTo(TomlTable t)
-    {
-        if (Position != Vector3.Zero) t["position"] = ImpToml.Vec3Array(Position);
-        if (Rotation != Vector3.Zero) t["rotation"] = ImpToml.Vec3Array(Rotation);
-        if (Scale    != Vector3.One)  t["scale"]    = ImpToml.Vec3Array(Scale);
-    }
+    // Taking the row over rather than letting the inspector reflect it. Reflection would
+    // hand back the three vectors in whatever order it found them and expand each into its
+    // own collapsible group; a transform is the one thing in the inspector whose shape
+    // everybody already knows, so it is spelled out here instead.
+    public bool Inspector_IsCustom() => true;
 
-    public void File_ReadFrom(TomlTable t)
+    public void Inspector_Rebuild(C2_InspectorProperty prop_ui)
     {
-        if (t.TryGetValue("position", out object? p)) Position = ImpToml.ToVec3(p);
-        if (t.TryGetValue("rotation", out object? r)) Rotation = ImpToml.ToVec3(r);
-        if (t.TryGetValue("scale",    out object? s)) Scale    = ImpToml.ToVec3(s, Vector3.One);
+        prop_ui.Group_BuildNamed(nameof(position), nameof(rotation), nameof(scale));
     }
 }
 
-public struct TTransform2D : I_Serialize
+public struct TTransform2 : I_Property
 {
-    [ImpVar] public Vector2 Position;
-    [ImpVar] public float Rotation;
-    [ImpVar] public Vector2 Scale= Vector2.One;
+    public Vector2 position;
+    public double rotation; //degrees
+    public Vector2 scale=Vector2.One;
 
-    public TTransform2D()
+    public TTransform2()
     {
-        Position = default;
-        Rotation = default;
+        position = default;
+        rotation = 0;
     }
 
-    public readonly void File_WriteTo(TomlTable t)
+    public bool Inspector_IsCustom() => true;
+
+    public void Inspector_Rebuild(C2_InspectorProperty prop_ui)
     {
-        if (Position != Vector2.Zero) t["position"] = ImpToml.Vec2Array(Position);
-        if (Rotation != 0f)           t["rotation"] = (double)Rotation;
-        if (Scale    != Vector2.One)  t["scale"]    = ImpToml.Vec2Array(Scale);
+        prop_ui.Group_BuildNamed(nameof(position), nameof(rotation), nameof(scale));
     }
-
-    public void File_ReadFrom(TomlTable t)
-    {
-        if (t.TryGetValue("position", out object? p)) Position = ImpToml.ToVec2(p);
-        if (t.TryGetValue("rotation", out object? r)) Rotation = Convert.ToSingle(r);
-        if (t.TryGetValue("scale",    out object? s)) Scale    = ImpToml.ToVec2(s, Vector2.One);
-    }
-}
-
-
-public struct TVector2B
-{
-    [ImpVar] public bool X, Y;
-}
-
-public struct TVector3B
-{
-    [ImpVar] public bool X, Y, Z;
-}
-
-public struct TVector4B
-{
-    [ImpVar] public bool X, Y, Z, A;
-}
-
-public struct TMargins2D
-{
-    [ImpVar] public float left, right, top, bottom;
 }

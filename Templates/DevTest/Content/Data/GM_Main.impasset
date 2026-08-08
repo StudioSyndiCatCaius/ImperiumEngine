@@ -1,5 +1,0 @@
-_type = "A_GameMode"
-[[states_automatic]]
-entity = "{game}/Entities/States/state_explore.ImpEnt"
-[custom_camera_config]
-_type = "A_CameraConfig"
