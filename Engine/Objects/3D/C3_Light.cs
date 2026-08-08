@@ -27,27 +27,36 @@ public abstract class C3_Light : ImpComponent3D
 
     bool? _shadowsApplied;
 
+    // Construction: push light params into R3D so the editor preview (and pre-Begin runtime)
+    // sees the light without needing OnUpdate.
+    public override void OnInit()
+    {
+        base.OnInit();
+        ApplyLight();
+    }
+
+    public override void OnDeinit()
+    {
+        R3D.SetLightActive(_light, false);
+        _shadowsApplied = null;
+        base.OnDeinit();
+    }
+
+    // Runtime tick — keeps the light in sync while playing.
     public override void OnUpdate(double delta)
     {
         base.OnUpdate(delta);
-        R3D.SetLightPosition(_light, WorldPosition);
-        R3D.SetLightColor(_light, color);
-        R3D.SetLightEnergy(_light, intensity);
-        R3D.SetLightRange(_light, range);
-        R3D.SetLightActive(_light, is_visible);
-        
-        // Shadow maps are allocated on enable — only toggle on change.
-        if (_shadowsApplied != cast_shadows)
-        {
-            if (cast_shadows) R3D.EnableShadow(_light);
-            else              R3D.DisableShadow(_light);
-            _shadowsApplied = cast_shadows;
-        }
+        ApplyLight();
     }
 
     public override void OnDraw(double delta, Camera3D cam, EDrawFlags flags)
     {
         base.OnDraw(delta, cam, flags);
+
+        // Editor has no OnUpdate: refresh light position/params each draw so gizmo moves
+        // and inspector edits stay live in the viewport without a play session.
+        if (flags.HasFlag(EDrawFlags.EDITOR_DEBUG))
+            ApplyLight();
 
         if (flags.HasFlag(EDrawFlags.EDITOR_DEBUG))
         {
@@ -57,14 +66,31 @@ public abstract class C3_Light : ImpComponent3D
         {
             Raylib.DrawSphereWires(WorldPosition, range, 8,8,color);
         }
-        
-        
     }
 
+    // Runtime play end — deactivate so a discarded PIE clone doesn't leave orphan lights.
     public override void OnEnd()
     {
-        base.OnEnd();
         R3D.SetLightActive(_light, false);
+        _shadowsApplied = null;
+        base.OnEnd();
+    }
+
+    protected virtual void ApplyLight()
+    {
+        R3D.SetLightPosition(_light, WorldPosition);
+        R3D.SetLightColor(_light, color);
+        R3D.SetLightEnergy(_light, intensity);
+        R3D.SetLightRange(_light, range);
+        R3D.SetLightActive(_light, is_visible);
+
+        // Shadow maps are allocated on enable — only toggle on change.
+        if (_shadowsApplied != cast_shadows)
+        {
+            if (cast_shadows) R3D.EnableShadow(_light);
+            else              R3D.DisableShadow(_light);
+            _shadowsApplied = cast_shadows;
+        }
     }
 }
 
@@ -105,11 +131,19 @@ public class C3_LightSpot : C3_Light
     public override void OnUpdate(double delta)
     {
         base.OnUpdate(delta);
-        
+        ApplySpot();
+    }
+
+    protected override void ApplyLight()
+    {
+        base.ApplyLight();
+        ApplySpot();
+    }
+
+    void ApplySpot()
+    {
         R3D.SetLightDirection(_light, direction);
         R3D.SetLightInnerCutOff(_light, inner_angle);
         R3D.SetLightOuterCutOff(_light, outer_angle);
     }
-
-    public override void OnEnd() => R3D.SetLightActive(_light, false);
 }

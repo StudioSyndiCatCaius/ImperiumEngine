@@ -18,6 +18,14 @@ public class PNL_Inspector : EditorPanel
     // fired when any field is edited this frame, so the owning window can mark its asset dirty
     public Action? on_changed;
 
+    // records a reversible edit into the owning window's undo history
+    public Action<IUndoable>? on_action;
+
+    // per-object "state before the current edit began", captured the frame an edit is first seen
+    // and held until the edit settles (mouse released / field defocused) so a drag coalesces into
+    // a single undo entry instead of one per frame.
+    readonly Dictionary<object, Dictionary<FieldInfo, object?>> _edit_before = new();
+
     protected override void OnDraw(double delta, EEditorWidgetDrawFlags flags)
     {
         if (selected_objects.Count == 0)
@@ -29,13 +37,102 @@ public class PNL_Inspector : EditorPanel
         bool changed = false;
         foreach (var obj in selected_objects)
         {
+            // snapshot the pre-edit state each frame; only kept if an edit actually starts below
+            var before = Snapshot(obj);
+
             ImGui.PushID(obj.GetHashCode());
             ImGui.SeparatorText(obj.GetType().Name);
-            if (DrawImpVarFields(obj, 0)) changed = true;
+            bool objChanged = DrawImpVarFields(obj, 0);
             ImGui.PopID();
+
+            if (objChanged)
+            {
+                changed = true;
+                // first frame of this edit: remember where it started (earliest pre-edit state)
+                if (!_edit_before.ContainsKey(obj)) _edit_before[obj] = before;
+            }
         }
 
+        // an edit is "settled" once no widget is being actively dragged/held; commit one action
+        // per object that genuinely changed.
+        if (_edit_before.Count > 0 && !ImGui.IsAnyItemActive())
+            CommitEdits();
+
         if (changed) on_changed?.Invoke();
+    }
+
+    void CommitEdits()
+    {
+        foreach (var (obj, before) in _edit_before)
+        {
+            var after = Snapshot(obj);
+            if (SnapshotsEqual(before, after)) continue;   // net no-op (e.g. dragged back)
+
+            // Current "after" values are already on the object — re-run construction once the
+            // edit settles (UE OnConstruction). Undo/redo re-applies the snapshot then Reconstruct.
+            if (obj is ImpComponent live)
+                live.Reconstruct();
+
+            var target = obj;   // capture for the closures
+            on_action?.Invoke(new RelayUndoable(
+                $"Edit {obj.GetType().Name}",
+                () => ApplyAndReconstruct(target, before),
+                () => ApplyAndReconstruct(target, after)));
+        }
+        _edit_before.Clear();
+    }
+
+    // Apply a field snapshot, then re-run construction on components so OnInit sees the restored
+    // values. Non-components (configs, assets) just take the snapshot.
+    static void ApplyAndReconstruct(object obj, Dictionary<FieldInfo, object?> snap)
+    {
+        ApplySnapshot(obj, snap);
+        if (obj is ImpComponent c)
+            c.Reconstruct();
+    }
+
+    // --- [ImpVar] state snapshots (for undo/redo) ---
+
+    // Captures every [ImpVar] field's value. Value types / strings are copied by value; mutable
+    // reference types (assets, lists, dicts) are deep-cloned through TOML so later edits can't
+    // disturb the snapshot. Nulls are recorded, so empty->set and set->empty both round-trip.
+    static Dictionary<FieldInfo, object?> Snapshot(object obj)
+    {
+        var snap = new Dictionary<FieldInfo, object?>();
+        for (var t = obj.GetType(); t != null && t != typeof(object); t = t.BaseType)
+        foreach (var f in t.GetFields(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+            if (f.IsDefined(typeof(ImpVarAttribute), false))
+                snap[f] = CloneValue(f.GetValue(obj), f.FieldType);
+        return snap;
+    }
+
+    static void ApplySnapshot(object obj, Dictionary<FieldInfo, object?> snap)
+    {
+        // clone again on the way in so the stored snapshot stays pristine across repeated undo/redo
+        foreach (var (f, v) in snap)
+            f.SetValue(obj, CloneValue(v, f.FieldType));
+    }
+
+    static object? CloneValue(object? v, Type t)
+    {
+        if (v == null) return null;
+        if (t.IsValueType || t == typeof(string)) return v;   // copied by value / immutable
+        var toml = ImpToml.ToTomlValue(v, t);                 // deep clone reference types via TOML
+        return toml == null ? v : ImpToml.ConvertTomlValue(toml, t);
+    }
+
+    static bool SnapshotsEqual(Dictionary<FieldInfo, object?> a, Dictionary<FieldInfo, object?> b)
+    {
+        foreach (var (f, av) in a)
+        {
+            b.TryGetValue(f, out var bv);
+            if (av == null || bv == null) { if (av != bv) return false; continue; }
+            // only value types / strings compare cheaply; treat reference-type fields as changed
+            if (f.FieldType.IsValueType || f.FieldType == typeof(string))
+            { if (!av.Equals(bv)) return false; }
+            else return false;
+        }
+        return true;
     }
 
     // Draws an edit row for every [ImpVar] field on obj, walking the type chain root-first so
@@ -238,7 +335,7 @@ public class PNL_Inspector : EditorPanel
         }
 
         // summary button — the drag-drop target and the actions-menu opener
-        bool isRef = asset is { IsReference: true };
+        bool isRef = asset is { is_reference: true };
         string summary = asset == null
             ? "(empty)"
             : isRef ? Path.GetFileNameWithoutExtension(asset.file_link)
@@ -309,7 +406,7 @@ public class PNL_Inspector : EditorPanel
             asset = value as ImpAsset;   // value may have been replaced by the menu above
             if (asset != null)
             {
-                bool refNow = asset.IsReference;
+                bool refNow = asset.is_reference;
                 ImGui.PushStyleColor(ImGuiCol.ChildBg, refNow
                     ? new Vector4(0.30f, 0.55f, 1f, 0.10f)     // light blue — reference
                     : new Vector4(1f, 0.35f, 0.35f, 0.10f));   // light red — instance
@@ -320,7 +417,7 @@ public class PNL_Inspector : EditorPanel
                 if (ImGui.BeginChild("asset_body", Vector2.Zero,
                         ImGuiChildFlags.AutoResizeY | ImGuiChildFlags.Borders))
                 {
-                    if (refNow) ImGui.TextDisabled(ImpAsset.ToKeywordPath(asset.file_link));
+                    if (refNow) ImGui.TextDisabled(ImpFile.Path_ToRelative(asset.file_link));
                     if (DrawImpVarFields(asset, depth + 1)) changed = true;
                 }
                 ImGui.EndChild();
@@ -332,26 +429,92 @@ public class PNL_Inspector : EditorPanel
         return changed;
     }
 
-    // TSubclassOf-style dropdown for a TRef<T> [ImpVar]. Lists "(none)" plus every concrete
-    // subclass of T (via the struct's own static Options()), so only valid classes are pickable.
-    // Reflection is used because T is only known at runtime; all the type rules live in TRef<T>.
+    // green tint for user-created entity classes (.ImpEnt), distinguishing them from C# classes
+    static readonly Vector4 EntityGreen = new(0.5f, 1f, 0.55f, 1f);
+
+    // per-combo search text, keyed by the widget's ImGui id so each TRef field filters independently
+    static readonly Dictionary<uint, string> s_ref_filter = new();
+
+    // TSubclassOf-style dropdown for a TRef<T> [ImpVar]: a searchable list of "(none)", every
+    // concrete C# subclass of T (via the struct's own static Options()), and every user-created
+    // entity class whose root type is assignable to T (shown in green). Reflection is used because
+    // T is only known at runtime; all the type rules live in TRef<T>.
     static bool DrawTypeRef(string label, Type t, ref object? value)
     {
         var options = ((IEnumerable<Type>)t.GetMethod(nameof(TRef<object>.Options))!
             .Invoke(null, null)!).ToList();
+        var baseType = (Type)t.GetProperty(nameof(TRef<object>.BaseType))!.GetValue(null)!;
 
-        var names = new string[options.Count + 1];
-        names[0] = "(none)";
-        for (int i = 0; i < options.Count; i++) names[i + 1] = options[i].Name;
+        var curType = (Type?)t.GetProperty(nameof(TRef<object>.Type))!.GetValue(value);
+        bool curIsEntity = (bool)t.GetProperty(nameof(TRef<object>.IsEntity))!.GetValue(value)!;
+        string curEntity = (string)t.GetProperty(nameof(TRef<object>.EntityPath))!.GetValue(value)!;
 
-        var current = (Type?)t.GetProperty(nameof(TRef<object>.Type))!.GetValue(value);
-        int idx = current == null ? 0 : options.IndexOf(current) + 1;
+        string preview = curType != null ? curType.Name
+            : curIsEntity ? Path.GetFileNameWithoutExtension(curEntity)
+            : "(none)";
 
-        if (!ImGui.Combo(label, ref idx, names, names.Length)) return false;
+        bool changed = false;
+        if (curIsEntity) ImGui.PushStyleColor(ImGuiCol.Text, EntityGreen);
+        bool open = ImGui.BeginCombo(label, preview);
+        if (curIsEntity) ImGui.PopStyleColor();
 
-        Type? chosen = idx <= 0 ? null : options[idx - 1];
-        value = Activator.CreateInstance(t, new object?[] { chosen });   // new TRef<T>(chosen)
-        return true;
+        if (!open) return false;
+
+        // search box pinned to the top, list scrolls below it
+        uint id = ImGui.GetID(label);
+        s_ref_filter.TryGetValue(id, out var filter);
+        filter ??= "";
+        ImGui.SetNextItemWidth(-1);
+        ImGui.InputTextWithHint("##ref_filter", "Search…", ref filter, 64);
+        s_ref_filter[id] = filter;
+        string f = filter.Trim();
+
+        ImGui.Separator();
+        if (ImGui.BeginChild("ref_list", new Vector2(0, 200)))
+        {
+            // "(none)" clears the reference (only when not filtering it out)
+            if ((f.Length == 0 || "(none)".Contains(f, StringComparison.OrdinalIgnoreCase)) &&
+                ImGui.Selectable("(none)", curType == null && !curIsEntity))
+            {
+                value = Activator.CreateInstance(t, new object?[] { (Type?)null });   // new TRef<T>(null)
+                changed = true;
+            }
+
+            // built-in C# classes
+            foreach (var opt in options)
+            {
+                if (f.Length > 0 && opt.Name.IndexOf(f, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                if (ImGui.Selectable(opt.Name, !curIsEntity && curType == opt))
+                {
+                    value = Activator.CreateInstance(t, new object?[] { opt });   // new TRef<T>(opt)
+                    changed = true;
+                }
+            }
+
+            // user-created entity classes (green)
+            var entities = EntityClasses.ForBase(baseType);
+            if (entities.Count > 0)
+            {
+                ImGui.PushStyleColor(ImGuiCol.Text, EntityGreen);
+                foreach (var e in entities)
+                {
+                    if (f.Length > 0 && e.Name.IndexOf(f, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                    if (ImGui.Selectable($"{e.Name}##{e.Path}", curIsEntity && curEntity == e.Path))
+                    {
+                        var box = Activator.CreateInstance(t)!;
+                        t.GetMethod(nameof(TRef<object>.SetEntity))!.Invoke(box, new object?[] { e.Path });
+                        value = box;
+                        changed = true;
+                    }
+                }
+                ImGui.PopStyleColor();
+            }
+        }
+        ImGui.EndChild();
+        ImGui.EndCombo();
+
+        if (changed) ImGui.CloseCurrentPopup();
+        return changed;
     }
 
     // Editor for any List<T>. Each element is drawn with DrawValue, so the element type decides

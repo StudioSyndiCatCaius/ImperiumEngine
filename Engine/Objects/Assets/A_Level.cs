@@ -8,12 +8,13 @@ namespace ImperiumEngine.Objects.Assets;
 // a level is a collection of entities
 public class A_Level : A_Entity
 {
-    [ImpVar] public A_GameMode game_mode;  
-    
+    [ImpVar] public A_GameMode game_mode;
+
+    protected override string Editor_GetExtension() => ".ImpLvl";
+
     public override bool File_Load(string path)
     {
         base.File_Load(path);
-        components.Clear();
 
         string toml;
         try { toml = File.ReadAllText(path); }
@@ -31,43 +32,49 @@ public class A_Level : A_Entity
             return false;
         }
 
-        if (!table.TryGetValue("entity", out object? entitiesObj) ||
-            entitiesObj is not TomlTableArray entities)
+        if (!LoadTable(table))
         {
             Console.WriteLine($"[A_Level] No [[entity]] entries found in {path}");
             return false;
         }
 
-        var asm = Assembly.GetExecutingAssembly();
-
-        foreach (TomlTable entity in entities)
-        {
-            string typeName = entity.TryGetValue("type", out object? t) ? t!.ToString()! : "";
-            if (string.IsNullOrEmpty(typeName)) continue;
-
-            Type? componentType =
-                asm.GetType($"ImperiumEngine.Objects._3D.{typeName}") ??
-                asm.GetType($"ImperiumEngine.Objects._2D.{typeName}") ??
-                asm.GetType($"ImperiumEngine.Objects._1D.{typeName}");
-
-            if (componentType == null || !componentType.IsAssignableTo(typeof(ImpComponent)))
-            {
-                Console.WriteLine($"[A_Level] Unknown entity type: {typeName}");
-                continue;
-            }
-
-            var component = (ImpComponent)Activator.CreateInstance(componentType)!;
-
-            // Apply all [ImpVar] fields from [entity.params] — including `transform`, which
-            // serializes itself via I_Serialize (see TTransform3D/TTransform2D).
-            if (entity.TryGetValue("params", out object? p) && p is TomlTable paramsTable)
-                ImpToml.ReadParams(component, paramsTable);
-
-            components.Add(component);
-        }
-
         Console.WriteLine($"[A_Level] Loaded '{Path.GetFileName(path)}' — {components.Count} entities");
         return true;
+    }
+
+    // Reads the level's own params + all entities from an already-parsed TOML document. Shared by
+    // File_Load (from disk) and Clone (from an in-memory snapshot). Returns false if the document
+    // has no [[entity]] array.
+    bool LoadTable(TomlTable table)
+    {
+        components.Clear();
+
+        // the level's own [ImpVar] fields (game_mode, ...) live in a top-level [params] table
+        if (table.TryGetValue("params", out object? levelParamsObj) && levelParamsObj is TomlTable levelParams)
+            ImpToml.ReadParams(this, levelParams);
+
+        if (!table.TryGetValue("entity", out object? entitiesObj) ||
+            entitiesObj is not TomlTableArray entities)
+            return false;
+
+        // each [[entity]] is a full tree (type + params + nested children) — see WriteComponentNode
+        foreach (TomlTable entity in entities)
+        {
+            var component = ReadComponentNode(entity);
+            if (component != null)
+                components.Add(component);
+        }
+        return true;
+    }
+
+    // A deep copy of the level, produced by round-tripping through the same TOML model used to
+    // save/load. Used by Play-In-Editor so the running instance is fully isolated from the edited
+    // level (edits during play are discarded on stop).
+    public A_Level Clone()
+    {
+        var clone = new A_Level { file_link = file_link };
+        clone.LoadTable(BuildDoc());
+        return clone;
     }
 
     // The level owns a bespoke [[entity]] TOML layout, so it routes File_Save (used by the
@@ -80,32 +87,33 @@ public class A_Level : A_Entity
         return true;
     }
 
-    public bool Save(string path)
+    // Builds the level's TOML document ([params] + [[entity]] array). Shared by Save (to disk) and
+    // Clone (in-memory deep copy).
+    public TomlTable BuildDoc()
     {
+        var doc = new TomlTable();
+
+        // the level's own [ImpVar] fields (game_mode, ...), omitting anything left at default.
+        // Written before [[entity]] so it reads as a top-level [params] table, not the last entity's.
+        var levelParams = new TomlTable();
+        ImpToml.WriteParams(this, new A_Level(), levelParams);
+        if (levelParams.Count > 0) doc["params"] = levelParams;
+
         var entities = new TomlTableArray();
 
+        // root components only — each node recursively embeds its Children hierarchy
         foreach (var component in components)
-        {
-            var type = component.GetType();
-            var entity = new TomlTable { ["type"] = type.Name };
+            entities.Add(WriteComponentNode(component));
 
-            // A fresh instance gives us every field's default, so we can omit
-            // anything the user never changed (matching File_Load, which leaves
-            // absent fields at their default).
-            var reference = (ImpComponent)Activator.CreateInstance(type)!;
+        doc["entity"] = entities;
+        return doc;
+    }
 
-            var paramsTable = new TomlTable();
-            ImpToml.WriteParams(component, reference, paramsTable);
-            if (paramsTable.Count > 0) entity["params"] = paramsTable;
-
-            entities.Add(entity);
-        }
-
-        var doc = new TomlTable { ["entity"] = entities };
-
+    public bool Save(string path)
+    {
         try
         {
-            File.WriteAllText(path, Toml.FromModel(doc));
+            File.WriteAllText(path, Toml.FromModel(BuildDoc()));
         }
         catch (Exception ex)
         {

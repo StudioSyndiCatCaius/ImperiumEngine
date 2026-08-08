@@ -20,6 +20,7 @@ namespace ImperiumEngine.Classes;
 public static class ImpToml
 {
     public const string TypeKey = "_type";
+    public const string SourceKey = "_source";   // links an asset to the raw file it imports from
 
     public static bool IsAssetType(Type t) => typeof(ImpAsset).IsAssignableFrom(t);
 
@@ -251,9 +252,11 @@ public static class ImpToml
     static object AssetToToml(ImpAsset asset)
     {
         if (!string.IsNullOrEmpty(asset.file_link))
-            return ImpAsset.ToKeywordPath(asset.file_link);
+            return ImpFile.Path_ToRelative(asset.file_link);
 
         var table = new TomlTable { [TypeKey] = asset.GetType().Name };
+        if (!string.IsNullOrEmpty(asset.file_source))
+            table[SourceKey] = ImpFile.Path_ToRelative(asset.file_source);
         WriteParams(asset, TryCreateDefault(asset.GetType()), table);
         return table;
     }
@@ -261,13 +264,15 @@ public static class ImpToml
     static ImpAsset? TomlToAsset(object raw, Type declaredType)
     {
         if (raw is string path)                     // reference — load from disk
-            return ImpAsset.LoadFile(ImpAsset.ResolvePath(path), declaredType);
+            return ImpAsset.LoadFile(ImpFile.Path_ToAbsolute(path), declaredType);
 
         if (raw is TomlTable table)                 // embedded instance
         {
             var type = ResolveAssetType(table, declaredType);
             if (type == null) return null;
             var asset = (ImpAsset)Activator.CreateInstance(type)!;
+            if (table.TryGetValue(SourceKey, out object? src) && src is string sp)
+                asset.file_source = ImpFile.Path_ToAbsolute(sp);
             ReadParams(asset, table);               // file_link stays "" → marks it an instance
             return asset;
         }

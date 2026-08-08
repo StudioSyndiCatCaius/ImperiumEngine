@@ -1,4 +1,4 @@
-using System.Numerics;
+﻿using System.Numerics;
 using ImperiumEngine;
 using ImperiumEngine.Classes;
 using Tomlyn;
@@ -49,7 +49,7 @@ public class EditorConfig : ImpConfig
         return cfg;
     }
 
-    public bool Save(string path)
+    public override bool Save(string path)
     {
         try
         {

@@ -8,6 +8,10 @@ public class EditorWindow : EditorWidget
 {
     public EditorPanel[] panels = [];
 
+    //this window's undo/redo stack for its document. Ctrl+Z/Ctrl+Y target the focused window's
+    //history; panels record their edits into it (see WND_LevelEdit wiring).
+    public UndoHistory history = new();
+
     public virtual string Title => GetType().Name;
 
     //stable ImGui/docking identity, kept separate from the (possibly dynamic) visible Title so
@@ -20,6 +24,10 @@ public class EditorWindow : EditorWidget
     //the asset this window edits (its "document"), if any. Drives the dirty "*" in the tab
     //title and is the target of the editor's Save / Save As hotkeys while this window is focused.
     public virtual ImpAsset? DocumentAsset => null;
+
+    //when set, the window forces itself focused (and, if docked, brings its tab to front) on its
+    //next draw. Applied before Begin so it wins the dock node's selected-tab slot for that frame.
+    public bool focus_next;
 
     protected override void OnOpen()
     {
@@ -42,6 +50,7 @@ public class EditorWindow : EditorWidget
         if (!is_open) return;
 
         ImGui.SetNextWindowDockID(dock_id, ImGuiCond.FirstUseEver);
+        if (focus_next) { ImGui.SetNextWindowFocus(); focus_next = false; }
 
         // "* " prefix marks unsaved changes; the "###Title" suffix keeps a stable ImGui id
         // (and docking identity) even as the visible label gains/loses the asterisk.

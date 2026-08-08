@@ -56,18 +56,35 @@ public class C3_Environment : ImpComponent3D
         _sunLight = R3D.CreateLight(LightType.Dir);
     }
 
-    public override void OnBegin()
+    // Construction (editor + pre-Begin): load sky / push fog+sun into R3D so the viewport
+    // matches without any play-session lifecycle.
+    public override void OnInit()
     {
+        base.OnInit();
+        ReleaseSky();
         LoadSky();
         ApplyEnvironment();
         ApplySun();
+    }
+
+    public override void OnDeinit()
+    {
+        ReleaseEnv();
+        base.OnDeinit();
+    }
+
+    // Runtime end of a play instance — same resource release as editor Deinit.
+    public override void OnEnd()
+    {
+        ReleaseEnv();
+        base.OnEnd();
     }
 
     void LoadSky()
     {
         if (string.IsNullOrEmpty(sky_hdri)) return;
 
-        string path = ImpAsset.ResolvePath(sky_hdri);
+        string path = ImpFile.Path_ToAbsolute(sky_hdri);
         if (!File.Exists(path))
         {
             Console.WriteLine($"[C3_Environment] Sky HDRI not found: {path}");
@@ -76,12 +93,6 @@ public class C3_Environment : ImpComponent3D
 
         _sky        = R3D.LoadCubemap(path, R3D_cs.CubemapLayout.Panorama);
         _skyAmbient = R3D.GenAmbientMap(_sky.Value, AmbientFlags.Illumination | AmbientFlags.Reflection);
-    }
-
-    public override void OnUpdate(double delta)
-    {
-        base.OnUpdate(delta);
-        //ApplySun();
     }
 
     void ApplyEnvironment()
@@ -118,9 +129,14 @@ public class C3_Environment : ImpComponent3D
         else             R3D.DisableShadow(_sunLight);
     }
 
-    public override void OnEnd()
+    void ReleaseEnv()
     {
         R3D.SetLightActive(_sunLight, false);
+        ReleaseSky();
+    }
+
+    void ReleaseSky()
+    {
         if (_skyAmbient is AmbientMap map) R3D.UnloadAmbientMap(map);
         if (_sky        is Cubemap sky)    R3D.UnloadCubemap(sky);
         _skyAmbient = null;

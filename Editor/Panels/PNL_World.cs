@@ -2,7 +2,9 @@ using System.Numerics;
 using ImGuiNET;
 using ImperiumEngine.Classes;
 using ImperiumEngine.Enums;
+using ImperiumEngine.Objects._3D;
 using ImperiumEngine.Objects.Assets;
+using ImperiumEngine.Structs;
 using R3D_cs;
 using Raylib_cs;
 using rlImGui_cs;
@@ -42,6 +44,11 @@ public class PNL_World : EditorPanel
 {
     public A_Level? level;
 
+    // When set (Play, NORMAL mode), the viewport renders exactly like the packaged game: the active
+    // game camera (C3_Camera.active, else this player's camera), EDrawFlags.NONE, and no editor
+    // gizmo/selection/picking. Null = the normal editor viewport (also used by Simulate).
+    public ImpPlayer? game_player;
+
     public EditorGizmo gizmo = new();
 
     //selected entities. Shared by reference with the outliner tree panel
@@ -50,6 +57,15 @@ public class PNL_World : EditorPanel
 
     //fired when a gizmo drag edits an entity's transform, so the level can be marked dirty
     public Action? on_edited;
+
+    //records the completed gizmo drag as one reversible edit
+    public Action<IUndoable>? on_action;
+
+    //local transforms of the gizmo targets captured at drag start, and whether this drag has
+    //actually moved anything — used to emit a single undo entry when the drag releases.
+    (ImpComponent3D c, TTransform3D xf)[]? _drag_before;
+    bool _drag_dirty;
+    bool _was_dragging;
 
     public ECameraViewMode view_mode;
     public ECameraRenderMode render_mode;
@@ -86,6 +102,9 @@ public class PNL_World : EditorPanel
 
     protected override void OnUpdate(double delta)
     {
+        // in game-view play the components drive their own camera/input; the editor fly camera and
+        // gizmo hotkeys stay out of the way
+        if (game_player != null) return;
         if (!_viewport_hovered) return;
 
         float wheel = GetMouseWheelMove();
@@ -150,12 +169,17 @@ public class PNL_World : EditorPanel
         }
         if (_rt == null) return;
 
+        // Play (NORMAL): render the running instance like the shipped game — no editor overlays
+        if (game_player != null) { RenderGame(delta); return; }
+
         var cam = BuildCamera();
 
         gizmo.Update(cam, _mouse_local, _content_size,
             _viewport_hovered && !IsMouseButtonDown(MouseButton.Right));
 
-        if (gizmo.made_edit) { gizmo.made_edit = false; on_edited?.Invoke(); }
+        TrackGizmoUndo();
+
+        if (gizmo.made_edit) { gizmo.made_edit = false; _drag_dirty = true; on_edited?.Invoke(); }
 
         // click-picking — only when the click isn't grabbing a gizmo handle or flying
         if (_viewport_hovered && !gizmo.IsDragging && !gizmo.IsHovered
@@ -182,6 +206,66 @@ public class PNL_World : EditorPanel
         gizmo.Draw(cam);
         EndMode3D();
         EndTextureMode();
+    }
+
+    // Renders the running play instance into the viewport exactly as the packaged Engine's main
+    // loop does (see Engine/Program.cs): the active game camera (or the player's fallback camera),
+    // a full R3D pass with EDrawFlags.NONE, then the raylib debug pass — no gizmo, selection, or
+    // picking. The player and components are ticked elsewhere (WND_LevelEdit.TickLevel).
+    void RenderGame(double delta)
+    {
+        var cam = C3_Camera.active?.raycamera ?? game_player!.camera;
+
+        var view = new View
+        {
+            Camera = R3D.CameraFromRL(cam),
+            Target = _rt!.Value,
+        };
+
+        R3D.BeginPro(view);
+        foreach (var c in level!.components)
+            c.Draw(delta, cam, EDrawFlags.NONE);
+        R3D.End();
+
+        BeginTextureMode(_rt.Value);
+        BeginMode3D(cam);
+        foreach (var c in level.components)
+            c.Draw(delta, cam, EDrawFlags.DEBUG_PASS);
+        EndMode3D();
+        EndTextureMode();
+    }
+
+    // Watches the gizmo's drag state: snapshots target local transforms when a drag begins and,
+    // when it releases, records one undo entry covering all moved targets. Runs each frame in
+    // RenderWorld, right after gizmo.Update.
+    void TrackGizmoUndo()
+    {
+        bool dragging = gizmo.IsDragging;
+
+        if (dragging && !_was_dragging)
+        {
+            _drag_before = gizmo.targets.Select(c => (c, c.transform)).ToArray();
+            _drag_dirty = false;
+        }
+        else if (!dragging && _was_dragging)
+        {
+            if (_drag_dirty && _drag_before is { Length: > 0 })
+            {
+                // pair each target's start transform with where it ended up
+                var edits = _drag_before
+                    .Select(b => (b.c, before: b.xf, after: b.c.transform))
+                    .Where(e => !e.before.Equals(e.after))
+                    .ToArray();
+
+                if (edits.Length > 0)
+                    on_action?.Invoke(new RelayUndoable("Transform",
+                        () => { foreach (var e in edits) e.c.transform = e.before; },
+                        () => { foreach (var e in edits) e.c.transform = e.after; }));
+            }
+            _drag_before = null;
+        }
+
+        _was_dragging = dragging;
     }
 
     protected override void OnDraw(double delta, EEditorWidgetDrawFlags flags)
@@ -242,7 +326,10 @@ public class PNL_World : EditorPanel
         ImpComponent3D? best = null;
         float best_d = float.MaxValue;
         foreach (var c in AllComponents())
-            if (c is ImpComponent3D c3 && c3.is_visible && RayHitsBounds(ray, c3, out float d) && d < best_d)
+            if (c is ImpComponent3D c3
+                && c3.is_visible
+                && !c3.IsWorldPickLocked()
+                && RayHitsBounds(ray, c3, out float d) && d < best_d)
             {
                 best_d = d;
                 best = c3;

@@ -9,10 +9,16 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <PackageReference Include="JoltPhysicsSharp" Version="2.22.0" />
       <PackageReference Include="R3D-cs" Version="0.10.0" />
       <PackageReference Include="Raylib-cs" Version="8.0.0" />
       <PackageReference Include="rlImgui-cs" Version="3.2.0" />
       <PackageReference Include="Tomlyn" Version="0.17.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Content\Assets\LibAnim\" />
+      <Folder Include="Content\Assets\LibSound\" />
     </ItemGroup>
 
 </Project>

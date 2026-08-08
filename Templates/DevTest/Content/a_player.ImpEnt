@@ -1,0 +1,6 @@
+_type = "A_Entity"
+parent_type = "C3_Character"
+[[entity]]
+type = "C3_Character"
+[entity.params.move_mode]
+_type = "A_MoveMode"

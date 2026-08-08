@@ -4,7 +4,7 @@ using ImperiumEngine.Structs;
 namespace ImperiumEngine.Objects._1D;
 
 //A base gameplay state
-public abstract class C1_GameState : ImpComponent
+public class C1_GameState : ImpComponent
 {
     protected override bool IsSingleton() => true;
     

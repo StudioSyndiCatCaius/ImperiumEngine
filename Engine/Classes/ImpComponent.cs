@@ -10,6 +10,34 @@ namespace ImperiumEngine.Classes;
 // the main class for composing scene/entities. A fusion of Nodes (Godot) & Actors/Components (in uE)
 public class ImpComponent
 {
+    // --------------------------------------
+    // Static
+    // --------------------------------------
+    
+    //removes these EXACT strings from a component when first added to the tree outliner (does not prevent them from being added to the name manually later)
+    private static string[] strip_name_strings = ["C1_", "C2_", "C3_"];
+    
+    // --------------------------------------
+    // ImpVar
+    // --------------------------------------
+    
+    //display name shown in the editor tree (in place of the class type). Free-form and may be
+    //duplicated across components; only auto-generated names (on add) are kept unique. Empty
+    //falls back to the stripped type name via DisplayName.
+    [ImpVar] public string name = "";
+
+    //name to show in the tree: the set name, or the stripped type name when unset
+    public string DisplayName => string.IsNullOrEmpty(name) ? DefaultName() : name;
+
+    //default name for this type — its class name with any C1_/C2_/C3_ prefix stripped
+    public string DefaultName()
+    {
+        var n = GetType().Name;
+        foreach (var s in strip_name_strings)
+            if (n.StartsWith(s, StringComparison.Ordinal)) return n[s.Length..];
+        return n;
+    }
+
     [ImpVar] public Guid guid = Guid.NewGuid();
 
     //allows drawing
@@ -17,6 +45,11 @@ public class ImpComponent
 
     //allows update ticking
     [ImpVar] public bool is_active = true;
+
+    // Editor lock (outliner): greys the name, blocks world-viewport picking for this node and its
+    // descendants, hides those children from the outliner tree / Entity inspector. The locked node
+    // itself remains selectable in the outliner only. Ignored at runtime.
+    [ImpVar] public bool is_locked = false;
 
     // --------------------------------------
     // Hierarchy
@@ -33,6 +66,22 @@ public class ImpComponent
     {
         for (var p = other.parent; p != null; p = p.parent)
             if (p == this) return true;
+        return false;
+    }
+
+    // true if this node or any ancestor is locked — world picking must skip these
+    public bool IsWorldPickLocked()
+    {
+        for (var p = this; p != null; p = p.parent)
+            if (p.is_locked) return true;
+        return false;
+    }
+
+    // true if any ancestor (not self) is locked — inspector hides these descendants
+    public bool HasLockedAncestor()
+    {
+        for (var p = parent; p != null; p = p.parent)
+            if (p.is_locked) return true;
         return false;
     }
 
@@ -63,17 +112,35 @@ public class ImpComponent
 
     // --------------------------------------
     // Life
+    //
+    // Two separate tracks (Unreal-style):
+    //
+    //   Construction (editor + runtime):
+    //     OnInit  — like UE OnConstruction. Runs in the editor on spawn / property edit /
+    //               level load, AND at runtime before OnBegin. Build meshes, apply lights,
+    //               load resources here. Must be safe to re-run (pair with OnDeinit).
+    //     OnDeinit — reverse of OnInit. Editor remove / re-construct / level unload.
+    //
+    //   Play (runtime / PIE ONLY — never editor preview):
+    //     OnBegin  — play start (register input, spawn physics bodies, claim active camera…)
+    //     OnUpdate — per-frame tick (input, simulation). Must not run in the editor or
+    //                things like C3_Camera_RotTest mouse look fire while editing.
+    //     OnEnd    — play stop / destroy during play (release bodies, unregister input…)
+    //
+    //   OnDraw — both editor and runtime (see flags).
     // --------------------------------------
 
-    //Runtime START
-    public virtual void OnBegin() { }
-    //Runtime END on object destroyed
-    public virtual void OnEnd() { }
-    //Runtime UPDATE
-    public virtual void OnUpdate(double delta) { }
+    // Runtime play start. NEVER called by the editor preview.
+    [ImpVsEvent] public virtual void OnBegin() { }
+    // Runtime play end. NEVER called by the editor preview.
+    [ImpVsEvent] public virtual void OnEnd() { }
+    // Runtime per-frame tick. NEVER called by the editor preview.
+    [ImpVsEvent] public virtual void OnUpdate(double delta) { }
 
-    //on init. plays before OnBegin, and plays in editor (equivalent of OnConstruction in Unreal Engine)
-    public virtual void OnInit() { }
+    // Construction (editor + pre-Begin at runtime). Equivalent of UE OnConstruction.
+    [ImpVsEvent] public virtual void OnInit() { }
+    // Reverse construction — free resources built in OnInit. Safe if nothing was built.
+    [ImpVsEvent] public virtual void OnDeinit() { }
 
     //On drawn in runtime or editor. Called once per render pass each frame:
     //  1. inside R3D.Begin/End — submit R3D meshes/models here (DEBUG_PASS not set)
@@ -86,6 +153,10 @@ public class ImpComponent
     // --------------------------------------
 
     public void Init() { OnInit(); foreach (var c in children) c.Init(); }
+    // Children first so parents can tear down after dependents (mirrors End).
+    public void Deinit() { foreach (var c in children) c.Deinit(); OnDeinit(); }
+
+    // Runtime-only. Editor must never call these on the edited level.
     public void Begin() { OnBegin(); foreach (var c in children) c.Begin(); }
     public void End() { foreach (var c in children) c.End(); OnEnd(); }
 
@@ -94,6 +165,14 @@ public class ImpComponent
         if (!is_active) return;
         OnUpdate(delta);
         foreach (var c in children) c.Update(delta);
+    }
+
+    // Re-run construction on this node only (no children). Used by the inspector after a
+    // property edit so OnInit sees the new values without rebuilding the whole subtree.
+    public void Reconstruct()
+    {
+        OnDeinit();
+        OnInit();
     }
 
     public void Draw(double delta, Camera3D cam, EDrawFlags flags)
@@ -109,6 +188,8 @@ public class ImpComponent
 
     protected virtual bool IsSingleton() => false;
     protected virtual bool Editor_AllowAdd() => true;
+    
+     
 }
 
 // ============================================================================================================
@@ -120,6 +201,8 @@ public class ImpComponent2D : ImpComponent
     // `= new()` runs the struct's parameterless ctor so Scale starts at One; a bare
     // `TTransform2D transform;` would leave Scale at 0 (field initializers don't run then).
     [ImpVar] public TTransform2D transform = new();
+    
+    [ImpVar] public TMargins2D child_margins = new();
 }
 
 // ============================================================================================================
@@ -203,15 +286,7 @@ public class ImpComponent3D : ImpComponent
         b.Z != 0 ? a.Z / b.Z : 0);
 }
 
-// ============================================================================================================
-// 3D Physics object
-// ============================================================================================================
-
-public class ImpPhysic3D : ImpComponent3D
-{
-    public Vector3 velocity;
-}
-
+// ImpPhysic3D (physics-capable 3D component) lives in ImpPhysic3D.cs.
 
 // ============================================================================================================
 // Level

@@ -28,9 +28,23 @@ public class C3_Character : C3_Collider
     R3D_cs.Model? _model;
     R3D_cs.Mesh?  _fallback;
 
+    public C3_Character()
+    {
+        // an upright cylinder collider around the 1.8m mannequin; falls under gravity on play
+        shape            = EColliderShape.Cylinder;
+        radius           = 0.4f;
+        height           = 1.8f;
+        simulate_physics = true;
+    }
+
+    // stays upright like an Unreal capsule — the body can't tip over
+    protected override bool LockUpright => true;
+
     public override void OnInit()
     {
-        string glbPath = Path.Combine(ImpAsset.s_engineContentDir, "3D", "sk_mannequin.glb");
+        ReleaseVisuals();
+
+        string glbPath = Path.Combine(ImpFile.s_engineContentDir, "3D", "sk_mannequin.glb");
 
         if (File.Exists(glbPath))
         {
@@ -47,6 +61,12 @@ public class C3_Character : C3_Collider
         }
     }
 
+    public override void OnDeinit()
+    {
+        ReleaseVisuals();
+        base.OnDeinit();
+    }
+
     public override void OnDraw(double delta, Camera3D cam, EDrawFlags flags)
     {
         if (flags.HasFlag(EDrawFlags.DEBUG_PASS)) return;
@@ -60,6 +80,12 @@ public class C3_Character : C3_Collider
     }
 
     public override void OnEnd()
+    {
+        base.OnEnd(); // release the physics body (runtime only)
+        ReleaseVisuals();
+    }
+
+    void ReleaseVisuals()
     {
         if (_model is R3D_cs.Model m) R3D.UnloadModel(m, true);
         _model    = null;

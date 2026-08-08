@@ -20,10 +20,11 @@ public static class Program
         Console.WriteLine($"[Engine] Project dir:        {projectDir}");
         Console.WriteLine($"[Engine] Engine content dir: {engineContentDir}");
 
-        ImpAsset.s_projectDir = projectDir;
-        ImpAsset.s_engineContentDir = engineContentDir;
+        ImpFile.s_projectDir = projectDir;
+        ImpFile.s_engineContentDir = engineContentDir;
 
         var cfg = new CFG_Graphics();
+        cfg.Load(cfg.FilePath(projectDir));
 
         SetConfigFlags(ConfigFlags.MaximizedWindow);
         
@@ -41,6 +42,8 @@ public static class Program
 
         var player = new ImpPlayer();
         ImpPlayer.s_active = player;
+
+        ImpPhysicsWorld.Init();   // spin up Jolt before components create their bodies in Begin
 
         foreach (var e in level.components)
         {
@@ -65,6 +68,7 @@ public static class Program
             if (IsWindowResized())
                 R3D.SetResolution(GetScreenWidth(), GetScreenHeight());
 
+            ImpPhysicsWorld.Step(delta);   // advance the sim; components read results back in Update
             player.OnUpdate(delta);
             foreach (var e in level.components)
                 e.Update(delta);
@@ -89,6 +93,7 @@ public static class Program
         }
 
         foreach (var e in level.components) e.End();
+        ImpPhysicsWorld.Shutdown();
         R3D.Close();
         CloseWindow();
 

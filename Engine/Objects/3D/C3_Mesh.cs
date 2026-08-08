@@ -2,6 +2,7 @@ using System.Numerics;
 using ImperiumEngine.Classes;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Objects.Assets;
+using JoltPhysicsSharp;
 using R3D_cs;
 using Raylib_cs;
 
@@ -20,10 +21,13 @@ public class C3_Mesh : ImpPhysic3D
 
     public override void OnInit()
     {
+        // Re-entrant: property edits / Reconstruct release the previous GPU mesh first.
+        ReleaseVisuals();
+
         // [ImpVar] fields are set before OnInit, so mesh_source is already populated
         mesh.file_source = mesh_source;
 
-        string source = ImpAsset.ResolvePath(mesh.file_source);
+        string source = ImpFile.Path_ToAbsolute(mesh.file_source);
 
         if (source == "builtin:plane")
         {
@@ -47,6 +51,12 @@ public class C3_Mesh : ImpPhysic3D
         }
     }
 
+    public override void OnDeinit()
+    {
+        ReleaseVisuals();
+        base.OnDeinit();
+    }
+
     public override void OnDraw(double delta, Camera3D cam, EDrawFlags flags)
     {
         if (flags.HasFlag(EDrawFlags.DEBUG_PASS)) return;
@@ -66,7 +76,27 @@ public class C3_Mesh : ImpPhysic3D
         return base.GetLocalBounds();
     }
 
+    // a box matching the mesh's AABB — used for floors and static props (dynamic meshes tumble as boxes)
+    protected override Shape? BuildCollisionShape(Vector3 worldScale)
+    {
+        var b    = GetLocalBounds();
+        var half = Vector3.Max((b.Max - b.Min) * 0.5f * worldScale, new Vector3(0.02f));
+        return new BoxShape(half, 0f);
+    }
+
+    protected override Vector3 ColliderCenterLocal()
+    {
+        var b = GetLocalBounds();
+        return (b.Max + b.Min) * 0.5f;
+    }
+
     public override void OnEnd()
+    {
+        base.OnEnd(); // release the physics body (runtime only)
+        ReleaseVisuals();
+    }
+
+    void ReleaseVisuals()
     {
         if (_model is R3D_cs.Model m) R3D.UnloadModel(m, true);
         _model = null;

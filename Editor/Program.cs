@@ -3,6 +3,7 @@ using Editor.Windows;
 using ImGuiNET;
 using ImperiumEngine.Classes;
 using ImperiumEngine.Objects.Assets;
+using ImperiumEngine.Objects.Config;
 using R3D_cs;
 using Raylib_cs;
 using rlImGui_cs;
@@ -15,7 +16,16 @@ public static class Program
     public static WND_LevelEdit window_main = null!; //the main window (which is the level editor). Closing this will close the program.
     public static List<EditorWindow> windows_open = new(); //all the windows that are open. Closing these will NOT close the program (asides from the main window)
 
+    // the live editor config (session state + editor preferences). WND_SettingsEditor edits this
+    // same instance so its changes apply this session and are captured on exit.
+    public static EditorConfig config = null!;
+
     static bool _exit_requested;
+
+    // ImGui restores the last-selected dock tab from imgui.ini, and restored tool windows dock
+    // on top of the level editor — either can leave a non-level tab active on launch. Force the
+    // level editor tab to the front for the first few frames so it always opens focused.
+    static int _focus_main_frames = 3;
 
     // the most recently focused window that has a document asset. Kept sticky so it stays the
     // Save target even while a menu/popup steals focus (menus report the window as unfocused).
@@ -29,17 +39,24 @@ public static class Program
         Console.WriteLine($"[Editor] Project dir:        {projectDir}");
         Console.WriteLine($"[Editor] Engine content dir: {engineContentDir}");
 
-        ImpAsset.s_projectDir = projectDir;
-        ImpAsset.s_engineContentDir = engineContentDir;
+        ImpFile.s_projectDir = projectDir;
+        ImpFile.s_engineContentDir = engineContentDir;
 
         string configPath = EditorConfig.PathFor(projectDir);
-        var config = EditorConfig.Load(configPath);
+        config = EditorConfig.Load(configPath);
 
         SetConfigFlags(ConfigFlags.ResizableWindow);
         InitWindow(1600, 900, "Imperium Editor");
+        // Raylib defaults Escape to "close window"; the editor uses Esc for PIE stop / UI cancel.
+        SetExitKey(KeyboardKey.Null);
         SetTargetFPS(60);
 
         R3D.Init(GetScreenWidth(), GetScreenHeight());
+        // Match the packaged game: load project Graphics.toml and apply R3D AA so the level
+        // editor viewport is not jagged while play-mode / shipped builds look clean.
+        var gfx = new CFG_Graphics();
+        gfx.Load(gfx.FilePath(projectDir));
+        R3D.SetAntiAliasingMode(gfx.antialiasing_mode);
         rlImGui.Setup(darkTheme: true, enableDocking: true);
         ApplyEditorTheme();
 
@@ -47,20 +64,17 @@ public static class Program
         string levelPath = Path.Combine(projectDir, "Content", "Levels", "test.ImpLvl");
         if (config.last_level != "")
         {
-            string resolved = ImpAsset.ResolvePath(config.last_level);
+            string resolved = ImpFile.Path_ToAbsolute(config.last_level);
             if (File.Exists(resolved)) levelPath = resolved;
         }
 
         var level = new A_Level();
         level.File_Load(levelPath);
 
-        // The editor previews the level live for now: init + begin so environment/
-        // lights apply, and tick OnUpdate so R3D light state stays in sync.
+        // Construction only (OnInit) — never Begin/Update/End in the editor. Lights,
+        // environment, meshes build via OnInit; play-only logic stays off until PIE.
         foreach (var c in level.components)
-        {
-            c.OnInit();
-            c.OnBegin();
-        }
+            c.Init();
 
         window_main = new WND_LevelEdit();
         window_main.SetLevel(level);
@@ -74,8 +88,9 @@ public static class Program
         {
             double delta = GetFrameTime();
 
-            foreach (var c in level.components)
-                if (c.is_active) c.OnUpdate(delta);
+            // ticks the level editor's live level — the running Play-In-Editor instance if one is
+            // active, otherwise the editor preview
+            window_main.TickLevel(delta);
 
             foreach (var w in windows_open)
                 w.Update(delta);
@@ -91,12 +106,23 @@ public static class Program
             DrawMainMenuBar();
             uint dock_id = ImGui.DockSpaceOverViewport();
 
+            // request the level editor tab up front, before any window's Begin, so it wins the
+            // dock node's selected-tab slot even as restored tool windows dock over the first frames.
+            if (_focus_main_frames > 0)
+            {
+                _focus_main_frames--;
+                window_main.focus_next = true;
+            }
+
             foreach (var w in windows_open.ToArray())
                 w.DrawWindow(delta, dock_id);
             windows_open.RemoveAll(w => !w.is_open);
 
             UpdateActiveDocWindow();
             HandleSaveHotkeys();
+            HandleUndoRedoHotkeys();
+            HandleDeleteHotkey();
+            HandleStopPlayHotkey();
 
             EditorDialog.DrawActive(delta);   // modal popups draw on top of everything
 
@@ -104,7 +130,9 @@ public static class Program
             EndDrawing();
         }
 
-        foreach (var c in level.components) c.OnEnd();
+        window_main.StopPlayInEditor();   // tears down any running play instance (no-op otherwise)
+        // Reverse construction only — OnEnd is runtime/PIE exclusive.
+        foreach (var c in level.components) c.Deinit();
 
         CaptureConfig(config, level);
         config.Save(configPath);
@@ -144,7 +172,7 @@ public static class Program
         config.side_width = window_main.SideWidth;
         config.side_split = window_main.SideSplit;
 
-        config.last_level = ImpAsset.ToKeywordPath(level.file_link);
+        config.last_level = ImpFile.Path_ToRelative(level.file_link);
 
         config.open_windows = windows_open
             .Where(x => x != window_main)
@@ -172,7 +200,11 @@ public static class Program
     // preserving saturation/brightness. Grays are untouched.
     static void ApplyEditorTheme()
     {
-        var colors = ImGui.GetStyle().Colors;
+        var style = ImGui.GetStyle();
+        // Tighter hierarchy indent (~60% less than Dear ImGui default) for outliner / type trees
+        style.IndentSpacing *= 0.4f;
+
+        var colors = style.Colors;
         for (int i = 0; i < (int)ImGuiCol.COUNT; i++)
         {
             var c = colors[i];
@@ -212,9 +244,14 @@ public static class Program
 
         if (ImGui.BeginMenu("Edit"))
         {
-            //TODO: undo/redo stack
-            ImGui.MenuItem("Undo", "Ctrl+Z", false, false);
-            ImGui.MenuItem("Redo", "Ctrl+Y", false, false);
+            var hist = _active_doc_window?.history;
+            bool can_undo = hist is { CanUndo: true };
+            bool can_redo = hist is { CanRedo: true };
+
+            if (ImGui.MenuItem(can_undo ? $"Undo {hist!.NextUndoLabel}" : "Undo", "Ctrl+Z", false, can_undo))
+            { hist!.Undo(); MarkActiveDirty(); }
+            if (ImGui.MenuItem(can_redo ? $"Redo {hist!.NextRedoLabel}" : "Redo", "Ctrl+Y", false, can_redo))
+            { hist!.Redo(); MarkActiveDirty(); }
             ImGui.EndMenu();
         }
 
@@ -222,6 +259,10 @@ public static class Program
         {
             if (ImGui.MenuItem("File Explorer")) OpenWindow<WND_FileExplorer>();
             if (ImGui.MenuItem("Asset Editor")) OpenWindow<WND_AssetEdit>();
+            if (ImGui.MenuItem("Build")) OpenWindow<WND_Build>();
+            if (ImGui.MenuItem("Log")) OpenWindow<WND_Log>();
+            if (ImGui.MenuItem("Settings: Project")) OpenWindow<WND_SettingsProject>();
+            if (ImGui.MenuItem("Settings: Editor")) OpenWindow<WND_SettingsEditor>();
             ImGui.EndMenu();
         }
 
@@ -278,6 +319,58 @@ public static class Program
         SaveActive(force_dialog: io.KeyCtrl && io.KeyShift);   // Ctrl+Shift+S -> Save As
     }
 
+    // Ctrl+Z = Undo, Ctrl+Y / Ctrl+Shift+Z = Redo, targeting the active document window's history.
+    // Suppressed while a modal/menu owns input or while typing into a field (ImGui does its own
+    // text-edit undo there).
+    static void HandleUndoRedoHotkeys()
+    {
+        var io = ImGui.GetIO();
+        if (EditorDialog.AnyActive || io.WantTextInput) return;
+        if (ImGui.IsPopupOpen("", ImGuiPopupFlags.AnyPopupId | ImGuiPopupFlags.AnyPopupLevel)) return;
+        if (!io.KeyCtrl || io.KeyAlt || io.KeySuper) return;
+
+        var hist = _active_doc_window?.history;
+        if (hist == null) return;
+
+        bool redo = ImGui.IsKeyPressed(ImGuiKey.Y, false) || (io.KeyShift && ImGui.IsKeyPressed(ImGuiKey.Z, false));
+        bool undo = !io.KeyShift && ImGui.IsKeyPressed(ImGuiKey.Z, false);
+
+        if (undo && hist.CanUndo) { hist.Undo(); MarkActiveDirty(); }
+        else if (redo && hist.CanRedo) { hist.Redo(); MarkActiveDirty(); }
+    }
+
+    // undo/redo bypasses the panels' normal on_changed/on_edited dirty path, so flag the document
+    static void MarkActiveDirty()
+    {
+        var doc = _active_doc_window?.DocumentAsset;
+        if (doc != null) doc.is_dirty = true;
+    }
+
+    // Delete = remove the level editor's selected entities. Only fires while the level editor is
+    // focused (not another window) and no modal/menu/text field is capturing input.
+    static void HandleDeleteHotkey()
+    {
+        var io = ImGui.GetIO();
+        if (EditorDialog.AnyActive || io.WantTextInput) return;
+        if (ImGui.IsPopupOpen("", ImGuiPopupFlags.AnyPopupId | ImGuiPopupFlags.AnyPopupLevel)) return;
+        if (io.KeyCtrl || io.KeyAlt || io.KeySuper) return;
+        if (!ImGui.IsKeyPressed(ImGuiKey.Delete, false)) return;
+
+        if (window_main.has_focus)
+            window_main.DeleteSelection();
+    }
+
+    // Shift+Esc stops a running Play-In-Editor session. Only active while playing, so plain Esc is
+    // left free for closing popups/menus.
+    static void HandleStopPlayHotkey()
+    {
+        if (!window_main.IsPlaying) return;
+        var io = ImGui.GetIO();
+        if (io.WantTextInput) return;
+        if (io.KeyShift && ImGui.IsKeyPressed(ImGuiKey.Escape, false))
+            window_main.StopPlayInEditor();
+    }
+
     // Saves the active document window's asset. `force_dialog` (Save As) always opens the
     // location picker; otherwise an asset with no backing file opens it, one with a file saves
     // straight through the async progress dialog.
@@ -286,7 +379,7 @@ public static class Program
         var asset = _active_doc_window?.DocumentAsset;
         if (asset == null) return;
 
-        if (force_dialog || !asset.IsReference)
+        if (force_dialog || !asset.is_reference)
         {
             DLG_SaveAsset.Show(asset, on_saved: _ => asset.is_dirty = false);
             return;
@@ -301,7 +394,7 @@ public static class Program
         var dirty = DirtyDocuments();
         if (dirty.Count == 0) return;
 
-        var needs_path = dirty.FirstOrDefault(a => !a.IsReference);
+        var needs_path = dirty.FirstOrDefault(a => !a.is_reference);
         if (needs_path != null)
         {
             DLG_SaveAsset.Show(needs_path, on_saved: _ =>
@@ -353,9 +446,9 @@ public static class Program
     static string DocLabel(EditorWindow w)
     {
         var a = w.DocumentAsset!;
-        return a.IsReference ? Path.GetFileNameWithoutExtension(a.file_link) : AssetName(a);
+        return a.is_reference ? Path.GetFileNameWithoutExtension(a.file_link) : AssetName(a);
     }
 
     static string AssetName(ImpAsset a) =>
-        a.IsReference ? Path.GetFileName(a.file_link) : a.GetType().Name;
+        a.is_reference ? Path.GetFileName(a.file_link) : a.GetType().Name;
 }

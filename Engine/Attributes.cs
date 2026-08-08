@@ -12,6 +12,10 @@ public class ExposedAttribute : Attribute { }
 [AttributeUsage(AttributeTargets.Field)]
 public class ImpVarAttribute : Attribute { }
 
+[AttributeUsage(AttributeTargets.Method)]
+public class ImpVsEventAttribute : Attribute { }
+
+
 
 // Custom attribute to hold a hex color code
 [AttributeUsage(AttributeTargets.Field)]

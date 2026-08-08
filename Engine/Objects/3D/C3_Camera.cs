@@ -1,9 +1,13 @@
 using System.Numerics;
 using ImperiumEngine.Classes;
+using ImperiumEngine.Enums;
 using ImperiumEngine.Interfaces;
 using ImperiumEngine.Structs;
+using R3D_cs;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
+using Mesh = R3D_cs.Mesh;
+using Model = R3D_cs.Model;
 
 namespace ImperiumEngine.Objects._3D;
 
@@ -50,7 +54,8 @@ public struct TSpringArmLagConfig
 
 public class C3_Camera : ImpComponent3D
 {
-    // The camera currently used for rendering — set by OnBegin so Program.cs can read it.
+    // The camera currently used for rendering — set in OnBegin (runtime/PIE only) so the
+    // packaged game / play session can find it. Never claimed during editor preview.
     public static C3_Camera? active;
 
     public Camera3D raycamera = new()
@@ -72,9 +77,48 @@ public class C3_Camera : ImpComponent3D
     [ImpVar] public bool capture_to_render_texture;
     //if empty, captures everything in view. If this list has items, only captures those and their children.
     [ImpVar] public LinkedList<ImpComponent> capture_list;
+
+    Model camera_mesh = new Model();
     
+    public C3_Camera()
+    {
+        camera_mesh = R3D.LoadModel(ImpFile.Path_ToAbsolute("{engine}/3D/sm_UTIL_camera.glb"));
+    }
     
+    // Runtime only — editor preview keeps the free-fly camera and must not steal `active`.
     public override void OnBegin() => active = this;
+
+    public override void OnEnd()
+    {
+        if (active == this) active = null;
+        base.OnEnd();
+    }
+
+    public override void OnDraw(double delta, Camera3D cam, EDrawFlags flags)
+    {
+        base.OnDraw(delta, cam, flags);
+        if (!flags.HasFlag(EDrawFlags.EDITOR_DEBUG)) return;
+
+        GetWorldTRS(out var pivot, out var rot, out _);
+
+        // The boom points from the pivot (root) back toward the camera eye. With an
+        // identity rotation the camera sits toward +Z and looks back down -Z, matching
+        // the boom_dir convention in UpdateBoom.
+        var boom_dir   = Vector3.Transform(Vector3.UnitZ, rot);
+        var camera_eye = pivot + boom_dir * boom_length;
+
+        if (!flags.HasFlag(EDrawFlags.DEBUG_PASS))
+        {
+            // R3D submission pass: the mesh only renders when DEBUG_PASS is not set.
+            // Draw it at the camera eye, oriented to match the camera's rotation.
+            R3D.DrawModelEx(camera_mesh, camera_eye, rot, Vector3.One);
+        }
+        else
+        {
+            // raylib overlay pass: the spring-arm line from the root to the camera eye.
+            DrawLine3D(pivot, camera_eye, Color.Yellow);
+        }
+    }
     
 
     // Builds raycamera from a look-at pivot and a unit boom direction (pointing from the
@@ -109,11 +153,21 @@ public class C3_Camera_RotTest : C3_Camera, I_InputTarget
 
     public C3_Camera_RotTest() => boom_length = 14f;
 
+    
+    
+    // Runtime only (Begin/Update never run in the editor — otherwise RMB orbit steals input
+    // from the free-fly viewport camera while editing).
     public override void OnBegin()
     {
         base.OnBegin();
         ImpPlayer.s_active?.input_targets.Add(this);
         RefreshCamera(0);   // delta 0 primes the lag state so the first frame snaps into place
+    }
+
+    public override void OnEnd()
+    {
+        ImpPlayer.s_active?.input_targets.Remove(this);
+        base.OnEnd();
     }
 
     public override void OnUpdate(double delta)

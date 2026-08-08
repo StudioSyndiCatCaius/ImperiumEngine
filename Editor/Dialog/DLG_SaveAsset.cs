@@ -28,7 +28,7 @@ public class DLG_SaveAsset : EditorDialog
     // (the asset's file_link is now set, so it has become a reference).
     public static void Show(ImpAsset asset, string? start_rel = null, Action<string>? on_saved = null)
     {
-        string root = Path.Combine(ImpAsset.s_projectDir, "Content");
+        string root = Path.Combine(ImpFile.s_projectDir, "Content");
         new DLG_SaveAsset
         {
             _asset = asset,

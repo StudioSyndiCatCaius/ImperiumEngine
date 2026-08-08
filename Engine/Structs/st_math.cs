@@ -60,3 +60,24 @@ public struct TTransform2D : I_Serialize
         if (t.TryGetValue("scale",    out object? s)) Scale    = ImpToml.ToVec2(s, Vector2.One);
     }
 }
+
+
+public struct TVector2B
+{
+    [ImpVar] public bool X, Y;
+}
+
+public struct TVector3B
+{
+    [ImpVar] public bool X, Y, Z;
+}
+
+public struct TVector4B
+{
+    [ImpVar] public bool X, Y, Z, A;
+}
+
+public struct TMargins2D
+{
+    [ImpVar] public float left, right, top, bottom;
+}
