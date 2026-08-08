@@ -1,4 +1,5 @@
 using System.Numerics;
+using ImperiumEngine.Assets;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Main;
 using Raylib_cs;
@@ -22,6 +23,7 @@ public class TTreeItem
     // are drawn dim, in fixed-width columns off the right edge.
     public List<string> sections = new List<string>();
     public List<TTreeItem> children = new List<TTreeItem>();
+    public A_Texture? icon;
 
     public TTreeItem? parent;
 
@@ -34,6 +36,7 @@ public class TTreeItem
         is_selected = false;
         sections = new List<string>();
         children = new List<TTreeItem>();
+        icon = null;
     }
 
     public void Child_Add(TTreeItem child)
@@ -104,6 +107,7 @@ public class C2_Tree : ImpComp2D
     {
         item.data = comp;
         item.sections = [Comp_Label(comp), comp.GetType().Name];
+        item.icon = ImpIcon.Get(comp.GetType());
 
         foreach (var child in comp.children)
         {
@@ -336,6 +340,21 @@ public class C2_Tree : ImpComp2D
         if (row.item.children.Count > 0) Arrow_Draw(Rect_Arrow(row), row.item.is_expanded, th);
 
         float text_x = row.rect.X + (row.depth + 1) * indent + th.padding * 0.5f;
+
+        // the icon sits in the label column and pushes the text along, so a row without one
+        // (trees that aren't built from comps) simply starts its label further left
+        if (row.item.icon != null)
+        {
+            float icon_size = MathF.Max(0f, row.rect.Height - th.padding);
+
+            ImpUI.TextureFit(row.item.icon, new Rectangle(
+                text_x,
+                row.rect.Y + (row.rect.Height - icon_size) * 0.5f,
+                icon_size, icon_size), Color.White);
+
+            text_x += icon_size + th.padding * 0.5f;
+        }
+
         float columns_w = MathF.Max(0, row.item.sections.Count - 1) * section_width;
         float label_w = row.rect.X + row.rect.Width - text_x - columns_w - th.padding;
 

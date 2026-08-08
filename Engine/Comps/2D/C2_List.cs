@@ -9,16 +9,27 @@ namespace ImperiumEngine.Comps._2D;
 // C2_ScrollBox rather than making the list scroll itself.
 public class C2_List : ImpComp2D
 {
-    public EUIAlignment Alignment = EUIAlignment.Vertical;
-    public float separation = 4f;
+    [ImpVar] public EUIAlignment Alignment = EUIAlignment.Vertical;
+    [ImpVar] public float separation = 4f;
 
     //if true, ignores designated child size and stretches children to in-total fill this
-    public bool stretch_children;
+    [ImpVar] public bool stretch_children;
 
-    public UIStyle_Rect? style;
-
+    [ImpVar] public UIStyle_Rect? style;
+    
     bool Vertical => Alignment == EUIAlignment.Vertical;
+    
+    // ---------------------------------------------------
+    // Options
+    // ---------------------------------------------------
 
+    /*
+     *  Options are a way a list can handle & popular its children with selection and other bindings
+     */
+    
+    public Action<C2_List, ImpComp2D, int> on_option_selected;
+    public Action<C2_List, ImpComp2D, int, bool> on_option_hovered;
+    
     // ---------------------------------------------------
     // layout
     // ---------------------------------------------------

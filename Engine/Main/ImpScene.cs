@@ -32,6 +32,15 @@ public class ImpScene : ImpAsset
     
     [ImpVar] public float bloom_intensity=0.5f;
 
+    // Screen-space ambient occlusion. Grounds geometry by darkening the creases contact
+    // between surfaces makes, which flat ambient light alone cannot express.
+    [Category("SSAO")] [ImpVar] public bool ssao_enabled=true;
+    [Category("SSAO")] [ImpVar] public float ssao_radius=1f;      //world-space sampling radius
+    [Category("SSAO")] [ImpVar] public float ssao_intensity=1f;   //occlusion strength
+    [Category("SSAO")] [ImpVar] public float ssao_power=1f;       //falloff sharpness
+    [Category("SSAO")] [ImpVar] public float ssao_bias=0.05f;     //keeps surfaces from occluding themselves
+    [Category("SSAO")] [ImpVar] public int ssao_samples=16;
+
     public Action<ImpScene,ImpComp> on_comp_added;
     public Action<ImpScene,ImpComp> on_comp_removed;
     
@@ -66,11 +75,13 @@ public class ImpScene : ImpAsset
         environment.Ambient.Color = ambient_color;
         environment.Ambient.Energy = ambient_intensity;
         
-        environment.Ssao.Enabled = true;
-        environment.Ssao.Radius = 1f;
-        environment.Ssao.Intensity = 1f;
-        environment.Ssao.Bias = 0.05f;
-        
+        environment.Ssao.Enabled = ssao_enabled;
+        environment.Ssao.Radius = ssao_radius;
+        environment.Ssao.Intensity = ssao_intensity;
+        environment.Ssao.Power = ssao_power;
+        environment.Ssao.Bias = ssao_bias;
+        environment.Ssao.SampleCount = ssao_samples;
+
         //environment.Bloom.Intensity=bloom_intensity;
         //environment.Bloom.Mode = Bloom.Additive;
         

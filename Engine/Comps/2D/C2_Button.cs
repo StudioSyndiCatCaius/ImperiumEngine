@@ -1,4 +1,5 @@
 using System.Numerics;
+using ImperiumEngine.Assets;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Main;
 using ImperiumEngine.Structs;
@@ -6,13 +7,20 @@ using Raylib_cs;
 
 namespace ImperiumEngine.Comps._2D;
 
+public enum EButtonLayout
+{
+    Icon_Text_H, Text_Icon_H, Icon_Text_V, Text_Icon_V,
+}
+
 public class C2_Button : ImpComp2D
 {
-    public string text = "";
-    public UIStyle_Button? style;
-    public UIStyle_Text? style_text;
-
-    public bool is_disabled = false;
+    [ImpVar] public string text = "";
+    [ImpVar] public A_Texture? icon;
+    [ImpVar] public UIStyle_Button? style;
+    [ImpVar] public UIStyle_Text? style_text;
+    [ImpVar] public EButtonLayout layout = EButtonLayout.Icon_Text_H;
+    
+    [ImpVar] public bool is_disabled = false;
 
     public Action<C2_Button>? on_click;
 

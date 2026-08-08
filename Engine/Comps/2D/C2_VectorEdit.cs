@@ -18,6 +18,16 @@ public class C2_VectorEdit : ImpComp2D
     public readonly C2_Progresser[] fields;
     public string[] tags = { "X", "Y", "Z", "W" };
 
+    // Axis tint, kept muted: this is a tag on a field, not a control of its own, and a
+    // transform puts nine of them on screen at once. W has no axis colour to borrow.
+    public static readonly Color[] axis_colors =
+    {
+        new Color(198, 82, 92, 255),   // X
+        new Color(124, 176, 84, 255),  // Y
+        new Color(78, 130, 208, 255),  // Z
+        new Color(150, 150, 160, 255), // W
+    };
+
     //multi-selection disagreement; fields blank rather than showing one target's value
     public bool is_mixed;
 
@@ -46,6 +56,7 @@ public class C2_VectorEdit : ImpComp2D
                 decimals = integers ? 0 : 3,
                 drag_sensitivity = integers ? 0.1f : 0.01f,
                 text_inset = 4f, //three fields on one line have no room for theme padding
+                accent_color = axis_colors[Math.Min(i, axis_colors.Length - 1)],
             };
 
             field.on_value_changed = _ => on_changed?.Invoke(this);

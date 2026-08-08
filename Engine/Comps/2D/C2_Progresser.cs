@@ -35,6 +35,10 @@ public class C2_Progresser : ImpComp2D
     //inset for the value text; negative takes the theme's padding, which is too generous
     //once several of these share a row
     [ImpVar] public float text_inset = -1f;
+
+    //thin colour tab down the leading edge; a vector row tags each axis with one
+    [ImpVar] public Color accent_color = Color.Blank;
+    [ImpVar] public float accent_width = 2f;
     
     [ImpVar] public bool can_type_edit; //allow user to edit value by clicking and typing on box
     C2_TextEdit? value_text_edit; //the text edit component for the value field.
@@ -211,8 +215,18 @@ public class C2_Progresser : ImpComp2D
             if (style?.show_slider_bar == true) Grip_Draw(th);
         }
 
+        if (accent_color.A > 0 && accent_width > 0f)
+        {
+            ImpUI.Rect(new Rectangle(rect.X, rect.Y, accent_width, rect.Height), accent_color);
+        }
+
         string label = Text_Get();
         if (label.Length == 0) return;
+
+        // A value can always be longer than the box holding it - three coordinates sharing
+        // one inspector row leaves each barely wide enough for "0.000", and "150.000" ran
+        // straight over the next field's tag. Clip so a number can only spill inside its box.
+        ImpUI.Clip_Push(rect);
 
         // centred over a fill bar reads as a progress label; a bare drag-field reads
         // better as a left-aligned value, like every other field in a property list
@@ -223,11 +237,14 @@ public class C2_Progresser : ImpComp2D
         else
         {
             float pad = text_inset >= 0f ? text_inset : th.padding;
+            float lead = MathF.Max(pad, accent_color.A > 0 ? accent_width + pad : pad);
 
-            var tr = new Rectangle(rect.X + pad, rect.Y,
-                                   MathF.Max(0, rect.Width - pad * 2), rect.Height);
+            var tr = new Rectangle(rect.X + lead, rect.Y,
+                                   MathF.Max(0, rect.Width - lead - pad), rect.Height);
             ImpUI.TextInRect(label, tr, StyleText, 0f);
         }
+
+        ImpUI.Clip_Pop();
     }
 
     void Grip_Draw(ImpUITheme th)

@@ -39,6 +39,9 @@ Imperium is designed to be cross-platform:
 ### Mod Support
 Imperium uses a modular content system, making it easy to add patches & mods that add new content or override existing content.
 
+## Model Notes:
+* Opus 5: cache reasonable path & engine infomation in a dictionary.md as you go, so you can cut down on think time and implement fast & simple.
+* Sonnet 5: they to keep things simple & fast, namely just fixing/adding what i tell you and whatever minimum is needed to get that job done. 
 
 ## NOTES
 * child Comp vars on a comp break the nomral snake case and use `c_compname` with the `c_` acting as the specifier for child/component

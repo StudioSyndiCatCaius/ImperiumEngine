@@ -1,5 +1,6 @@
 using System.Numerics;
 using ImperiumEngine.Enums;
+using ImperiumEngine.Interfaces;
 using ImperiumEngine.Structs;
 using Raylib_cs;
 
@@ -10,10 +11,11 @@ namespace ImperiumEngine.Main;
 public class ImpPlayer
 {
     const float DEADZONE_MOVEMENT = 0.1f;
+    
     // =====================================================================================
     // Statics
     // =====================================================================================
-
+    
     [ImpConfig] public static byte max_players=1;
 
     //input_actions and input_natives are both used to define the input bindings for the player
@@ -49,6 +51,7 @@ public class ImpPlayer
         ["_Jump"] = new TInputAction() { keys = { [EInputKey.Key_Space]=new TInputKey() { }, } },
         ["_Crouch"] = new TInputAction() { keys = { [EInputKey.Key_C]=new TInputKey() { }, } },
         ["_Sprint"] = new TInputAction() { keys = { [EInputKey.Key_LeftShift]=new TInputKey() { }, } },
+        ["_DragDrop"] = new TInputAction() { keys = { [EInputKey.Mouse_Left]=new TInputKey() { }, } },
     };
 
     public static bool is_mouse_visible=true;
@@ -81,7 +84,23 @@ public class ImpPlayer
         }
         return false;
     }
+    
+    // -----------------------------------------------
+    // Grab (Drag&Drop)
+    // -----------------------------------------------
+    [ImpConfig] public static float grab_hold_time=0.2f; // time (sec) when attempting to grab an object for drag&drop to wait before confirming
+    
+    public static readonly TLabel INPUT_ACTION_GRAB = "_Grab";
+    public static bool is_grabbing=false;
+    public static object grab_object=null;
 
+    public static void Update_Grab(float dt)
+    {
+        
+    }
+    
+
+        
     // -----------------------------------------------
     // Poll
     // -----------------------------------------------
@@ -115,17 +134,48 @@ public class ImpPlayer
     }
 
     // Hands this frame's state changes to whatever registered for them.
+    // Actions (not raw keys) are the dispatch unit, since one action can be bound
+    // across several keys (eg. "_Move" spanning W/A/S/D) that need to combine into
+    // a single state and axis, mirroring Action_GetState/Action_GetAxis.
     void Input_Dispatch(double dt)
     {
         if (input_targets.Count == 0) return;
 
-        foreach (var (key, state) in key_state)
+        var labels = new HashSet<TLabel>(input_natives.Keys);
+        labels.UnionWith(input_actions.Keys);
+
+        foreach (var label in labels)
         {
+            var action = input_actions.GetValueOrDefault(label) ?? input_natives.GetValueOrDefault(label);
+            if (action == null) continue;
+
+            EInputState state = EInputState.None;
+            Vector3 axis = Vector3.Zero;
+
+            foreach (var (key, binding) in action.keys)
+            {
+                EInputState keyState = key_state.GetValueOrDefault(key, EInputState.None);
+                if (keyState == EInputState.Pressed) state = EInputState.Pressed;
+                else if (keyState == EInputState.Down && state != EInputState.Pressed) state = EInputState.Down;
+                else if (keyState == EInputState.Released && state == EInputState.None) state = EInputState.Released;
+
+                float value = key_value.GetValueOrDefault(key, 0f);
+                if (MathF.Abs(value) < binding.deadzone) continue;
+                axis += binding.axis_scale * value;
+            }
+
             if (state == EInputState.None) continue;
 
             foreach (var target in input_targets)
             {
-                if (target.Input_IsEnabled()) target.Input_OnEvent((byte)key, state, dt);
+                if (!target.Input_IsEnabled()) continue;
+
+                switch (state)
+                {
+                    case EInputState.Pressed: target.Input_OnPressed(action, axis); break;
+                    case EInputState.Down: target.Input_OnUpdate(action, axis,dt); break;
+                    case EInputState.Released: target.Input_OnReleased(action, axis); break;
+                }
             }
         }
     }
@@ -347,7 +397,7 @@ public class ImpPlayer
     public ImpComp3D? pawn;
     public byte player_id;
     public ImpComp2D? focus_widget;
-    public List<ImpComp> input_targets = new List<ImpComp>();
+    public List<I_InputTarget> input_targets = new List<I_InputTarget>();
     public Dictionary<EInputKey, EInputState> key_state = new Dictionary<EInputKey, EInputState>();
     public Dictionary<EInputKey, float> key_value = new Dictionary<EInputKey, float>();
 }

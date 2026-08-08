@@ -12,6 +12,14 @@ public class C2_Rect : ImpComp2D
 
     UIStyle_Rect Style => style ?? Theme_Get().style_rect;
 
+    public void Set_FromTexture(A_Texture tex)
+    {
+        style = new UIStyle_Rect
+        {
+            texture_background = tex
+        };
+    }
+    
     protected override TMargins Margins_StyleInner() => Style.margins_inner;
     protected override TMargins Margins_StyleOuter() => Style.margins_outer;
 

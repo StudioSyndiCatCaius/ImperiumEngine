@@ -2,6 +2,7 @@
 using ImperiumEngine.Assets;
 using ImperiumEngine.Comps._2D;
 using ImperiumEngine.Enums;
+using ImperiumEngine.Interfaces;
 using ImperiumEngine.Structs;
 using Raylib_cs;
 
@@ -15,25 +16,29 @@ public enum EDrawFlags
     DebugDraw  = 1 << 1, //debug overlays: colliders, bounds, nav
 }
 
-public enum ECompEvent
+public enum ECompUpdateMode
 {
-    
+    Inherit, // inherit from parent
+    On, // force update On, regardless of parent
+    Off, // force update Off, regardless of parent
 }
 
 
 
 //comps/components are the building blocks of Imperium Node objects
 
-public class ImpComp
+public class ImpComp : I_InputTarget, I_General
 {
-    // ----------------------------------------------------------------
+    // ========================================================================
     // Statics
-    // ----------------------------------------------------------------
+    // ========================================================================
+
+    public A_Texture? gIcon() => ImpIcon.Get(GetType());
+
     
-    
-    // ----------------------------------------------------------------
+    // ========================================================================
     // Class
-    // ----------------------------------------------------------------
+    // ========================================================================
 
     public Guid Guid;
     public string name;
@@ -41,8 +46,25 @@ public class ImpComp
     public List<ImpComp> children = new List<ImpComp>();
     public ImpScene owning_scene;
     
-    [ImpVar][Export] public bool is_visible = true;
-    [ImpVar][Export] public A_Script script;
+    [ImpVar] public bool is_visible = true;
+    [ImpVar] public A_Script script;
+    [ImpVar] public ECompUpdateMode update_mode = ECompUpdateMode.Inherit;
+
+    //allows for exposing & editing instances of this comps' children. when turning off, reinit chidlren to refualt before rer
+    [ImpVar]
+    public bool children_editable
+    {
+        set { children_editable=value;
+            if (value)
+            {
+              // amke children editable  
+            }
+            else
+            {
+                //make them uneditable
+            }
+        }
+    } 
 
     public void Destroy()
     {
@@ -83,12 +105,12 @@ public class ImpComp
     // ---------------------------------------------------
     
     // Editor + Runtime -----------------
-    public virtual void OnInit()
+    [ImpFunc] public virtual void OnInit()
     {
         foreach (var child in children) { child.OnInit(); }
     }
     
-    public virtual void OnDeinit()
+    [ImpFunc] public virtual void OnDeinit()
     {
         foreach (var child in children) { child.OnDeinit(); }
     }
@@ -116,17 +138,17 @@ public class ImpComp
     }
 
     // RUNTIME -----------------
-    public virtual void OnBegin()
+    [ImpFunc] public virtual void OnBegin()
     {
         foreach (var child in children) { child.OnBegin(); }
     }
 
-    public virtual void OnEnd()
+    [ImpFunc] public virtual void OnEnd()
     {
         foreach (var child in children) { child.OnEnd(); }
     }
     
-    public virtual void OnUpdate(double dt)
+    [ImpFunc] public virtual void OnUpdate(double dt)
     {
         foreach (var child in children)
         {
@@ -135,17 +157,7 @@ public class ImpComp
         }
     }
     
-    // INPUT ------------
-    public virtual bool Input_IsEnabled()
-    {
-        return true;
-    }
-    
-    public virtual void Input_OnEvent(byte Key, EInputState state, double dt)
-    {
-        
-    }
-    
+
     // ---------------------------------------------------
     // mouse
     // ---------------------------------------------------
@@ -221,6 +233,42 @@ public class ImpComp2D : ImpComp
     [ImpVar] public Color modulate = Color.White;
     [ImpVar] public Color modulate_self = Color.White; // modulate the color of the component itself, not the children.
 
+    // ---------------------------------------------------
+    // Option
+    // ---------------------------------------------------
+
+    
+    [ImpVar][Category("Option")] public Object option_source; //a generic object to reference generic data from
+    [ImpVar][Category("Option")] public C2_Text? option_ui_title;
+    [ImpVar][Category("Option")] public C2_Rect? option_ui_icon;
+    [ImpVar][Category("Option")] public C2_Text? option_ui_description;
+    [ImpVar][Category("Option")] public C2_Button? option_ui_button; // button to trigger select/hover on this
+    
+    public Action<ImpComp2D> on_option_select;
+    public Action<ImpComp2D, bool> on_option_hover;
+
+    public void Option_Refresh()
+    {
+        if (option_source == null) return;
+        if (option_source is I_General _s)
+        {
+            option_ui_title.text = _s.gTitle().ToString();
+            option_ui_icon.Set_FromTexture(_s.gIcon());
+            option_ui_description.text = _s.gDescription().ToString();    
+        }
+
+        if (option_ui_button!=null)
+        {
+            option_ui_button.on_click = (btn) => on_option_select.Invoke(this);
+        }
+        
+    }
+    
+    // ---------------------------------------------------
+    // misc
+    // ---------------------------------------------------
+
+    
     // Absolute screen rect for this comp, recomputed every frame by OnLayout.
     public Rectangle rect;
     // rect inset by the inner margins: the area this comp's children lay out into.
@@ -382,6 +430,21 @@ public class ImpComp2D : ImpComp
 
             default:                           a_min = new(0f, 0f);     a_max = a_min;         break;
         }
+    }
+    
+    // ---------------------------------------------------
+    // Life
+    // ---------------------------------------------------
+
+    public override void OnBegin()
+    {
+        base.OnBegin();
+        Option_Refresh();
+    }
+
+    public override void OnEnd()
+    {
+        base.OnEnd();
     }
 
     // ---------------------------------------------------

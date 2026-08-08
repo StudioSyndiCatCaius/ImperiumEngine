@@ -25,9 +25,11 @@ public class ImpResource_Font : ImpResource
         var font = Raylib.LoadFontEx(filepath, base_size, null, 0);
         if (font.Texture.Id == 0) return;
 
-        // the atlas is rasterised once at base_size, so filter it for the common case of
-        // drawing smaller than that - otherwise downscaled glyphs alias badly
-        Raylib.SetTextureFilter(font.Texture, TextureFilter.Bilinear);
+        // The atlas is rasterised once at base_size and UI text is drawn well under it (16pt
+        // off a 48pt atlas), so a single mip sampled bilinearly still undersamples and leaves
+        // glyph edges ragged. Mips give the minification something to blend between.
+        Raylib.GenTextureMipmaps(ref font.Texture);
+        Raylib.SetTextureFilter(font.Texture, TextureFilter.Trilinear);
 
         r_font.Add(font);
     }

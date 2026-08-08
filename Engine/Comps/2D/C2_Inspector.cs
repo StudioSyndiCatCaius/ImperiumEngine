@@ -1,6 +1,7 @@
 using System.Numerics;
 using System.Reflection;
 using System.Text;
+using ImperiumEngine.Assets;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Interfaces;
 using ImperiumEngine.Main;
@@ -104,6 +105,8 @@ public class C2_Inspector : ImpComp2D
     [ImpVar] public float label_ratio = 0.4f;
     //how deep nested structs are expanded before the inspector stops recursing
     [ImpVar] public int max_depth = 4;
+    //group rows under a header per category; off lays every row out in one flat list
+    [ImpVar] public bool use_categories = true;
 
     public Action<C2_InspectorProperty>? on_property_changed;
 
@@ -178,21 +181,105 @@ public class C2_Inspector : ImpComp2D
             return;
         }
 
-        foreach (var m in Members_Shared(targets))
+        var members = Members_Shared(targets);
+
+        if (!use_categories)
         {
-            var binds = new List<TPropertyBind>();
-            foreach (var t in targets)
+            foreach (var m in members)
             {
-                var b = TPropertyBind.Member(t, Member_On(t.GetType(), m) ?? m);
-                if (b != null) binds.Add(b);
+                var flat = Row_Build(targets, m);
+                if (flat != null) c_list.Child_Add(flat);
+            }
+            return;
+        }
+
+        foreach (var (category, list) in Categories_Group(members))
+        {
+            var box = new C2_Expandable
+            {
+                name = category,
+                //class names are shown as declared: "ImpComp3D" prettifies to "Imp Comp3 D"
+                title = category,
+                is_expanded = true,
+                icon = Category_Icon(category, list[0]),
+            };
+
+            foreach (var m in list)
+            {
+                var row = Row_Build(targets, m);
+                if (row != null) box.Child_Add(row);
             }
 
-            if (binds.Count == 0) continue;
-
-            var row = new C2_InspectorProperty(this, binds);
-            row.Rebuild(0);
-            c_list.Child_Add(row);
+            if (box.children.Count == 0) continue;
+            c_list.Child_Add(box);
         }
+    }
+
+    // One member, bound across every selected target, as a row ready to be parented.
+    C2_InspectorProperty? Row_Build(List<object> targets, MemberInfo m)
+    {
+        var binds = new List<TPropertyBind>();
+        foreach (var t in targets)
+        {
+            var b = TPropertyBind.Member(t, Member_On(t.GetType(), m) ?? m);
+            if (b != null) binds.Add(b);
+        }
+
+        if (binds.Count == 0) return null;
+
+        var row = new C2_InspectorProperty(this, binds);
+        row.Rebuild(0);
+        return row;
+    }
+
+    // ---------------------------------------------------
+    // categories
+    // ---------------------------------------------------
+
+    // A member's category: its [Category] when it declares one, otherwise the class that
+    // declared it - so an inherited member files under the base class it actually came from
+    // rather than whatever concrete type happens to be selected.
+    public static string Category_Of(MemberInfo m)
+    {
+        var attr = m.GetCustomAttribute<CategoryAttribute>();
+        if (attr?.Name is string custom && custom.Length > 0) return custom;
+
+        return m.DeclaringType?.Name ?? "";
+    }
+
+    // Members bucketed by category, ordered by where each category first appears. Reflection
+    // lists a type's own members ahead of the ones it inherits, so the selected object's own
+    // class heads the inspector and its bases follow underneath.
+    static List<KeyValuePair<string, List<MemberInfo>>> Categories_Group(List<MemberInfo> members)
+    {
+        var order = new List<string>();
+        var map = new Dictionary<string, List<MemberInfo>>();
+
+        foreach (var m in members)
+        {
+            string key = Category_Of(m);
+
+            if (!map.TryGetValue(key, out var list))
+            {
+                list = new List<MemberInfo>();
+                map[key] = list;
+                order.Add(key);
+            }
+
+            list.Add(m);
+        }
+
+        var result = new List<KeyValuePair<string, List<MemberInfo>>>();
+        foreach (var key in order) { result.Add(new KeyValuePair<string, List<MemberInfo>>(key, map[key])); }
+        return result;
+    }
+
+    // A category named after the class it came from can use that class's icon, inheritance
+    // fallback and all. A custom label has only its own name to match on.
+    static A_Texture? Category_Icon(string category, MemberInfo first)
+    {
+        if (first.DeclaringType is Type t && t.Name == category) return ImpIcon.Get(t);
+        return ImpIcon.Get(category);
     }
 
     // Skips nulls, and collapses to a single target when multi-select is off.

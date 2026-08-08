@@ -24,6 +24,10 @@ public class ImpApp
     public void Run(Action? pre_loop=null)
     {
         app = this;
+
+        //must precede InitWindow: raylib reads the flags when it creates the GL context.
+        //multisampling is what keeps gizmo lines and 3D silhouettes from stair-stepping.
+        Raylib.SetConfigFlags(ConfigFlags.Msaa4xHint);
         Raylib.InitWindow(1280, 720, name);
         R3D.Init(Raylib.GetScreenWidth(), Raylib.GetScreenHeight());
 

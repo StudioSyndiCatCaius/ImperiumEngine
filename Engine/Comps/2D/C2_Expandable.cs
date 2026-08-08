@@ -18,6 +18,9 @@ public class C2_Expandable : ImpComp2D
     public float separation = 2f;
     public float indent = 12f; //how far children are inset from the header
 
+    //drawn left of the title; inspector categories use it to show the owning class
+    public A_Texture? icon;
+
     public UIStyle_Text? style_text;
 
     public Action<C2_Expandable>? on_expanded_changed;
@@ -123,8 +126,20 @@ public class C2_Expandable : ImpComp2D
 
         Arrow_Draw(th);
 
-        var tr = new Rectangle(rect_header.X + th.padding * 2, rect_header.Y,
-                               MathF.Max(0, rect_header.Width - th.padding * 2), rect_header.Height);
+        float text_x = rect_header.X + th.padding * 2;
+
+        if (icon != null)
+        {
+            float s = MathF.Max(0f, rect_header.Height - th.padding);
+
+            ImpUI.TextureFit(icon, new Rectangle(
+                text_x, rect_header.Y + (rect_header.Height - s) * 0.5f, s, s), th.col_text);
+
+            text_x += s + th.padding * 0.5f;
+        }
+
+        var tr = new Rectangle(text_x, rect_header.Y,
+                               MathF.Max(0, rect_header.X + rect_header.Width - text_x), rect_header.Height);
         ImpUI.TextInRect(title, tr, StyleText, 0f);
     }
 

@@ -213,7 +213,37 @@ public static class ImpUI
         if (tex?.get_Texture2D() is not Texture2D t || t.Id == 0) return;
 
         var src = new Rectangle(0, 0, t.Width, t.Height);
-        Raylib.DrawTexturePro(t, src, dest, Vector2.Zero, 0f, Color_Mul(tint, Modulate_Current));
+        Raylib.DrawTexturePro(t, src, Rect_Snap(dest), Vector2.Zero, 0f, Color_Mul(tint, Modulate_Current));
+    }
+
+    // Draws a texture centred in `area` at its own pixel size, scaling down only when it
+    // cannot fit. UI icons are authored at the size they are shown at (16px), and stretching
+    // one to fill an 18px row box resamples pixel-exact artwork into a blurry mess - so the
+    // box is treated as space reserved for the icon rather than a size to stretch it to.
+    public static void TextureFit(A_Texture tex, Rectangle area, Color tint)
+    {
+        if (tex?.get_Texture2D() is not Texture2D t || t.Id == 0) return;
+        if (t.Width <= 0 || t.Height <= 0) return;
+
+        float scale = MathF.Min(1f, MathF.Min(area.Width / t.Width, area.Height / t.Height));
+        float w = t.Width * scale;
+        float h = t.Height * scale;
+
+        Texture(tex, new Rectangle(
+            area.X + (area.Width - w) * 0.5f,
+            area.Y + (area.Height - h) * 0.5f,
+            w, h), tint);
+    }
+
+    // Layout works in floats, so a rect routinely lands on a half pixel - which samples an
+    // icon between texels and smears it. Snapping to the pixel grid at draw time keeps the
+    // geometry honest without forcing the layout to be integral.
+    public static Rectangle Rect_Snap(Rectangle r)
+    {
+        float x = MathF.Round(r.X);
+        float y = MathF.Round(r.Y);
+
+        return new Rectangle(x, y, MathF.Round(r.X + r.Width) - x, MathF.Round(r.Y + r.Height) - y);
     }
 
     // Draws with the style's shadow, then outline, then fill.
@@ -225,6 +255,10 @@ public static class ImpUI
         Font font = Font_Of(style);
         float size = style.size;
         float spacing = Text_Spacing(style);
+
+        // A glyph quad starting mid-pixel is resampled across two columns of texels, which
+        // reads as soft, uneven text. Centring maths hands us those positions constantly.
+        pos = new Vector2(MathF.Round(pos.X), MathF.Round(pos.Y));
 
         if (style.shadow_size > 0)
         {
