@@ -4,19 +4,25 @@ namespace ImperiumEngine.Comps._1D.Dialog;
 
 public class Dialog_Confirm : C1_Dialog
 {
-    [ImpVar] public string text="Do this thing?";
-    [ImpVar] public string text_yes="Yes";
-    [ImpVar] public string text_no="No";
+    public string message;
+
+    public string text_yes = "Yes";
+    public string text_no = "No";
     
-    public Action<bool> on_confirm;
+    public Action on_yes;
+    public Action on_no;
+    
+    C2_Box box=new ();
+    C2_Text text=new ();
+    C2_Button btn_yes=new ();
+    C2_Button btn_no=new ();
 
-    public C2_Button? button_yes = new();
-    public C2_Button? button_no = new ();
-
-    public Dialog_Confirm()
+    public async Task Run(string _message, Action _on_yes, Action _on_no)
     {
-        button_yes.text = text_yes;
-        button_no.text = text_no;
+        box.is_visible=true;
+        
+        //wait for the user to press a button.
+        
+        box.is_visible=false;
     }
-    
 }

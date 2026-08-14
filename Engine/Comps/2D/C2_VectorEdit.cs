@@ -1,126 +1,105 @@
 using System.Numerics;
 using ImperiumEngine.Enums;
-using ImperiumEngine.Main;
+using ImperiumEngine.Structs;
 using Raylib_cs;
 
 namespace ImperiumEngine.Comps._2D;
 
-// A row of numeric fields sharing one line, each behind a one-letter tag.
-//
-// This is what a vector wants to look like. Left to the generic struct expansion a Vector3
-// becomes a collapsible group of three full-width rows, which costs four lines to say what
-// fits on one - and a transform, which is three vectors, would take twelve.
 public class C2_VectorEdit : ImpComp2D
 {
-    //separation between columns
-    const float COLUMN_GAP = 4f;
-
-    public readonly C2_Progresser[] fields;
+    public readonly C2_Slider[] fields;
     public string[] tags = { "X", "Y", "Z", "W" };
-
-    // Axis tint, kept muted: this is a tag on a field, not a control of its own, and a
-    // transform puts nine of them on screen at once. W has no axis colour to borrow.
     public static readonly Color[] axis_colors =
     {
-        new Color(198, 82, 92, 255),   // X
-        new Color(124, 176, 84, 255),  // Y
-        new Color(78, 130, 208, 255),  // Z
-        new Color(150, 150, 160, 255), // W
+        new Color(198, 82, 92, 255),
+        new Color(124, 176, 84, 255),
+        new Color(78, 130, 208, 255),
+        new Color(150, 150, 160, 255),
     };
 
-    //multi-selection disagreement; fields blank rather than showing one target's value
-    public bool is_mixed;
+    public Action<C2_VectorEdit> on_changed;
 
-    public Action<C2_VectorEdit>? on_changed;
-
-    readonly Rectangle[] rect_tags;
-    float tag_width = 12f;
+    const float Gap = 4f;
+    float _tag_w = 12f;
+    readonly Rectangle[] _tags;
 
     public int Count => fields.Length;
 
     public C2_VectorEdit(int count, bool integers = false)
     {
-        cursor_filter = ECursorFilter.Pass; //the fields take the cursor, not the row
-
-        fields = new C2_Progresser[count];
-        rect_tags = new Rectangle[count];
-
+        cursor_filter = ECursorFilter.Pass;
+        fields = new C2_Slider[count];
+        _tags = new Rectangle[count];
         for (int i = 0; i < count; i++)
         {
-            var field = new C2_Progresser
+            C2_Slider field = new()
             {
-                mouse_can_edit = true,
-                can_type_edit = true,
-                text_style = EProgresserTextStyle.Value,
-                step_amount = integers ? 1f : 0f,
-                decimals = integers ? 0 : 3,
-                drag_sensitivity = integers ? 0.1f : 0.01f,
-                text_inset = 4f, //three fields on one line have no room for theme padding
+                is_spinner = true,
+                min = 0,
+                max = 0,
+                step = integers ? 1f : 0f,
+                value_text_decimals = integers ? 0 : 3,
+                drag_sensitivity = integers ? 0.2f : 0.05f,
                 accent_color = axis_colors[Math.Min(i, axis_colors.Length - 1)],
+                view_alighnment_H = EUIViewportAlignment.Start,
+                view_alighnment_V = EUIViewportAlignment.Fill,
             };
-
-            field.on_value_changed = _ => on_changed?.Invoke(this);
-
+            field.on_changed = _ => on_changed?.Invoke(this);
             fields[i] = field;
             Child_Add(field);
         }
     }
 
-    // ---------------------------------------------------
-    // value
-    // ---------------------------------------------------
-
-    public float Value_Get(int index)
-    {
-        return index >= 0 && index < fields.Length ? fields[index].value : 0f;
-    }
+    public float Value_Get(int index) =>
+        index >= 0 && index < fields.Length ? fields[index].value : 0f;
 
     public void Values_SetQuiet(ReadOnlySpan<float> values)
     {
         for (int i = 0; i < fields.Length; i++)
         {
+            if (fields[i].IsBusy) continue;
             fields[i].Value_SetQuiet(i < values.Length ? values[i] : 0f);
-            fields[i].text_style = is_mixed ? EProgresserTextStyle.None : EProgresserTextStyle.Value;
         }
     }
 
-    // ---------------------------------------------------
-    // layout
-    // ---------------------------------------------------
-
-    public override Vector2 Size_GetContentMin() => new Vector2(0, Theme_Get().item_height);
-
-    protected override void Layout_Children(Rectangle content)
+    public bool IsBusy()
     {
-        var th = Theme_Get();
+        for (int i = 0; i < fields.Length; i++)
+            if (fields[i].IsBusy) return true;
+        return false;
+    }
 
-        //the tag column is measured, not guessed, so a larger theme font still fits
-        tag_width = ImpUI.TextMeasure("W", th.style_text_dim).X + 4f;
+    public override void OnUpdate(double dt)
+    {
+        base.OnUpdate(dt);
+        TDimensions2 dim = Dimensions_Get();
+        if (dim.size.X <= 0 || fields.Length == 0) return;
 
-        float column = (content.Width - COLUMN_GAP * (fields.Length - 1)) / fields.Length;
-
+        float col = (dim.size.X - Gap * (fields.Length - 1)) / fields.Length;
+        _tag_w = 12f;
         for (int i = 0; i < fields.Length; i++)
         {
-            float x = content.X + i * (column + COLUMN_GAP);
-
-            rect_tags[i] = new Rectangle(x, content.Y, tag_width, content.Height);
-
-            fields[i].OnLayout_Exact(new Rectangle(
-                x + tag_width, content.Y, MathF.Max(0, column - tag_width), content.Height));
+            float x = i * (col + Gap);
+            _tags[i] = new Rectangle(dim.position.X + x, dim.position.Y, _tag_w, dim.size.Y);
+            fields[i].transform.position = new Vector2(x + _tag_w, 0);
+            fields[i].size = new Vector2(MathF.Max(0, col - _tag_w), dim.size.Y);
+            fields[i].size_min = new Vector2(0, 18);
+            fields[i].view_alighnment_H = EUIViewportAlignment.Start;
+            fields[i].view_alighnment_V = EUIViewportAlignment.Fill;
         }
     }
 
-    // ---------------------------------------------------
-    // draw
-    // ---------------------------------------------------
-
-    protected override void Draw_Self(double dt, EDrawFlags flags)
+    public override void OnDraw2D(double dt, WDrawFlags flags)
     {
-        var th = Theme_Get();
-
+        base.OnDraw2D(dt, flags);
         for (int i = 0; i < fields.Length && i < tags.Length; i++)
         {
-            ImpUI.TextInRect(tags[i], rect_tags[i], th.style_text_dim, 0.5f);
+            Color prev = UiStyle_Text.MUTED.color;
+            UiStyle_Text.MUTED.color = axis_colors[Math.Min(i, axis_colors.Length - 1)];
+            UiStyle_Text.MUTED.Draw(tags[i], new Vector2(_tags[i].X, _tags[i].Y),
+                new Vector2(_tags[i].Width, _tags[i].Height),
+                0, ETextWrap.None, EUIPositionAlignment.Center, EUIPositionAlignment.Center);
+            UiStyle_Text.MUTED.color = prev;
         }
     }
 }

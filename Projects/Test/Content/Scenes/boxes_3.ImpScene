@@ -1,0 +1,83 @@
+{
+  "_class": "ImpScene",
+  "vars": {
+    "root_type": {
+      "class_name": "ImpComp3D"
+    },
+    "background_color": {
+      "R": 26,
+      "G": 30,
+      "B": 36,
+      "A": 255
+    },
+    "canvas_size": {
+      "X": 1920,
+      "Y": 1080
+    },
+    "source_file": null,
+    "source_index": 0,
+    "root": {
+      "_class": "ImpComp3D",
+      "name": "Boxes3",
+      "vars": {
+        "transform": {
+          "position": { "X": 0, "Y": 0, "Z": 0 },
+          "rotation": { "X": 0, "Y": 0, "Z": 0 },
+          "scale": { "X": 1, "Y": 1, "Z": 1 }
+        },
+        "physics_enabled": false,
+        "is_visible": true
+      },
+      "children": [
+        {
+          "_class": "C3_Mesh",
+          "name": "Box_A",
+          "vars": {
+            "mesh": { "path": "builtin:A_Mesh.GEO_CUBE" },
+            "cast_shadows": true,
+            "transform": {
+              "position": { "X": -2, "Y": 0.5, "Z": 0 },
+              "rotation": { "X": 0, "Y": 0, "Z": 0 },
+              "scale": { "X": 1, "Y": 1, "Z": 1 }
+            },
+            "physics_enabled": true,
+            "is_visible": true
+          },
+          "children": []
+        },
+        {
+          "_class": "C3_Mesh",
+          "name": "Box_B",
+          "vars": {
+            "mesh": { "path": "builtin:A_Mesh.GEO_CUBE" },
+            "cast_shadows": true,
+            "transform": {
+              "position": { "X": 0, "Y": 0.5, "Z": 0 },
+              "rotation": { "X": 0, "Y": 0, "Z": 0 },
+              "scale": { "X": 1, "Y": 1, "Z": 1 }
+            },
+            "physics_enabled": true,
+            "is_visible": true
+          },
+          "children": []
+        },
+        {
+          "_class": "C3_Mesh",
+          "name": "Box_C",
+          "vars": {
+            "mesh": { "path": "builtin:A_Mesh.GEO_CUBE" },
+            "cast_shadows": true,
+            "transform": {
+              "position": { "X": 2, "Y": 0.5, "Z": 0 },
+              "rotation": { "X": 0, "Y": 0, "Z": 0 },
+              "scale": { "X": 1, "Y": 1, "Z": 1 }
+            },
+            "physics_enabled": true,
+            "is_visible": true
+          },
+          "children": []
+        }
+      ]
+    }
+  }
+}

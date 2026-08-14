@@ -1,116 +1,158 @@
-using ImperiumEngine.Main;
-using Raylib_cs;
+﻿using System.Numerics;
+using ImperiumEngine.Enums;
+using ImperiumEngine.Structs;
 
 namespace ImperiumEngine.Comps._2D;
 
-//equivalent of TabContainer in Godot
 public class C2_TabBox : ImpComp2D
 {
-    public int active_tab = 0;
-
-    [ImpVar] public UIStyle_Rect? style;
-    [ImpVar] public UIStyle_Text? style_text;
-    [ImpVar] public bool can_close_tabs;
+    public int selected_tab = 0;
+    public bool show_tabs = true;
+    public float tab_height = 28f;
+    public float tab_width = 96f;
     
-    public Action<C2_TabBox, int>? on_tab_changed;
-    public Action<C2_TabBox, int, ImpComp>? on_request_close_tab;
 
-    readonly List<Rectangle> tab_rects = new List<Rectangle>();
-    Rectangle rect_tabs;
-    Rectangle rect_body;
+    public Action<int> on_tab_change;
 
-    UIStyle_Rect Style => style ?? Theme_Get().style_rect;
-    UIStyle_Text StyleText => style_text ?? Theme_Get().style_text;
-
-    // ---------------------------------------------------
-    // layout
-    // ---------------------------------------------------
-
-    protected override void Layout_Children(Rectangle content)
+    public C2_List list_tabs = new()
     {
-        var th = Theme_Get();
+        alignment = EUIAlignment.Horizontal,
+        is_scrollable = false,
+        spacing = 0,
+    };
 
-        rect_tabs = new Rectangle(content.X, content.Y, content.Width, th.tab_height);
-        rect_body = new Rectangle(
-            content.X, content.Y + th.tab_height,
-            content.Width, MathF.Max(0, content.Height - th.tab_height));
+    public UiStyle_Box style_background = UiStyle_Box.STYLE_BKG_DARK;
+    public UiStyle_Box style_tab_idle = UiStyle_Box.STYLE_TAB_IDLE;
+    public UiStyle_Box style_tab_hovered = UiStyle_Box.STYLE_TAB_HOVER;
+    public UiStyle_Box style_tab_selected = UiStyle_Box.STYLE_TAB_PRESS;
+    public UiStyle_Text text_style = UiStyle_Text.DEFAULT;
 
-        tab_rects.Clear();
-        float x = rect_tabs.X;
-        foreach (var c in children)
-        {
-            float w = ImpUI.TextMeasure(Tab_Name(c), StyleText).X + th.padding * 3;
-            tab_rects.Add(new Rectangle(x, rect_tabs.Y, w, rect_tabs.Height));
-            x += w;
-        }
+    int last_tab = -1;
+    int _built_count = -1;
 
-        if (children.Count > 0) active_tab = Math.Clamp(active_tab, 0, children.Count - 1);
+    public C2_TabBox()
+    {
+        cursor_filter = ECursorFilter.Pass;
+        view_alighnment_H = EUIViewportAlignment.Fill;
+        view_alighnment_V = EUIViewportAlignment.Fill;
 
-        // Only the active tab is laid out. Everything else has its geometry wiped, so no
-        // inactive tab can be drawn or hit-tested off a stale rect.
+        Child_Add(list_tabs);
+        list_tabs.on_option_select = OnTabSelect;
+    }
+
+    public override void OnUpdate(double dt)
+    {
+        base.OnUpdate(dt);
+
+        if (!children.Contains(list_tabs))
+            Child_Add(list_tabs);
+
+        List<ImpComp2D> pages = new();
         for (int i = 0; i < children.Count; i++)
         {
-            if (i == active_tab && children[i].is_visible) children[i].OnLayout(rect_body);
-            else Rect_Clear(children[i]);
+            if (children[i] == list_tabs) continue;
+            if (children[i] is ImpComp2D p) pages.Add(p);
         }
-    }
 
-    // ---------------------------------------------------
-    // draw
-    // ---------------------------------------------------
-
-    protected override void Draw_Self(double dt, EDrawFlags flags)
-    {
-        var th = Theme_Get();
-
-        ImpUI.Rect(rect_body, Style.color);
-        ImpUI.Rect(rect_tabs, th.col_panel_alt);
-
-        Input_Update();
-
-        for (int i = 0; i < children.Count && i < tab_rects.Count; i++)
+        if (pages.Count == 0)
         {
-            var r = tab_rects[i];
-            bool is_active = i == active_tab;
-
-            if (is_active)
+            selected_tab = 0;
+            list_tabs.is_visible = false;
+            if (_built_count != 0)
             {
-                ImpUI.Rect(r, Style.color);
-                ImpUI.Rect(new Rectangle(r.X, r.Y, r.Width, 2), th.col_accent);
+                list_tabs.Child_RemoveAll();
+                _built_count = 0;
             }
-            else if (ImpUI.IsHovered(this) && Raylib.CheckCollisionPointRec(ImpUI.mouse_pos, r))
-            {
-                ImpUI.Rect(r, th.col_hover);
-            }
-
-            ImpUI.TextInRect(Tab_Name(children[i]), r, StyleText, 0.5f);
+            return;
         }
-    }
 
-    protected override void Draw_Children(double dt, EDrawFlags flags)
-    {
-        var active = Child_GetActive();
-        if (active != null && active.is_visible) active.OnDraw(dt, flags);
-    }
+        selected_tab = Math.Clamp(selected_tab, 0, pages.Count - 1);
 
-    void Input_Update()
-    {
-        if (!ImpUI.mouse_pressed || !ImpUI.IsHovered(this)) return;
+        if (_built_count != pages.Count)
+            RebuildTabs(pages.Count);
 
-        for (int i = 0; i < tab_rects.Count; i++)
+        for (int i = 0; i < list_tabs.children.Count; i++)
         {
-            if (Raylib.CheckCollisionPointRec(ImpUI.mouse_pos, tab_rects[i]))
-            {
-                active_tab = i;
-                return;
-            }
+            if (list_tabs.children[i] is not C2_Button btn) continue;
+            string title = TitleOf(i);
+            if (btn.text != title) btn.text = title;
+            bool sel = i == selected_tab;
+            btn.style.style_unhovered = sel ? style_tab_selected : style_tab_idle;
+            btn.style.style_hovered = style_tab_hovered;
+            btn.style.style_pressed = style_tab_selected;
+        }
+
+        TDimensions2 dim = Dimensions_Get();
+        float th = show_tabs ? tab_height : 0f;
+
+        list_tabs.is_visible = show_tabs;
+        list_tabs.view_alighnment_H = EUIViewportAlignment.Start;
+        list_tabs.view_alighnment_V = EUIViewportAlignment.Start;
+        list_tabs.size = new Vector2(dim.size.X, th);
+        list_tabs.size_min = new Vector2(0, th);
+        list_tabs.transform.position = Vector2.Zero;
+
+        float content_h = MathF.Max(0, dim.size.Y - th);
+        for (int i = 0; i < pages.Count; i++)
+        {
+            ImpComp2D page = pages[i];
+            page.is_visible = i == selected_tab;
+            page.view_alighnment_H = EUIViewportAlignment.Start;
+            page.view_alighnment_V = EUIViewportAlignment.Start;
+            page.size = new Vector2(dim.size.X, content_h);
+            page.size_min = new Vector2(0, 0);
+            page.transform.position = new Vector2(0, th);
+        }
+
+        if (last_tab != selected_tab)
+        {
+            last_tab = selected_tab;
+            on_tab_change?.Invoke(selected_tab);
         }
     }
 
-    public ImpComp? Child_GetActive()
+    public override void OnDraw2D(double dt, WDrawFlags flags)
     {
-        return active_tab >= 0 && active_tab < children.Count ? children[active_tab] : null;
+        base.OnDraw2D(dt, flags);
+        style_background?.Draw(Dimensions_Get());
     }
 
-    static string Tab_Name(ImpComp c) => string.IsNullOrEmpty(c.name) ? "Tab" : c.name;
+    void RebuildTabs(int count)
+    {
+        list_tabs.Child_RemoveAll();
+        for (int i = 0; i < count; i++)
+        {
+            C2_Button btn = new()
+            {
+                text = TitleOf(i),
+                size = new Vector2(tab_width, tab_height),
+                size_min = new Vector2(tab_width, tab_height),
+                style = new UiStyle_Button
+                {
+                    style_unhovered = style_tab_idle,
+                    style_hovered = style_tab_hovered,
+                    style_pressed = style_tab_selected,
+                },
+                text_style = text_style,
+            };
+            list_tabs.Child_Add(btn);
+        }
+        _built_count = count;
+    }
+
+    void OnTabSelect(ImpComp2D c, int i)
+    {
+        if (i < 0) return;
+        selected_tab = i;
+    }
+
+    string TitleOf(int i)
+    {
+        ImpComp? _tab = Child_GetAt(i+1);
+        if (_tab != null)
+        {
+            return _tab.name;
+        }
+        return "Tab "+i;
+    }
 }

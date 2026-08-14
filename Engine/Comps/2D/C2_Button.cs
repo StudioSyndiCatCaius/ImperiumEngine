@@ -1,7 +1,6 @@
-using System.Numerics;
+﻿using System.Numerics;
 using ImperiumEngine.Assets;
 using ImperiumEngine.Enums;
-using ImperiumEngine.Main;
 using ImperiumEngine.Structs;
 using Raylib_cs;
 
@@ -9,89 +8,181 @@ namespace ImperiumEngine.Comps._2D;
 
 public enum EButtonLayout
 {
-    Icon_Text_H, Text_Icon_H, Icon_Text_V, Text_Icon_V,
+    Icon_Text_H, Icon_Text_V, Text_Icon_H, Text_Icon_V,
 }
 
 public class C2_Button : ImpComp2D
 {
-    [ImpVar] public string text = "";
-    [ImpVar] public A_Texture? icon;
-    [ImpVar] public UIStyle_Button? style;
-    [ImpVar] public UIStyle_Text? style_text;
-    [ImpVar] public EButtonLayout layout = EButtonLayout.Icon_Text_H;
-    
-    [ImpVar] public bool is_disabled = false;
+    public string text = "";
+    public A_Texture icon = null;
+    public EButtonLayout layout = EButtonLayout.Icon_Text_H;
+    public UiStyle_Button style = UiStyle_Button.DEFAULT;
+    public UiStyle_Text text_style = UiStyle_Text.DEFAULT;
 
-    public Action<C2_Button>? on_click;
+    public float icon_size = 16;
+    public int override_font_size = 0;
+    public float content_pad = 4;
+    public float gap = 4;
+    public EUIPositionAlignment content_align_h = EUIPositionAlignment.Center;
+    public EUIPositionAlignment content_align_v = EUIPositionAlignment.Center;
+    public bool is_disabled = false;
 
-    // Colour actually drawn, eased towards the target state when blending is enabled.
-    Color col_current;
-    bool col_primed = false;
+    public Action on_click;
 
-    UIStyle_Button Style => style ?? Theme_Get().style_button;
-    UIStyle_Text StyleText => style_text ?? Theme_Get().style_text;
+    public bool is_hovered = false;
+    public bool is_pressed = false;
 
-    protected override TMargins Margins_StyleInner() => State_GetRect().margins_inner;
-    protected override TMargins Margins_StyleOuter() => State_GetRect().margins_outer;
-
-    public override Vector2 Size_GetContentMin()
+    public C2_Button()
     {
-        var m = ImpUI.TextMeasure(text, StyleText);
-        float pad = Theme_Get().padding;
-        return new Vector2(m.X + pad * 2, m.Y + pad);
+        option_button = this;
+        cursor_filter = ECursorFilter.Hit;
     }
 
-    // Picks the style rect matching the button's current interaction state.
-    UIStyle_Rect State_GetRect()
+    public override void OnDraw2D(double dt, WDrawFlags flags)
     {
-        var s = Style;
-        var th = Theme_Get();
+        base.OnDraw2D(dt, flags);
+        if (style == null) return;
 
-        if (is_disabled) return s.rect_disabled ?? th.style_button_disabled;
-        if (ImpUI.IsPressed(this)) return s.rect_pressed ?? th.style_button_pressed;
-        if (ImpUI.IsHovered(this)) return s.rect_hovered ?? th.style_button_hovered;
-        return s.rect_normal ?? th.style_button_normal;
+        TDimensions2 dim = Dimensions_Get();
+        if (dim.size.X <= 0 || dim.size.Y <= 0) return;
+
+        if (is_pressed)
+        {
+            style.style_pressed.Draw(dim);
+            is_pressed = false;
+        }
+        else if (is_hovered) style.style_hovered.Draw(dim);
+        else style.style_unhovered.Draw(dim);
+
+        bool has_icon = icon != null;
+        bool has_text = !string.IsNullOrEmpty(text);
+        if (!has_icon && !has_text) return;
+
+        float pad = content_pad > 0 ? content_pad : 0;
+        Vector2 origin = dim.position + new Vector2(pad, pad);
+        Vector2 area = dim.size - new Vector2(pad * 2, pad * 2);
+        if (area.X <= 0 || area.Y <= 0) return;
+
+        float iw = 0, ih = 0;
+        if (has_icon)
+        {
+            float s = icon_size > 0 ? icon_size : 16;
+            Texture2D tex = icon.texture;
+            float tw0 = tex.Width > 0 ? tex.Width : s;
+            float th0 = tex.Height > 0 ? tex.Height : s;
+            if (tw0 >= th0)
+            {
+                iw = s;
+                ih = s * (th0 / tw0);
+            }
+            else
+            {
+                ih = s;
+                iw = s * (tw0 / th0);
+            }
+        }
+
+        float tw = 0, th = 0;
+        Font font = text_style?.font != null ? text_style.font.font : Raylib.GetFontDefault();
+        float font_size = override_font_size > 0
+            ? override_font_size
+            : (text_style != null && text_style.size > 0 ? text_style.size : 16);
+        if (has_text)
+        {
+            Vector2 m = Raylib.MeasureTextEx(font, text, font_size, 1f);
+            tw = m.X;
+            th = m.Y;
+        }
+
+        float g = has_icon && has_text ? gap : 0;
+        bool vertical = layout is EButtonLayout.Icon_Text_V or EButtonLayout.Text_Icon_V;
+        float block_w = vertical ? MathF.Max(iw, tw) : iw + g + tw;
+        float block_h = vertical ? ih + g + th : MathF.Max(ih, th);
+        float bx = content_align_h switch
+        {
+            EUIPositionAlignment.Center => origin.X + (area.X - block_w) * 0.5f,
+            EUIPositionAlignment.End => origin.X + area.X - block_w,
+            _ => origin.X,
+        };
+        float by = content_align_v switch
+        {
+            EUIPositionAlignment.Center => origin.Y + (area.Y - block_h) * 0.5f,
+            EUIPositionAlignment.End => origin.Y + area.Y - block_h,
+            _ => origin.Y,
+        };
+
+        Vector2 icon_pos, text_pos;
+        switch (layout)
+        {
+            case EButtonLayout.Text_Icon_H:
+                text_pos = new Vector2(bx, by + (block_h - th) * 0.5f);
+                icon_pos = new Vector2(bx + tw + g, by + (block_h - ih) * 0.5f);
+                break;
+            case EButtonLayout.Icon_Text_V:
+                icon_pos = new Vector2(bx + (block_w - iw) * 0.5f, by);
+                text_pos = new Vector2(bx + (block_w - tw) * 0.5f, by + ih + g);
+                break;
+            case EButtonLayout.Text_Icon_V:
+                text_pos = new Vector2(bx + (block_w - tw) * 0.5f, by);
+                icon_pos = new Vector2(bx + (block_w - iw) * 0.5f, by + th + g);
+                break;
+            default: // Icon_Text_H
+                icon_pos = new Vector2(bx, by + (block_h - ih) * 0.5f);
+                text_pos = new Vector2(bx + iw + g, by + (block_h - th) * 0.5f);
+                break;
+        }
+
+        if (has_icon)
+        {
+            Texture2D tex = icon.texture;
+            Raylib.DrawTexturePro(tex,
+                new Rectangle(0, 0, tex.Width, tex.Height),
+                new Rectangle(icon_pos.X, icon_pos.Y, iw, ih),
+                Vector2.Zero, 0f, is_disabled ? new Color(255, 255, 255, 120) : Color.White);
+        }
+
+        if (has_text && text_style != null)
+        {
+            Color prev = text_style.color;
+            if (is_disabled) text_style.color = new Color(prev.R, prev.G, prev.B, (byte)120);
+            text_style.Draw(text, text_pos, new Vector2(tw + 1, th + 1), override_font_size, ETextWrap.None,
+                EUIPositionAlignment.Start, EUIPositionAlignment.Start);
+            text_style.color = prev;
+        }
     }
 
-    public override void Cursor_OnEvent(ECursorEvent ev)
+    public override void Cursor_OnEvent(ImpPlayer player, ECursorEvent evnt)
     {
+        base.Cursor_OnEvent(player, evnt);
         if (is_disabled) return;
-        if (ev == ECursorEvent.Clicked) on_click?.Invoke(this);
+        if (evnt == ECursorEvent.Select_A)
+        {
+            is_pressed = true;
+            as_option_select?.Invoke(this);
+            on_click?.Invoke();
+        }
     }
 
-    protected override void Draw_Self(double dt, EDrawFlags flags)
+    public override void Cursor_OnEnter(ImpPlayer player)
     {
-        var s = Style;
-        var target = State_GetRect();
+        base.Cursor_OnEnter(player);
+        is_hovered = true;
+        as_option_hover?.Invoke(this);
+    }
 
-        // ease between states so hover/press transitions aren't a hard snap
-        if (!col_primed)
-        {
-            col_current = target.color;
-            col_primed = true;
-        }
-        else if (s.use_blend_time && s.blend_time > 0f)
-        {
-            col_current = ImpUI.Color_Lerp(col_current, target.color, (float)(dt / s.blend_time));
-        }
-        else
-        {
-            col_current = target.color;
-        }
-
-        if (target.texture_background != null) ImpUI.Texture(target.texture_background, rect, col_current);
-        else ImpUI.Rect(rect, col_current);
-
-        ImpUI.TextInRect(text, rect, StyleText, 0.5f);
+    public override void Cursor_OnExit(ImpPlayer player)
+    {
+        base.Cursor_OnExit(player);
+        is_hovered = false;
+        as_option_unhover?.Invoke(this);
     }
 }
 
-public class UIStyle_Button : ImpAsset
+public class UiStyle_Button : ImpAsset
 {
-    public UIStyle_Rect? rect_normal;
-    public UIStyle_Rect? rect_hovered;
-    public UIStyle_Rect? rect_disabled;
-    public UIStyle_Rect? rect_pressed;
-    public bool use_blend_time=false;
-    public float blend_time=0.1f;
+    public static UiStyle_Button DEFAULT = new();
+
+    [ImpVar] public UiStyle_Box style_unhovered = UiStyle_Box.STYLE_BTN_IDLE;
+    [ImpVar] public UiStyle_Box style_hovered = UiStyle_Box.STYLE_BTN_HOVER;
+    [ImpVar] public UiStyle_Box style_pressed = UiStyle_Box.STYLE_BTN_PRESS;
 }

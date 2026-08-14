@@ -1,36 +1,34 @@
-using ImperiumEngine.Main;
-using Raylib_cs;
+﻿using Raylib_cs;
 
 namespace ImperiumEngine.Assets;
 
+[AssetColor(160, 90, 210)]
 public class A_Font : ImpAsset
 {
-    //pixel size the glyph atlas is rasterised at; text scales down from this
-    [ImpVar] public int base_size = 48;
+    // #################################################################################
+    // Class
+    // #################################################################################
+    public Font font;
+    [ImpVar] public TextureFilter filter=TextureFilter.Bilinear;
 
-    protected override ImpResource? Resource_Create(string full_path)
+    public override void Source_OnReload(ImpFile file)
     {
-        return new ImpResource_Font { base_size = base_size };
+        base.Source_OnReload(file);
+        int i = source_index;
+        if (i < 0 || i >= file.src_fonts.Count) return;
+        font=file.src_fonts[i];
+        Raylib.SetTextureFilter(font.Texture, filter);
     }
-}
-
-public class ImpResource_Font : ImpResource
-{
-    public int base_size = 48;
-
-    public override void OnImport(string filepath)
-    {
-        if (!File.Exists(filepath)) return;
-
-        var font = Raylib.LoadFontEx(filepath, base_size, null, 0);
-        if (font.Texture.Id == 0) return;
-
-        // The atlas is rasterised once at base_size and UI text is drawn well under it (16pt
-        // off a 48pt atlas), so a single mip sampled bilinearly still undersamples and leaves
-        // glyph edges ragged. Mips give the minification something to blend between.
-        Raylib.GenTextureMipmaps(ref font.Texture);
-        Raylib.SetTextureFilter(font.Texture, TextureFilter.Trilinear);
-
-        r_font.Add(font);
-    }
+    
+    // #################################################################################
+    // Static
+    // #################################################################################
+    
+    public static A_Font FONT_ARIAL=Import<A_Font>("{engine}/Fonts/Arial.ttf");
+    public static A_Font FONT_ARIAL_B=Import<A_Font>("{engine}/Fonts/Arial_Bold.ttf");
+    public static A_Font FONT_ARIAL_I=Import<A_Font>("{engine}/Fonts/Arial_Italic.ttf");
+    public static A_Font FONT_ARIAL_BI=Import<A_Font>("{engine}/Fonts/Arial_Bold_Italic.ttf");
+    
+    public static A_Font FONT_TENDERNESS=Import<A_Font>("{engine}/Fonts/tenderness.otf");
+    
 }

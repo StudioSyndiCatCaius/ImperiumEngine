@@ -6,20 +6,17 @@ namespace ImperiumEngine.Structs;
 
 public struct TTransform3 : I_Property
 {
-    public Vector3 position;
-    public Vector3 rotation; //euler degrees, applied yaw/pitch/roll - see Imp3D
-    public Vector3 scale=Vector3.One;
+    [ImpVar] public Vector3 position;
+    [ImpVar] public Vector3 rotation; //euler degrees, applied yaw/pitch/roll - see Imp3D
+    [ImpVar] public Vector3 scale=Vector3.One;
 
     public TTransform3()
     {
         position = default;
         rotation = default;
+        scale = Vector3.One;
     }
 
-    // Taking the row over rather than letting the inspector reflect it. Reflection would
-    // hand back the three vectors in whatever order it found them and expand each into its
-    // own collapsible group; a transform is the one thing in the inspector whose shape
-    // everybody already knows, so it is spelled out here instead.
     public bool Inspector_IsCustom() => true;
 
     public void Inspector_Rebuild(C2_InspectorProperty prop_ui)
@@ -30,14 +27,15 @@ public struct TTransform3 : I_Property
 
 public struct TTransform2 : I_Property
 {
-    public Vector2 position;
-    public double rotation; //degrees
-    public Vector2 scale=Vector2.One;
+    [ImpVar] public Vector2 position;
+    [ImpVar] public double rotation; //degrees
+    [ImpVar] public Vector2 scale=Vector2.One;
 
     public TTransform2()
     {
         position = default;
         rotation = 0;
+        scale = Vector2.One;
     }
 
     public bool Inspector_IsCustom() => true;

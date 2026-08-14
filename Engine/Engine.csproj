@@ -9,21 +9,15 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Folder Include="Assets\Shaders\" />
-      <Folder Include="_Content\Fonts\" />
-      <Folder Include="_Content\Icons\Types\" />
-    </ItemGroup>
-
-    <!-- engine content ships beside the exe; flows to referencing projects too -->
-    <ItemGroup>
-      <None Update="_Content\**\*.*" CopyToOutputDirectory="PreserveNewest" />
-    </ItemGroup>
-
-    <ItemGroup>
       <PackageReference Include="JoltPhysicsSharp" Version="2.22.0" />
       <PackageReference Include="R3D-cs" Version="0.10.0" />
+      <PackageReference Include="Raygui-cs-creeperlv" Version="1.0.0" />
       <PackageReference Include="Raylib-cs" Version="8.0.0" />
-      <PackageReference Include="Svg.Skia" Version="2.0.0.4" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Comps\1D\Abilities\" />
+      <Folder Include="Comps\1D\States\" />
     </ItemGroup>
 
 </Project>

@@ -1,54 +1,29 @@
-using ImperiumEngine.Main;
-using R3D_cs;
+﻿using ImperiumEngine.Assets.Materials;
 using Raylib_cs;
-using Material = R3D_cs.Material;
 
 namespace ImperiumEngine.Assets;
 
-public class A_Material : ImpAsset
+public struct TMaterialCommons
 {
-    [ImpVar][Export] public Color albedo_color = Color.White;
-    [ImpVar][Export] public A_Texture? albedo_texture;
-
-    [ImpVar][Export] public float roughness = 1.0f;
-    [ImpVar][Export] public float metalness = 0.0f;
-
-    [ImpVar][Export] public Color emission_color = Color.Black;
-    [ImpVar][Export] public float emission_energy = 0.0f;
-
-    [ImpVar][Export] public bool unlit;
-
-    // R3D material for this asset. Built from R3D's own defaults so every field this asset
-    // does not model keeps a sane value, then overridden with the ones it does. Rebuilt per
-    // call rather than cached, so an inspector edit shows up on the next frame.
-    public Material get_Material()
+    [ImpVar] public A_Texture color_map=null;
+    [ImpVar] public Color color_tint=Color.White;
+    [ImpVar] public float specular_intensity=1.0f;
+    [ImpVar] public A_Texture ORM_map=null;
+    [ImpVar] public float occlusion_intensity=1.0f;
+    [ImpVar] public float roughness_intensity=0.5f;
+    [ImpVar] public float metal_intensity=0.0f;
+    [ImpVar] public A_Texture normal_map=null;
+    [ImpVar] public float normal_intensity=1.0f;
+    [ImpVar] public A_Texture emission_map=null;
+    [ImpVar] public Color emission_color=Color.White;
+    [ImpVar] public float emission_intensity=0.0f;
+        
+    public TMaterialCommons()
     {
-        var material = R3D.GetDefaultMaterial();
-
-        material.Albedo.Color = albedo_color;
-        if (albedo_texture?.get_Texture2D() is Texture2D texture && texture.Id != 0)
-        {
-            material.Albedo.Texture = texture;
-        }
-
-        material.Orm.Roughness = roughness;
-        material.Orm.Metalness = metalness;
-
-        material.Emission.Color = emission_color;
-        material.Emission.Energy = emission_energy;
-
-        material.Unlit = unlit;
-
-        return material;
-    }
-
-    public override string File_GetExtension()
-    {
-        return "ImpMat";
     }
 }
 
-public class A_MaterialInstance : A_Material
+public abstract class A_Material : ImpAsset
 {
-    public A_Material? parent;
+    
 }

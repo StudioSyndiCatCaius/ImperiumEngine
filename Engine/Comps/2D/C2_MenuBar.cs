@@ -1,238 +1,387 @@
-using System.Numerics;
-using ImperiumEngine.Assets;
+﻿using System.Numerics;
 using ImperiumEngine.Enums;
-using ImperiumEngine.Main;
-using Raylib_cs;
+using ImperiumEngine.Structs;
 
 namespace ImperiumEngine.Comps._2D;
 
 public struct TMenuBarOption
 {
-    [Export] public string name;
-    public TMenuBarSubption[] subptions;
+    public string text;
+    public List<TMenuBarSubption> suboptions = new();
+    public Action on_press;
 
-    public TMenuBarOption(string name, TMenuBarSubption[] subptions)
+    public TMenuBarOption()
     {
-        this.name = name;
-        this.subptions = subptions;
+        text = "";
     }
 }
 
 public struct TMenuBarSubption
 {
-    [Export] public string name="";
-    public bool is_seperator=false;
+    public string text;
+    public bool is_separator;
+    public bool is_disabled;
+    public List<TMenuBarSubption> suboptions = new();
 
-    public Action? Do;
+    public EInputKey hotkey_key;
+    public bool hotkey_require_ctrl = true;
+    public bool hotkey_require_shift = false;
+    public bool hotkey_require_alt = false;
 
-    public TMenuBarSubption(string? name, Action? do_action)
+    public Action on_press;
+
+    public TMenuBarSubption()
     {
-        this.is_seperator = false;
-        this.name = name ?? "";
-        Do = do_action;
+        text = "";
+        is_separator = false;
+        is_disabled = false;
     }
 
-    public TMenuBarSubption(bool is_seperator)
+    public bool Hotkey_CanPress()
     {
-        this.is_seperator = is_seperator;
-        Do = null;
+        // Modifiers have to match exactly, or Ctrl+Shift+Z would also fire the plain Ctrl+Z
+        // entry sitting above it. Held rather than down so a modifier pressed on the same
+        // frame as the key still counts.
+        bool ctrl = ImpPlayer.Key_IsHeld(EInputKey.Key_LeftControl) || ImpPlayer.Key_IsHeld(EInputKey.Key_RightControl);
+        bool shift = ImpPlayer.Key_IsHeld(EInputKey.Key_LeftShift) || ImpPlayer.Key_IsHeld(EInputKey.Key_RightShift);
+        bool alt = ImpPlayer.Key_IsHeld(EInputKey.Key_LeftAlt) || ImpPlayer.Key_IsHeld(EInputKey.Key_RightAlt);
+        return ctrl == hotkey_require_ctrl && shift == hotkey_require_shift && alt == hotkey_require_alt;
     }
 }
 
 public class C2_MenuBar : ImpComp2D
 {
-    [Export] public TMenuBarOption[] options;
+    public List<TMenuBarOption> options = new();
 
-    public UIStyle_Rect? style;
-    public UIStyle_Text? style_text;
-
-    public int open_index = -1; //-1 = closed; settable to open a menu programmatically
-    readonly List<Rectangle> option_rects = new List<Rectangle>();
-
-    UIStyle_Rect Style => style ?? Theme_Get().style_rect;
-    UIStyle_Text StyleText => style_text ?? Theme_Get().style_text;
-
-    public C2_MenuBar(TMenuBarOption[] options)
+    public C2_List list_options = new()
     {
-        this.options = options;
+        alignment = EUIAlignment.Horizontal,
+        is_scrollable = false,
+        view_alighnment_H = EUIViewportAlignment.Fill,
+        view_alighnment_V = EUIViewportAlignment.Fill,
+    };
 
-        anchor_preset = EUIAnchorPreset.WideTop;
+    public C2_MenuBar_List open_list;
+    public int open_index = -1;
+
+    public UiStyle_Box style_background = UiStyle_Box.STYLE_BKG_DARK;
+    public UiStyle_Box style_options_idle = UiStyle_Box.STYLE_BTN_IDLE;
+    public UiStyle_Box style_options_hovered = UiStyle_Box.STYLE_BTN_HOVER;
+    public UiStyle_Box style_options_pressed = UiStyle_Box.STYLE_BTN_PRESS;
+
+    public float option_width = 72;
+    public float dropdown_width = 180;
+    public float row_height = 28;
+
+    int _built_count = -1;
+
+    public C2_MenuBar()
+    {
+        cursor_filter = ECursorFilter.Pass;
+        Child_Add(list_options);
+
+        list_options.on_option_select = OnTopSelect;
+        list_options.on_option_hover = OnTopHover;
     }
 
-    // Height comes from the theme rather than a fixed size, so it follows a theme swap.
-    public override Vector2 Size_GetContentMin()
+    public bool IsMenuOpen => open_list != null;
+
+    public override void OnUpdate(double dt)
     {
-        return new Vector2(0, Theme_Get().menubar_height);
-    }
+        base.OnUpdate(dt);
 
-    // ---------------------------------------------------
-    // layout
-    // ---------------------------------------------------
+        if (_built_count != options.Count)
+            Rebuild();
 
-    protected override void Layout_Children(Rectangle content)
-    {
-        var th = Theme_Get();
-        option_rects.Clear();
-
-        float x = content.X + th.padding;
-        foreach (var opt in options)
+        if (IsMenuOpen && ImpPlayer.Key_IsPressed(EInputKey.Mouse_Left))
         {
-            float w = ImpUI.TextMeasure(opt.name, StyleText).X + th.padding * 2;
-            option_rects.Add(new Rectangle(x, content.Y, w, content.Height));
-            x += w;
+            ImpComp target = ImpPlayer.players.Count > 0 ? ImpPlayer.players[0].cursor_target : null;
+            // open_list / cascades may live on the scene root (above other UI)
+            if (!IsMenuUi(target))
+                CloseAll();
         }
 
-        base.Layout_Children(content);
+        for (int i = 0; i < options.Count; i++)
+            Hotkey_Walk(options[i].suboptions);
     }
 
-    // ---------------------------------------------------
-    // draw
-    // ---------------------------------------------------
-
-    protected override void Draw_Self(double dt, EDrawFlags flags)
+    public void Rebuild()
     {
-        var th = Theme_Get();
-
-        ImpUI.Rect(rect, Style.color);
-
-        Input_Update();
-
-        for (int i = 0; i < options.Length && i < option_rects.Count; i++)
+        list_options.Child_RemoveAll();
+        for (int i = 0; i < options.Count; i++)
         {
-            var r = option_rects[i];
-
-            if (i == open_index) ImpUI.Rect(r, th.col_accent);
-            else if (Option_IsHot(r)) ImpUI.Rect(r, th.col_hover);
-
-            ImpUI.TextInRect(options[i].name, r, StyleText, 0.5f);
+            float h = size.Y > 0 ? size.Y : row_height;
+            C2_Button btn = new()
+            {
+                text = options[i].text ?? "",
+                size = new Vector2(option_width, h),
+                size_min = new Vector2(option_width, h),
+                style = new UiStyle_Button
+                {
+                    style_unhovered = style_options_idle,
+                    style_hovered = style_options_hovered,
+                    style_pressed = style_options_pressed,
+                },
+                text_style = UiStyle_Text.DEFAULT,
+            };
+            list_options.Child_Add(btn);
         }
-
-        if (open_index >= 0 && open_index < options.Length) Dropdown_Update(open_index);
+        _built_count = options.Count;
     }
 
-    bool Option_IsHot(Rectangle r)
+    public void CloseAll()
     {
-        return ImpUI.IsHovered(this) && Raylib.CheckCollisionPointRec(ImpUI.mouse_pos, r);
+        if (open_list != null)
+        {
+            open_list.CloseCascade();
+            open_list.Destroy();
+            open_list = null;
+        }
+        open_index = -1;
     }
 
-    int Option_At(Vector2 p)
+    void OnTopSelect(ImpComp2D c, int i)
     {
-        for (int i = 0; i < option_rects.Count; i++)
+        if (i < 0 || i >= options.Count) return;
+        TMenuBarOption opt = options[i];
+
+        if (opt.suboptions == null || opt.suboptions.Count == 0)
         {
-            if (Raylib.CheckCollisionPointRec(p, option_rects[i])) return i;
-        }
-        return -1;
-    }
-
-    void Input_Update()
-    {
-        if (!ImpUI.IsHovered(this)) return;
-
-        int over = Option_At(ImpUI.mouse_pos);
-
-        if (ImpUI.mouse_pressed)
-        {
-            open_index = over == open_index ? -1 : over;
-        }
-        else if (open_index >= 0 && over >= 0)
-        {
-            // with a menu already open, sliding along the bar switches menus
-            open_index = over;
-        }
-    }
-
-    // ---------------------------------------------------
-    // dropdown
-    // ---------------------------------------------------
-
-    // The dropdown paints through the overlay list so it sits above everything, and it
-    // handles its own clicks: ImpUI blocks the tree behind an overlay, so nothing else
-    // will react to a press inside the panel.
-    void Dropdown_Update(int index)
-    {
-        var th = Theme_Get();
-        var subs = options[index].subptions ?? Array.Empty<TMenuBarSubption>();
-        var anchor = option_rects[index];
-
-        float w = th.menu_min_width;
-        float h = th.padding * 2;
-        foreach (var s in subs)
-        {
-            if (!s.is_seperator) w = MathF.Max(w, ImpUI.TextMeasure(s.name, StyleText).X + th.padding * 5);
-            h += Sub_Height(th, s);
-        }
-
-        var panel = new Rectangle(anchor.X, anchor.Y + anchor.Height, w, h);
-
-        if (ImpUI.mouse_pressed && !Raylib.CheckCollisionPointRec(ImpUI.mouse_pos, panel))
-        {
-            // a press on the bar itself is handled by Input_Update, so only close here
-            if (!Raylib.CheckCollisionPointRec(ImpUI.mouse_pos, rect)) open_index = -1;
+            opt.on_press?.Invoke();
+            CloseAll();
             return;
         }
 
-        int clicked = ImpUI.mouse_pressed ? Sub_At(th, panel, subs, ImpUI.mouse_pos) : -1;
-
-        var text_style = StyleText;
-        ImpUI.Overlay_Push(panel, () => Dropdown_Draw(th, panel, subs, text_style));
-
-        if (clicked >= 0)
+        if (open_index == i)
         {
-            open_index = -1;
-            subs[clicked].Do?.Invoke();
+            CloseAll();
+            return;
+        }
+
+        OpenRoot(i);
+    }
+
+    void OnTopHover(ImpComp2D c, int i)
+    {
+        if (!IsMenuOpen) return;
+        if (i < 0 || i >= options.Count) return;
+        if (open_index == i) return;
+        if (options[i].suboptions == null || options[i].suboptions.Count == 0) return;
+        OpenRoot(i);
+    }
+
+    void OpenRoot(int i)
+    {
+        CloseAll();
+        open_index = i;
+        open_list = new C2_MenuBar_List(this, options[i].suboptions)
+        {
+            size = new Vector2(dropdown_width, 0),
+        };
+        // parent to scene root so dropdown draws above TabBox / other siblings
+        ImpComp host = PopupHost() ?? this;
+        host.Child_Add(open_list);
+        PlaceUnderTop(i, open_list);
+        open_list.RebuildRows();
+    }
+
+    void PlaceUnderTop(int i, C2_MenuBar_List list)
+    {
+        if (i < 0 || i >= list_options.children.Count) return;
+        if (list_options.children[i] is not ImpComp2D btn) return;
+
+        // screen-space when parented to non-2D root; local if fallback parent is the bar
+        TDimensions2 b = btn.Dimensions_Get();
+        if (list.parent is ImpComp2D p2)
+        {
+            TDimensions2 host = p2.Dimensions_Get();
+            list.transform.position = new Vector2(
+                b.position.X - host.position.X,
+                b.position.Y - host.position.Y + b.size.Y);
+        }
+        else
+            list.transform.position = new Vector2(b.position.X, b.position.Y + b.size.Y);
+    }
+
+    /// <summary>Topmost host so menus render above the rest of the UI tree.</summary>
+    public static ImpComp? PopupHost()
+    {
+        return ImpScene.current?.root;
+    }
+
+    void Hotkey_Walk(List<TMenuBarSubption> items)
+    {
+        if (items == null) return;
+        for (int i = 0; i < items.Count; i++)
+        {
+            TMenuBarSubption s = items[i];
+            if (!s.is_separator && !s.is_disabled
+                && s.hotkey_key != EInputKey.None
+                && s.Hotkey_CanPress()
+                && ImpPlayer.Key_IsPressed(s.hotkey_key))
+            {
+                s.on_press?.Invoke();
+                CloseAll();
+                return;
+            }
+            if (s.suboptions != null && s.suboptions.Count > 0)
+                Hotkey_Walk(s.suboptions);
         }
     }
 
-    static int Sub_At(ImpUITheme th, Rectangle panel, TMenuBarSubption[] subs, Vector2 p)
+    public static bool IsUnder(ImpComp root, ImpComp target)
     {
-        float y = panel.Y + th.padding;
-        for (int i = 0; i < subs.Length; i++)
+        while (target != null)
         {
-            float ih = Sub_Height(th, subs[i]);
-            if (!subs[i].is_seperator
-                && Raylib.CheckCollisionPointRec(p, new Rectangle(panel.X, y, panel.Width, ih)))
-            {
-                return i;
-            }
-            y += ih;
+            if (target == root) return true;
+            target = target.parent;
         }
-        return -1;
+        return false;
     }
 
-    static void Dropdown_Draw(ImpUITheme th, Rectangle panel, TMenuBarSubption[] subs, UIStyle_Text text_style)
+    public static bool IsMenuUi(ImpComp target)
     {
-        ImpUI.Rect(panel, th.col_panel_alt);
-        ImpUI.RectOutline(panel, 1f, th.col_line);
-
-        float y = panel.Y + th.padding;
-        foreach (var s in subs)
+        while (target != null)
         {
-            float ih = Sub_Height(th, s);
-            var ir = new Rectangle(panel.X, y, panel.Width, ih);
+            if (target is C2_MenuBar or C2_MenuBar_List) return true;
+            target = target.parent;
+        }
+        return false;
+    }
+}
 
-            if (s.is_seperator)
+public class C2_MenuBar_List : C2_List
+{
+    public C2_MenuBar bar;
+    public List<TMenuBarSubption> items = new();
+    public C2_MenuBar_List cascade;
+    public int cascade_index = -1;
+
+    public C2_MenuBar_List(C2_MenuBar bar, List<TMenuBarSubption> items)
+    {
+        this.bar = bar;
+        this.items = items ?? new List<TMenuBarSubption>();
+        alignment = EUIAlignment.Vertical;
+        is_scrollable = false;
+        spacing = 0;
+        cursor_filter = ECursorFilter.Pass;
+
+        on_option_select = OnRowSelect;
+        on_option_hover = OnRowHover;
+        on_option_unhover = OnRowUnhover;
+    }
+
+    public void RebuildRows()
+    {
+        Child_RemoveAll();
+        cascade = null;
+        cascade_index = -1;
+
+        float w = size.X > 0 ? size.X : bar.dropdown_width;
+        float h = bar.row_height;
+        float total_h = 0;
+
+        for (int i = 0; i < items.Count; i++)
+        {
+            TMenuBarSubption s = items[i];
+            if (s.is_separator)
             {
-                float my = ir.Y + ih * 0.5f;
-                ImpUI.Line(
-                    new Vector2(ir.X + th.padding, my),
-                    new Vector2(ir.X + ir.Width - th.padding, my),
-                    1f, th.col_line);
+                ImpComp2D sep = new()
+                {
+                    size = new Vector2(w, 6),
+                    cursor_filter = ECursorFilter.Ignore,
+                };
+                Child_Add(sep);
+                total_h += 6;
+                continue;
             }
-            else
+
+            C2_Button btn = new()
             {
-                if (Raylib.CheckCollisionPointRec(ImpUI.mouse_pos, ir)) ImpUI.Rect(ir, th.col_accent);
+                text = s.text ?? "",
+                size = new Vector2(w, h),
+                is_disabled = s.is_disabled,
+                style = new UiStyle_Button
+                {
+                    style_unhovered = bar.style_options_idle,
+                    style_hovered = bar.style_options_hovered,
+                    style_pressed = bar.style_options_pressed,
+                },
+            };
+            Child_Add(btn);
+            total_h += h;
+        }
 
-                var tr = new Rectangle(ir.X + th.padding * 2, ir.Y,
-                                       ir.Width - th.padding * 3, ir.Height);
-                ImpUI.TextInRect(s.name, tr, text_style, 0f);
-            }
+        size = new Vector2(w, total_h);
+    }
 
-            y += ih;
+    void OnRowSelect(ImpComp2D c, int i)
+    {
+        if (i < 0 || i >= items.Count) return;
+        TMenuBarSubption s = items[i];
+        if (s.is_separator || s.is_disabled) return;
+
+        if (s.suboptions != null && s.suboptions.Count > 0)
+        {
+            OpenCascade(i);
+            return;
+        }
+
+        s.on_press?.Invoke();
+        bar.CloseAll();
+    }
+
+    void OnRowHover(ImpComp2D c, int i)
+    {
+        if (i < 0 || i >= items.Count) return;
+        TMenuBarSubption s = items[i];
+        if (s.is_separator || s.is_disabled)
+        {
+            CloseCascade();
+            return;
+        }
+
+        if (s.suboptions != null && s.suboptions.Count > 0)
+            OpenCascade(i);
+        else
+            CloseCascade();
+    }
+
+    void OnRowUnhover(ImpComp2D c, int i)
+    {
+        // cascade stays until hover moves to another row / outside
+    }
+
+    void OpenCascade(int i)
+    {
+        if (cascade_index == i && cascade != null) return;
+        CloseCascade();
+        cascade_index = i;
+        cascade = new C2_MenuBar_List(bar, items[i].suboptions)
+        {
+            size = new Vector2(bar.dropdown_width, 0),
+        };
+        // same popup host as root dropdown (not this list — layout would stack it as a row)
+        ImpComp host = C2_MenuBar.PopupHost() ?? bar;
+        host.Child_Add(cascade);
+        cascade.RebuildRows();
+
+        if (i < children.Count && children[i] is ImpComp2D row)
+        {
+            TDimensions2 self = Dimensions_Get();
+            TDimensions2 r = row.Dimensions_Get();
+            cascade.transform.position = new Vector2(self.position.X + size.X, r.position.Y);
         }
     }
 
-    static float Sub_Height(ImpUITheme th, TMenuBarSubption s)
+    public void CloseCascade()
     {
-        return s.is_seperator ? th.padding * 1.5f : th.item_height;
+        if (cascade != null)
+        {
+            cascade.CloseCascade();
+            cascade.Destroy();
+            cascade = null;
+        }
+        cascade_index = -1;
     }
 }

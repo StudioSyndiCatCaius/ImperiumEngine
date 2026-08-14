@@ -1,292 +1,388 @@
+using System.Globalization;
 using System.Numerics;
 using System.Reflection;
 using System.Text;
-using ImperiumEngine.Assets;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Interfaces;
-using ImperiumEngine.Main;
+using ImperiumEngine.Structs;
 using Raylib_cs;
 
 namespace ImperiumEngine.Comps._2D;
 
-// ==========================================================================================
-// Binding
-// ==========================================================================================
-
-// One editable member on one target. The inspector never touches fields directly - every
-// read and write goes through a bind, which is what lets a field inside a struct work:
-// structs copy on read, so the nested bind mutates a boxed copy and pushes the whole
-// struct back through its parent.
+// One member on one target. Nested binds mutate a boxed struct copy and push it back
+// through the parent, so edits inside a TTransform3 actually stick.
 public class TPropertyBind
 {
     public readonly string name;
     public readonly Type type;
+    public readonly bool is_readonly;
+    public readonly ImpVarAttribute var_attr;
 
-    readonly Func<object?> fn_get;
-    readonly Action<object?> fn_set;
+    // What a freshly built target has in this member. Only meaningful when has_default is set -
+    // a type we cannot construct simply has no yardstick and never offers a revert.
+    public readonly bool has_default;
+    public readonly object default_value;
 
-    public TPropertyBind(string name, Type type, Func<object?> get, Action<object?> set)
+    readonly Func<object> _get;
+    readonly Action<object> _set;
+
+    public TPropertyBind(string name, Type type, Func<object> get, Action<object> set, bool is_readonly = false,
+        ImpVarAttribute var_attr = null, bool has_default = false, object default_value = null)
     {
         this.name = name;
         this.type = type;
-        fn_get = get;
-        fn_set = set;
+        this.is_readonly = is_readonly;
+        this.var_attr = var_attr;
+        this.has_default = has_default;
+        this.default_value = default_value;
+        _get = get;
+        _set = set;
     }
 
-    public object? Get() => fn_get();
-    public void Set(object? value) => fn_set(value);
+    public object Get() => _get();
+    public void Set(object value) { if (!is_readonly) _set(value); }
 
-    // Binds a member held directly by a target instance.
-    public static TPropertyBind? Member(object target, MemberInfo m)
+    public bool IsDefault() => !has_default || Value_Same(Get(), default_value);
+
+    // A null string and an empty one are the same edit as far as the user can see, and the string
+    // editor writes "" where the field started null - without this every such row looks changed.
+    public static bool Value_Same(object a, object b)
     {
-        if (!Accessors(m, out var type, out var get, out var set)) return null;
-
-        return new TPropertyBind(m.Name, type, () => get(target), v => set(target, v));
+        if (a is string || b is string)
+            return string.Equals(a as string ?? "", b as string ?? "", StringComparison.Ordinal);
+        return Equals(a, b);
     }
 
-    // Binds a member of the struct that `parent` points at.
-    public static TPropertyBind? Nested(TPropertyBind parent, MemberInfo m)
+    public static TPropertyBind Member(object target, MemberInfo m)
     {
-        if (!Accessors(m, out var type, out var get, out var set)) return null;
+        if (!Accessors(m, out Type type, out var get, out var set, out bool locked, out ImpVarAttribute attr))
+            return null;
+        Default_Read(get, C2_Inspector.Default_Instance(target.GetType()), out bool has_def, out object def);
+        return new TPropertyBind(m.Name, type, () => get(target), v => set(target, v), locked, attr, has_def, def);
+    }
 
+    public static TPropertyBind Nested(TPropertyBind parent, MemberInfo m)
+    {
+        if (!Accessors(m, out Type type, out var get, out var set, out bool locked, out ImpVarAttribute attr))
+            return null;
+        Default_Read(get, parent.has_default ? parent.default_value : null, out bool has_def, out object def);
         return new TPropertyBind(m.Name, type,
-            () =>
-            {
-                var box = parent.Get();
-                return box == null ? null : get(box);
-            },
+            () => { object box = parent.Get(); return box == null ? null : get(box); },
             v =>
             {
-                var box = parent.Get();
+                object box = parent.Get();
                 if (box == null) return;
-
                 set(box, v);
-                parent.Set(box); //unbox back into the owner, or the edit is lost
-            });
+                parent.Set(box);
+            },
+            locked || parent.is_readonly, attr, has_def, def);
     }
 
-    static bool Accessors(MemberInfo m, out Type type, out Func<object, object?> get, out Action<object, object?> set)
+    static void Default_Read(Func<object, object> get, object owner, out bool has_default, out object value)
     {
+        has_default = false;
+        value = null;
+        if (owner == null) return;
+        try
+        {
+            value = get(owner);
+            has_default = true;
+        }
+        catch { }
+    }
+
+    static bool Accessors(MemberInfo m, out Type type, out Func<object, object> get,
+        out Action<object, object> set, out bool locked, out ImpVarAttribute attr)
+    {
+        attr = m.GetCustomAttribute<ImpVarAttribute>();
+        locked = attr?.ReadOnly ?? false;
         switch (m)
         {
-            case FieldInfo f when !f.IsInitOnly && !f.IsLiteral:
+            case FieldInfo f when !f.IsLiteral:
                 type = f.FieldType;
                 get = o => f.GetValue(o);
                 set = (o, v) => f.SetValue(o, v);
+                locked |= f.IsInitOnly;
                 return true;
-
-            case PropertyInfo p when p.CanRead && p.CanWrite && p.GetIndexParameters().Length == 0:
+            case PropertyInfo p when p.CanRead && p.GetIndexParameters().Length == 0:
                 type = p.PropertyType;
                 get = o => p.GetValue(o);
                 set = (o, v) => p.SetValue(o, v);
+                locked |= !p.CanWrite;
                 return true;
         }
-
         type = typeof(object);
-        get = null!;
-        set = null!;
+        get = null;
+        set = null;
+        locked = false;
         return false;
     }
 }
 
-// ==========================================================================================
-// Inspector
-// ==========================================================================================
+// ##############################################################################
+// INSPECTOR
+// ##############################################################################
 
-// Property inspector: reflects the [ImpVar] members of whatever is selected and builds a
-// row per member. Rows are rebuilt only on Rebuild(); between rebuilds they poll their
-// bind each frame so external changes to the object show up without a full teardown.
 public class C2_Inspector : ImpComp2D
 {
-    public List<object> selected_objects = new List<object>();
+    public List<object> selected_objects = new();
     [ImpVar] public bool allow_multi_select = true;
-
-    //share of the row width given to the label column
     [ImpVar] public float label_ratio = 0.4f;
-    //how deep nested structs are expanded before the inspector stops recursing
     [ImpVar] public int max_depth = 4;
-    //group rows under a header per category; off lays every row out in one flat list
     [ImpVar] public bool use_categories = true;
+    [ImpVar] public bool show_advanced;
+    [ImpVar] public bool declared_only;
+    [ImpVar] public bool show_header = true;
+    public float label_pad = 8f;
+    public float depth_indent = 8f;
 
-    public Action<C2_InspectorProperty>? on_property_changed;
+    public Action<C2_InspectorProperty> on_property_changed;
+    public Action<ImpComp, ImpComp, ETreeDrop> on_hierarchy_drop;
 
-    public C2_ScrollBox c_scroll;
-    public C2_List c_list;
+    public C2_List list_properties = new()
+    {
+        alignment = EUIAlignment.Vertical,
+        is_scrollable = true,
+        spacing = 2,
+        view_alighnment_H = EUIViewportAlignment.Fill,
+        view_alighnment_V = EUIViewportAlignment.Fill,
+    };
+
+    C2_List _header = new()
+    {
+        alignment = EUIAlignment.Horizontal,
+        view_alighnment_H = EUIViewportAlignment.Fill,
+        size = new Vector2(0, 24),
+        size_min = new Vector2(0, 24),
+        spacing = 4,
+    };
+
+    C2_CheckBox _check_advanced = new()
+    {
+        text = "Advanced",
+        size = new Vector2(120, 22),
+        size_min = new Vector2(80, 22),
+    };
+
+    UiStyle_Box style_box = UiStyle_Box.STYLE_BKG_DARK;
+    readonly HashSet<string> _collapsed = new();
+    static readonly Dictionary<Type, List<MemberInfo>> _member_cache = new();
+    static readonly Dictionary<Type, I_Property> _prototypes = new();
+    static readonly Dictionary<Type, object> _default_instances = new();
+    static readonly HashSet<Type> _default_building = new();
 
     public C2_Inspector()
     {
-        name = "Inspector";
-        cursor_filter = ECursorFilter.Pass; //container only; rows and widgets take the cursor
+        cursor_filter = ECursorFilter.Pass;
+        view_alighnment_H = EUIViewportAlignment.Fill;
+        view_alighnment_V = EUIViewportAlignment.Fill;
 
-        c_list = new C2_List
+        _check_advanced.on_changed = next =>
         {
-            name = "Properties",
-            Alignment = EUIAlignment.Vertical,
-            separation = 2f,
-            cursor_filter = ECursorFilter.Pass,
+            show_advanced = next;
+            Rebuild();
         };
 
-        c_scroll = new C2_ScrollBox
+        C2_List body = new()
         {
-            name = "Scroll",
-            anchor_preset = EUIAnchorPreset.Full,
+            alignment = EUIAlignment.Vertical,
+            view_alighnment_H = EUIViewportAlignment.Fill,
+            view_alighnment_V = EUIViewportAlignment.Fill,
+            spacing = 2,
         };
-
-        c_scroll.Child_Add(c_list);
-        Child_Add(c_scroll);
+        _header.Child_Add(_check_advanced);
+        body.Child_Add(_header);
+        body.Child_Add(list_properties);
+        Child_Add(body);
     }
 
-    // ---------------------------------------------------
-    // selection
-    // ---------------------------------------------------
+    public void Object_Add(object obj, bool added)
+    {
+        if (added) selected_objects.Add(obj);
+        else selected_objects.Remove(obj);
+        Rebuild();
+    }
+
+    public void Objects_Add(List<object> objs, bool added, bool clear_first = true)
+    {
+        if (clear_first) selected_objects.Clear();
+        if (objs != null)
+        {
+            foreach (object o in objs)
+            {
+                if (added) selected_objects.Add(o);
+                else selected_objects.Remove(o);
+            }
+        }
+        Rebuild();
+    }
+
+    public void Objects_Clear()
+    {
+        selected_objects.Clear();
+        Rebuild();
+    }
 
     public void Select(params object[] objects)
     {
         selected_objects.Clear();
-
-        foreach (var o in objects)
+        foreach (object o in objects)
         {
             if (o == null) continue;
             selected_objects.Add(o);
             if (!allow_multi_select) break;
         }
-
         Rebuild();
     }
 
-    public void Select_Clear()
-    {
-        selected_objects.Clear();
-        Rebuild();
-    }
-
-    // ---------------------------------------------------
-    // build
-    // ---------------------------------------------------
+    public void Properties_Rebuild() => Rebuild();
 
     public void Rebuild()
     {
-        c_list.Child_RemoveAll();
+        _check_advanced.is_checked = show_advanced;
+        _header.is_visible = show_header;
+        if (list_properties.scroll_box != null) list_properties.scroll_box.Child_RemoveAll();
+        else list_properties.Child_RemoveAll();
 
-        var targets = Targets_Get();
+        List<object> targets = Targets();
         if (targets.Count == 0)
         {
-            c_list.Child_Add(new C2_Text("Nothing selected")
+            AddRow(new C2_Text
             {
-                style_dim = true,
-                align = 0.5f,
-                cursor_filter = ECursorFilter.Ignore,
-                size = new Vector2(0, Theme_Get().item_height),
+                text = "Nothing selected",
+                style = UiStyle_Text.MUTED,
+                wrap = ETextWrap.None,
+                view_alighnment_H = EUIViewportAlignment.Fill,
+                size = new Vector2(0, 22),
+                size_min = new Vector2(0, 22),
             });
             return;
         }
 
-        var members = Members_Shared(targets);
-
+        List<MemberInfo> members = Members_Filter(Members_Shared(targets));
+        if (declared_only && targets.Count > 0)
+        {
+            Type declared = targets[0].GetType();
+            List<MemberInfo> cut = new();
+            foreach (MemberInfo m in members)
+                if (m.DeclaringType == declared) cut.Add(m);
+            members = cut;
+        }
         if (!use_categories)
         {
-            foreach (var m in members)
+            foreach (MemberInfo m in members)
             {
-                var flat = Row_Build(targets, m);
-                if (flat != null) c_list.Child_Add(flat);
+                C2_InspectorProperty row = Row_Build(targets, m);
+                if (row != null) AddRow(row);
             }
             return;
         }
 
         foreach (var (category, list) in Categories_Group(members))
         {
-            var box = new C2_Expandable
+            C2_Expandable box = new()
             {
                 name = category,
-                //class names are shown as declared: "ImpComp3D" prettifies to "Imp Comp3 D"
-                title = category,
-                is_expanded = true,
-                icon = Category_Icon(category, list[0]),
+                is_expanded = !_collapsed.Contains(category),
+                bar_height = 22,
+                content_indent = 10f,
+                view_alighnment_H = EUIViewportAlignment.Fill,
+                view_alighnment_V = EUIViewportAlignment.Start,
+            };
+            box.on_expand = open =>
+            {
+                if (open) _collapsed.Remove(category);
+                else _collapsed.Add(category);
             };
 
-            foreach (var m in list)
+            float h = box.bar_height;
+            foreach (MemberInfo m in list)
             {
-                var row = Row_Build(targets, m);
-                if (row != null) box.Child_Add(row);
+                C2_InspectorProperty row = Row_Build(targets, m);
+                if (row == null) continue;
+                box.Child_Add(row);
+                h += row.size.Y + 2;
             }
-
-            if (box.children.Count == 0) continue;
-            c_list.Child_Add(box);
+            box.size = new Vector2(0, h);
+            box.size_min = box.size;
+            AddRow(box);
         }
+
+        if (targets.Count == 1 && targets[0] is ImpComp host
+            && host.children.Count > 0 && !host.IsInstanceRoot && !host.IsPackedForeign)
+            AddChildrenTree(host);
     }
 
-    // One member, bound across every selected target, as a row ready to be parented.
-    C2_InspectorProperty? Row_Build(List<object> targets, MemberInfo m)
+    void AddChildrenTree(ImpComp host)
     {
-        var binds = new List<TPropertyBind>();
-        foreach (var t in targets)
+        const string key = "Children";
+        C2_Expandable box = new()
         {
-            var b = TPropertyBind.Member(t, Member_On(t.GetType(), m) ?? m);
+            name = key,
+            is_expanded = !_collapsed.Contains(key),
+            bar_height = 22,
+            content_indent = 10f,
+            view_alighnment_H = EUIViewportAlignment.Fill,
+            view_alighnment_V = EUIViewportAlignment.Start,
+        };
+        box.on_expand = open =>
+        {
+            if (open) _collapsed.Remove(key);
+            else _collapsed.Add(key);
+        };
+
+        int count = 1 + ChildCount(host);
+        float h = Math.Clamp(22f * count + 8f, 48f, 240f);
+        C2_Tree tree = new()
+        {
+            allow_reorder = true,
+            view_alighnment_H = EUIViewportAlignment.Fill,
+            size = new Vector2(0, h),
+            size_min = new Vector2(0, 48),
+        };
+        tree.on_item_drop = (src, dst, where) =>
+        {
+            if (src.data is ImpComp a && dst.data is ImpComp b)
+                on_hierarchy_drop?.Invoke(a, b, where);
+        };
+        tree.Tree_Populate_FromComp(host);
+        box.Child_Add(tree);
+        box.size = new Vector2(0, box.bar_height + h + 4);
+        box.size_min = box.size;
+        AddRow(box);
+    }
+
+    static int ChildCount(ImpComp c)
+    {
+        int n = c.children.Count;
+        for (int i = 0; i < c.children.Count; i++) n += ChildCount(c.children[i]);
+        return n;
+    }
+
+    void AddRow(ImpComp2D row)
+    {
+        if (list_properties.scroll_box != null) list_properties.scroll_box.Child_Add(row);
+        else list_properties.Child_Add(row);
+    }
+
+    C2_InspectorProperty Row_Build(List<object> targets, MemberInfo m)
+    {
+        List<TPropertyBind> binds = new();
+        foreach (object t in targets)
+        {
+            TPropertyBind b = TPropertyBind.Member(t, Member_On(t.GetType(), m) ?? m);
             if (b != null) binds.Add(b);
         }
-
         if (binds.Count == 0) return null;
-
-        var row = new C2_InspectorProperty(this, binds);
+        C2_InspectorProperty row = new(this, binds);
         row.Rebuild(0);
         return row;
     }
 
-    // ---------------------------------------------------
-    // categories
-    // ---------------------------------------------------
-
-    // A member's category: its [Category] when it declares one, otherwise the class that
-    // declared it - so an inherited member files under the base class it actually came from
-    // rather than whatever concrete type happens to be selected.
-    public static string Category_Of(MemberInfo m)
+    List<object> Targets()
     {
-        var attr = m.GetCustomAttribute<CategoryAttribute>();
-        if (attr?.Name is string custom && custom.Length > 0) return custom;
-
-        return m.DeclaringType?.Name ?? "";
-    }
-
-    // Members bucketed by category, ordered by where each category first appears. Reflection
-    // lists a type's own members ahead of the ones it inherits, so the selected object's own
-    // class heads the inspector and its bases follow underneath.
-    static List<KeyValuePair<string, List<MemberInfo>>> Categories_Group(List<MemberInfo> members)
-    {
-        var order = new List<string>();
-        var map = new Dictionary<string, List<MemberInfo>>();
-
-        foreach (var m in members)
-        {
-            string key = Category_Of(m);
-
-            if (!map.TryGetValue(key, out var list))
-            {
-                list = new List<MemberInfo>();
-                map[key] = list;
-                order.Add(key);
-            }
-
-            list.Add(m);
-        }
-
-        var result = new List<KeyValuePair<string, List<MemberInfo>>>();
-        foreach (var key in order) { result.Add(new KeyValuePair<string, List<MemberInfo>>(key, map[key])); }
-        return result;
-    }
-
-    // A category named after the class it came from can use that class's icon, inheritance
-    // fallback and all. A custom label has only its own name to match on.
-    static A_Texture? Category_Icon(string category, MemberInfo first)
-    {
-        if (first.DeclaringType is Type t && t.Name == category) return ImpIcon.Get(t);
-        return ImpIcon.Get(category);
-    }
-
-    // Skips nulls, and collapses to a single target when multi-select is off.
-    List<object> Targets_Get()
-    {
-        var list = new List<object>();
-        foreach (var o in selected_objects)
+        List<object> list = new();
+        foreach (object o in selected_objects)
         {
             if (o == null) continue;
             list.Add(o);
@@ -295,185 +391,257 @@ public class C2_Inspector : ImpComp2D
         return list;
     }
 
-    // Members every selected object has in common, by name and type. With one object
-    // selected this is just its member list; with several it's the editable intersection.
+    public List<MemberInfo> Members_Filter(List<MemberInfo> members)
+    {
+        if (show_advanced) return members;
+        List<MemberInfo> list = new();
+        foreach (MemberInfo m in members)
+        {
+            if (m.GetCustomAttribute<ImpVarAttribute>()?.Advanced == true) continue;
+            list.Add(m);
+        }
+        return list;
+    }
+
     List<MemberInfo> Members_Shared(List<object> targets)
     {
-        var shared = Members_Get(targets[0].GetType());
+        List<MemberInfo> shared = Members_Get(targets[0].GetType());
         if (targets.Count == 1) return shared;
-
-        var result = new List<MemberInfo>();
-        foreach (var m in shared)
+        List<MemberInfo> result = new();
+        foreach (MemberInfo m in shared)
         {
             bool on_all = true;
             for (int i = 1; i < targets.Count && on_all; i++)
-            {
                 on_all = Member_On(targets[i].GetType(), m) != null;
-            }
             if (on_all) result.Add(m);
         }
         return result;
     }
 
-    // Same-named member of the same type on another type, or null if it has none.
-    static MemberInfo? Member_On(Type t, MemberInfo want)
+    static MemberInfo Member_On(Type t, MemberInfo want)
     {
-        foreach (var m in Members_Get(t))
+        foreach (MemberInfo m in Members_Get(t))
         {
             if (m.Name == want.Name && Member_Type(m) == Member_Type(want)) return m;
         }
         return null;
     }
 
-    // ---------------------------------------------------
-    // reflection
-    // ---------------------------------------------------
+    public static string Category_Of(MemberInfo m)
+    {
+        CategoryAttribute attr = m.GetCustomAttribute<CategoryAttribute>();
+        if (!string.IsNullOrEmpty(attr?.Name)) return attr.Name;
+        return m.DeclaringType?.Name ?? "";
+    }
 
-    static readonly Dictionary<Type, List<MemberInfo>> member_cache = new Dictionary<Type, List<MemberInfo>>();
+    static List<(string cat, List<MemberInfo> list)> Categories_Group(List<MemberInfo> members)
+    {
+        List<string> order = new();
+        Dictionary<string, List<MemberInfo>> map = new();
+        foreach (MemberInfo m in members)
+        {
+            string key = Category_Of(m);
+            if (!map.TryGetValue(key, out List<MemberInfo> list))
+            {
+                list = new List<MemberInfo>();
+                map[key] = list;
+                order.Add(key);
+            }
+            list.Add(m);
+        }
+        List<(string, List<MemberInfo>)> result = new();
+        foreach (string key in order) result.Add((key, map[key]));
+        return result;
+    }
 
-    // Public instance members marked [ImpVar], base classes included. Cached: this runs
-    // per row per rebuild and reflection lookups are not cheap.
     public static List<MemberInfo> Members_Get(Type t)
     {
-        if (member_cache.TryGetValue(t, out var hit)) return hit;
+        if (_member_cache.TryGetValue(t, out List<MemberInfo> hit)) return hit;
+        List<MemberInfo> list = new();
+        List<Type> chain = new();
+        for (Type cur = t; cur != null && cur != typeof(object); cur = cur.BaseType)
+            chain.Add(cur);
 
-        var list = new List<MemberInfo>();
-        const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
-
-        foreach (var f in t.GetFields(flags))
+        const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+        foreach (Type cur in chain)
         {
-            if (f.GetCustomAttribute<ImpVarAttribute>() != null) list.Add(f);
+            foreach (FieldInfo f in cur.GetFields(flags))
+                if (f.GetCustomAttribute<ImpVarAttribute>() != null) list.Add(f);
+            foreach (PropertyInfo p in cur.GetProperties(flags))
+                if (p.GetCustomAttribute<ImpVarAttribute>() != null) list.Add(p);
         }
-        foreach (var p in t.GetProperties(flags))
-        {
-            if (p.GetCustomAttribute<ImpVarAttribute>() != null) list.Add(p);
-        }
-
-        member_cache[t] = list;
+        _member_cache[t] = list;
         return list;
     }
 
-    // Members to show inside an expanded struct. Engine structs tag their fields, but
-    // library ones (Vector2, Color) don't - for those, fall back to every public field so
-    // they still expand into something editable.
     public static List<MemberInfo> Members_GetNested(Type t)
     {
-        var tagged = Members_Get(t);
+        List<MemberInfo> tagged = Members_Get(t);
         if (tagged.Count > 0) return tagged;
-
-        var list = new List<MemberInfo>();
-        foreach (var f in t.GetFields(BindingFlags.Public | BindingFlags.Instance))
+        List<MemberInfo> list = new();
+        foreach (FieldInfo f in t.GetFields(BindingFlags.Public | BindingFlags.Instance))
         {
             if (!f.IsInitOnly && !f.IsLiteral) list.Add(f);
         }
         return list;
     }
 
-    public static Type Member_Type(MemberInfo m)
+    public static Type Member_Type(MemberInfo m) => m switch
     {
-        return m switch
-        {
-            FieldInfo f => f.FieldType,
-            PropertyInfo p => p.PropertyType,
-            _ => typeof(object),
-        };
-    }
+        FieldInfo f => f.FieldType,
+        PropertyInfo p => p.PropertyType,
+        _ => typeof(object),
+    };
 
-    // "test_string" / "testString" -> "Test String"
     public static string Name_Pretty(string raw)
     {
         if (string.IsNullOrEmpty(raw)) return "";
-
-        var sb = new StringBuilder();
+        StringBuilder sb = new();
         bool next_upper = true;
-
         for (int i = 0; i < raw.Length; i++)
         {
             char c = raw[i];
-
-            if (c == '_' || c == ' ')
-            {
-                sb.Append(' ');
-                next_upper = true;
-                continue;
-            }
-
+            if (c == '_' || c == ' ') { sb.Append(' '); next_upper = true; continue; }
             if (i > 0 && char.IsUpper(c) && !char.IsUpper(raw[i - 1])) sb.Append(' ');
-
             sb.Append(next_upper ? char.ToUpperInvariant(c) : c);
             next_upper = false;
         }
-
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// A freshly built instance of a type, kept as the yardstick for "default value" - whatever the
+    /// field initialisers and constructor left in a member is what the revert button puts back.
+    /// Types without a usable parameterless constructor give null, and those rows never offer revert.
+    /// </summary>
+    internal static object Default_Instance(Type t)
+    {
+        if (_default_instances.TryGetValue(t, out object hit)) return hit;
+
+        // A comp whose constructor points an inspector at itself - the file browser does exactly
+        // that - would otherwise ask for its own default part way through building it, and never
+        // stop. Anything re-entering for a type already under construction gets no default.
+        if (!_default_building.Add(t)) return null;
+        object made = null;
+        try
+        {
+            if (!t.IsAbstract && (t.IsValueType || t.GetConstructor(Type.EmptyTypes) != null))
+                made = Activator.CreateInstance(t);
+        }
+        catch { }
+        finally { _default_building.Remove(t); }
+
+        _default_instances[t] = made;
+        return made;
+    }
+
+    internal static I_Property Prototype(Type t)
+    {
+        if (_prototypes.TryGetValue(t, out I_Property hit)) return hit;
+        I_Property made = null;
+        if (!t.IsAbstract)
+        {
+            try { made = Activator.CreateInstance(t) as I_Property; }
+            catch { }
+        }
+        _prototypes[t] = made;
+        return made;
+    }
+
+    public override void OnDraw2D(double dt, WDrawFlags flags)
+    {
+        base.OnDraw2D(dt, flags);
+        style_box?.Draw(Dimensions_Get());
     }
 }
 
-// ==========================================================================================
-// Property row
-// ==========================================================================================
+// ##############################################################################
+// PROPERTY
+// ##############################################################################
 
-// One member: a label on the left and a type-appropriate editor on the right. Struct
-// members instead become an expandable group holding a row per sub-member.
 public class C2_InspectorProperty : ImpComp2D
 {
-    public C2_Inspector? _owner;
-    public List<TPropertyBind> binds = new List<TPropertyBind>();
+    public C2_Inspector owner;
+    public List<TPropertyBind> binds = new();
     public string label = "";
-
-    public ImpComp2D? c_pedit; //editor widget, right column
-    public C2_Text? c_label;
-    public C2_Expandable? c_group; //set instead of c_pedit for struct members
-
-    string[]? enum_names; //cached for the per-frame refresh, which would otherwise re-reflect
-
-    //how many structs deep this row sits; I_Property implementations need it to keep nesting
+    public ImpComp2D c_pedit;
+    public C2_Text c_label;
+    public C2_Expandable c_group;
+    public C2_ButtonRevert c_revert;
+    public float? label_ratio_override;
+    public bool pedit_full_width;
     public int depth;
 
-    //narrows the label column for rows whose editor needs the width more than the name does
-    public float? label_ratio_override;
+    string[] _enum_names;
+    const float RowH = 26f;
+    const float RevertW = 16f;
 
     public Type value_type => binds.Count > 0 ? binds[0].type : typeof(object);
+    public bool IsReadOnly => binds.Count > 0 && binds[0].is_readonly;
+    public bool Depth_CanNest => depth < (owner?.max_depth ?? 4);
 
-    public C2_InspectorProperty() { }
-
-    public C2_InspectorProperty(C2_Inspector? owner, List<TPropertyBind> binds)
+    /// <summary>True when the row could ever revert - the gutter is reserved on those rows so the
+    /// editor does not resize as the button comes and goes.</summary>
+    public bool Revert_CanEver
     {
-        _owner = owner;
-        this.binds = binds;
-        name = binds.Count > 0 ? binds[0].name : "";
-        label = C2_Inspector.Name_Pretty(name);
-    }
-
-    // ---------------------------------------------------
-    // value
-    // ---------------------------------------------------
-
-    public object? Value_Get() => binds.Count > 0 ? binds[0].Get() : null;
-
-    public void Value_Set(object? new_value)
-    {
-        foreach (var b in binds) { b.Set(new_value); }
-        _owner?.on_property_changed?.Invoke(this);
-    }
-
-    public void OnEdit(object? new_value) => Value_Set(new_value);
-
-    // True when a multi-selection disagrees, so editors can show an indeterminate state.
-    public bool Value_IsMixed()
-    {
-        if (binds.Count < 2) return false;
-
-        var first = binds[0].Get();
-        for (int i = 1; i < binds.Count; i++)
+        get
         {
-            if (!Equals(first, binds[i].Get())) return true;
+            if (IsReadOnly) return false;
+            for (int i = 0; i < binds.Count; i++)
+                if (binds[i].has_default) return true;
+            return false;
         }
+    }
+
+    public bool IsModified()
+    {
+        for (int i = 0; i < binds.Count; i++)
+            if (!binds[i].IsDefault()) return true;
         return false;
     }
 
-    // ---------------------------------------------------
-    // build
-    // ---------------------------------------------------
+    public C2_InspectorProperty() { }
+
+    public C2_InspectorProperty(C2_Inspector owner, List<TPropertyBind> binds)
+    {
+        this.owner = owner;
+        this.binds = binds;
+        name = binds.Count > 0 ? binds[0].name : "";
+        label = C2_Inspector.Name_Pretty(name);
+        cursor_filter = ECursorFilter.Pass;
+        view_alighnment_H = EUIViewportAlignment.Fill;
+        size = new Vector2(0, RowH);
+        size_min = size;
+    }
+
+    public object Value_Get() => binds.Count > 0 ? binds[0].Get() : null;
+
+    public void Value_Set(object value)
+    {
+        if (IsReadOnly) return;
+        // The row itself is the merge key: a slider drag or a burst of typing on one row
+        // collapses into a single undo step, while touching another row starts a new one.
+        ImpUndo.Bind_Set(binds, value, label, this);
+        owner?.on_property_changed?.Invoke(this);
+    }
+
+    /// <summary>
+    /// Puts every bind back to its own default. Multi-select can hold targets of different types
+    /// with different defaults, so each bind is set separately and the group makes it one undo step.
+    /// </summary>
+    public void Value_Revert()
+    {
+        if (IsReadOnly) return;
+        ImpUndo.Group_Begin($"Revert {label}");
+        foreach (TPropertyBind b in binds)
+        {
+            if (!b.has_default) continue;
+            ImpUndo.Bind_Set(new List<TPropertyBind> { b }, b.default_value, label);
+        }
+        ImpUndo.Group_End();
+        owner?.on_property_changed?.Invoke(this);
+        Refresh();
+    }
 
     public void Rebuild(int depth = 0)
     {
@@ -481,382 +649,453 @@ public class C2_InspectorProperty : ImpComp2D
         c_pedit = null;
         c_group = null;
         c_label = null;
-        enum_names = null;
+        c_revert = null;
+        _enum_names = null;
         label_ratio_override = null;
+        pedit_full_width = false;
         this.depth = depth;
-
         cursor_filter = ECursorFilter.Pass;
 
-        // a type can take over its own row entirely
-        if (Value_Get() is I_Property custom && custom.Inspector_IsCustom())
+        Type t = value_type;
+        I_Property custom = Property_Custom(t);
+        if (custom != null)
         {
             custom.Inspector_Rebuild(this);
+            if (IsReadOnly) ReadOnly_Apply();
+            FitHeight();
             return;
         }
 
-        var t = value_type;
-
-        // structs get a dropdown box with all their fields inside, unless they have an
-        // editor of their own - a colour taken apart into R/G/B/A is four numbers nobody
-        // can read as a colour, and a vector split over three rows is just noise
-        if (Type_IsGroup(t) && !Type_HasEditor(t) && depth < (_owner?.max_depth ?? 4))
+        if (Type_IsGroup(t) && !Type_HasEditor(t) && depth < (owner?.max_depth ?? 4))
         {
             Group_Build(t, depth);
+            FitHeight();
             return;
         }
 
-        c_label = new C2_Text(label)
+        Editor_Set(Editor_Build(t));
+        if (c_pedit is C2_VectorEdit vec) label_ratio_override = vec.Count >= 3 ? 0.28f : 0.34f;
+        if (IsReadOnly) ReadOnly_Apply();
+        Refresh();
+    }
+
+    I_Property Property_Custom(Type t)
+    {
+        if (Value_Get() is I_Property live && live.Inspector_IsCustom()) return live;
+        if (!typeof(I_Property).IsAssignableFrom(t)) return null;
+        I_Property stand = C2_Inspector.Prototype(t);
+        return stand != null && stand.Inspector_IsCustom() ? stand : null;
+    }
+
+    public void Editor_Set(ImpComp2D editor, float? label_ratio = null)
+    {
+        c_label = new C2_Text
         {
-            align = 0f,
+            text = label,
+            style = UiStyle_Text.LIGHT,
+            wrap = ETextWrap.None,
+            text_alignment_h = EUIPositionAlignment.Start,
+            text_alignment_v = EUIPositionAlignment.Center,
             cursor_filter = ECursorFilter.Ignore,
         };
         Child_Add(c_label);
+        c_pedit = editor;
+        if (editor != null) Child_Add(editor);
+        Revert_Build();
+        label_ratio_override = label_ratio;
+        size = new Vector2(0, RowH);
+        size_min = size;
+    }
 
-        c_pedit = Editor_Build(t);
-        if (c_pedit != null) Child_Add(c_pedit);
+    void Revert_Build()
+    {
+        if (!Revert_CanEver) return;
+        c_revert = new C2_ButtonRevert { is_visible = false };
+        c_revert.on_click = Value_Revert;
+        Child_Add(c_revert);
+    }
 
-        // A vector splits its column three or four ways, so the default share leaves each
-        // field too narrow to print its own number. "Position" needs far less room than
-        // three coordinates do.
-        if (c_pedit is C2_VectorEdit vec) label_ratio_override = vec.Count >= 3 ? 0.28f : 0.34f;
+    public void Editor_SetFull(ImpComp2D editor)
+    {
+        c_pedit = editor;
+        pedit_full_width = true;
+        if (editor != null) Child_Add(editor);
+        size = new Vector2(0, MathF.Max(RowH, editor?.size.Y ?? RowH));
+        size_min = size;
+    }
 
-        Refresh();
+    public List<ImpComp2D> Rows_ForObject(object target)
+    {
+        List<ImpComp2D> rows = new();
+        if (target == null) return rows;
+        List<MemberInfo> members = C2_Inspector.Members_Get(target.GetType());
+        if (owner != null) members = owner.Members_Filter(members);
+        foreach (MemberInfo m in members)
+        {
+            TPropertyBind bind = TPropertyBind.Member(target, m);
+            if (bind == null) continue;
+            C2_InspectorProperty row = new(owner, new List<TPropertyBind> { bind });
+            row.Rebuild(depth + 1);
+            rows.Add(row);
+        }
+        return rows;
+    }
+
+    public C2_Expandable Group_BuildNamed(params string[] member_names)
+    {
+        c_group = MakeGroup();
+        foreach (string member_name in member_names)
+        {
+            MemberInfo m = Member_Named(value_type, member_name);
+            if (m != null) AddNested(m);
+        }
+        Child_Add(c_group);
+        FitHeight();
+        return c_group;
+    }
+
+    void Group_Build(Type t, int depth)
+    {
+        c_group = MakeGroup();
+        List<MemberInfo> members = C2_Inspector.Members_GetNested(t);
+        if (owner != null) members = owner.Members_Filter(members);
+        foreach (MemberInfo m in members) AddNested(m);
+        Child_Add(c_group);
+    }
+
+    C2_Expandable MakeGroup()
+    {
+        return new C2_Expandable
+        {
+            name = label,
+            is_expanded = true,
+            bar_height = 22,
+            content_indent = 10f + depth * 4f,
+            view_alighnment_H = EUIViewportAlignment.Fill,
+            view_alighnment_V = EUIViewportAlignment.Start,
+            size = new Vector2(0, 22),
+            size_min = new Vector2(0, 22),
+        };
+    }
+
+    void AddNested(MemberInfo m)
+    {
+        List<TPropertyBind> nested = new();
+        foreach (TPropertyBind b in binds)
+        {
+            TPropertyBind nb = TPropertyBind.Nested(b, m);
+            if (nb != null) nested.Add(nb);
+        }
+        if (nested.Count == 0) return;
+        C2_InspectorProperty row = new(owner, nested);
+        row.Rebuild(depth + 1);
+        c_group.Child_Add(row);
+    }
+
+    static MemberInfo Member_Named(Type t, string member_name)
+    {
+        foreach (MemberInfo m in C2_Inspector.Members_GetNested(t))
+            if (m.Name == member_name) return m;
+        return null;
     }
 
     static bool Type_IsGroup(Type t)
     {
         if (!t.IsValueType || t.IsPrimitive || t.IsEnum) return false;
         if (t == typeof(decimal) || t == typeof(DateTime) || t == typeof(TimeSpan)) return false;
-
         return C2_Inspector.Members_GetNested(t).Count > 0;
     }
 
-    // Structs Editor_Build knows how to draw whole. These are library types that can't
-    // implement I_Property themselves, which is the difference between this list and the
-    // interface - engine types declare their own custom rows.
-    static bool Type_HasEditor(Type t)
-    {
-        return t == typeof(Color)
-            || t == typeof(Vector2) || t == typeof(Vector3) || t == typeof(Vector4);
-    }
+    static bool Type_HasEditor(Type t) =>
+        t == typeof(Color) || t == typeof(Vector2) || t == typeof(Vector3) || t == typeof(Vector4);
 
-    void Group_Build(Type t, int depth)
+    ImpComp2D Editor_Build(Type t)
     {
-        c_group = new C2_Expandable
+        if (t == typeof(bool))
         {
-            name = name,
-            title = label,
-            is_expanded = true,
-        };
-
-        foreach (var m in C2_Inspector.Members_GetNested(t))
+            C2_CheckBox box = new();
+            box.on_changed = v => Value_Set(v);
+            return box;
+        }
+        if (t.IsEnum)
         {
-            var nested = new List<TPropertyBind>();
-            foreach (var b in binds)
+            _enum_names = Enum.GetNames(t);
+            C2_Dropdown drop = new() { placeholder_text = "-" };
+            drop.Options_Set(_enum_names);
+            drop.on_dropdown_change = (_, opt, _) => Value_Set(Enum.Parse(t, opt.name));
+            return drop;
+        }
+        if (t == typeof(string))
+        {
+            C2_TextEdit edit = new() { text_placeholder = "..." };
+            edit.on_text_changed = s => Value_Set(s ?? "");
+            return edit;
+        }
+        if (Type_IsNumeric(t))
+        {
+            bool is_int = t == typeof(int) || t == typeof(uint) || t == typeof(long) || t == typeof(byte);
+            ImpVarAttribute attr = binds.Count > 0 ? binds[0].var_attr : null;
+            bool ranged = attr != null && attr.Max > attr.Min;
+            C2_Slider slider = new()
             {
-                var nb = TPropertyBind.Nested(b, m);
-                if (nb != null) nested.Add(nb);
-            }
-
-            if (nested.Count == 0) continue;
-
-            var row = new C2_InspectorProperty(_owner, nested);
-            row.Rebuild(depth + 1);
-            c_group.Child_Add(row);
-        }
-
-        Child_Add(c_group);
-    }
-
-    // Builds this row as a group holding just the named members, in the order given.
-    //
-    // This is the hook an I_Property struct uses from Inspector_Rebuild: it gets the same
-    // nested binds the generic expansion uses - so writes still unbox back through the
-    // owner - while deciding for itself which members show and in what order, rather than
-    // taking whatever order reflection happens to return.
-    public C2_Expandable Group_BuildNamed(params string[] member_names)
-    {
-        var t = value_type;
-
-        c_group = new C2_Expandable
-        {
-            name = name,
-            title = label,
-            is_expanded = true,
-        };
-
-        foreach (var member_name in member_names)
-        {
-            var m = Member_Named(t, member_name);
-            if (m == null) continue;
-
-            var nested = new List<TPropertyBind>();
-            foreach (var b in binds)
+                is_spinner = true,
+                min = ranged ? attr.Min : 0f,
+                max = ranged ? attr.Max : 0f,
+                step = is_int ? 1f : 0f,
+                value_text_decimals = is_int ? 0 : 3,
+                drag_sensitivity = is_int ? 0.15f : 0.05f,
+            };
+            slider.on_changed = s =>
             {
-                var nb = TPropertyBind.Nested(b, m);
-                if (nb != null) nested.Add(nb);
-            }
-
-            if (nested.Count == 0) continue;
-
-            var row = new C2_InspectorProperty(_owner, nested);
-            row.Rebuild(depth + 1);
-            c_group.Child_Add(row);
+                if (t == typeof(int)) Value_Set((int)Math.Clamp(MathF.Round(s.value), int.MinValue, int.MaxValue));
+                else if (t == typeof(float)) Value_Set(s.value);
+                else if (t == typeof(double)) Value_Set((double)s.value);
+                else if (t == typeof(uint)) Value_Set((uint)Math.Max(0, MathF.Round(s.value)));
+                else if (t == typeof(long)) Value_Set((long)MathF.Round(s.value));
+                else if (t == typeof(byte)) Value_Set((byte)Math.Clamp(MathF.Round(s.value), 0, 255));
+            };
+            return slider;
         }
-
-        Child_Add(c_group);
-        return c_group;
-    }
-
-    static MemberInfo? Member_Named(Type t, string member_name)
-    {
-        foreach (var m in C2_Inspector.Members_GetNested(t))
+        if (t == typeof(Color))
         {
-            if (m.Name == member_name) return m;
+            C2_ColorPicker col = new();
+            col.on_color_changed = c => Value_Set(c.color);
+            return col;
         }
-        return null;
-    }
-
-    // ---------------------------------------------------
-    // editors
-    // ---------------------------------------------------
-
-    ImpComp2D? Editor_Build(Type t)
-    {
-        // BOOL -------------------
-        if (t == typeof(bool)) return Editor_Bool();
-
-        // ENUM -------------------
-        if (t.IsEnum) return Editor_Enum(t);
-
-        // NUMERIC -------------------
-        if (Type_IsNumeric(t)) return Editor_Numeric(t);
-
-        // STRING -------------------
-        if (t == typeof(string)) return Editor_String();
-
-        // COLOR -------------------
-        if (t == typeof(Color)) return Editor_Color();
-
-        // VECTOR -------------------
-        if (t == typeof(Vector2)) return Editor_Vector(t, 2);
-        if (t == typeof(Vector3)) return Editor_Vector(t, 3);
-        if (t == typeof(Vector4)) return Editor_Vector(t, 4);
-
-        // anything else has no editor yet; say so rather than drawing an empty slot
-        return new C2_Text($"({t.Name})")
+        if (t == typeof(Vector2)) return Editor_Vector(2);
+        if (t == typeof(Vector3)) return Editor_Vector(3);
+        if (t == typeof(Vector4)) return Editor_Vector(4);
+        if (typeof(ImpAsset).IsAssignableFrom(t))
         {
-            style_dim = true,
-            align = 0f,
+            return new C2_Text
+            {
+                text = Value_Get() is ImpAsset a
+                    ? (string.IsNullOrEmpty(a.filepath) ? a.GetType().Name : a.GetName())
+                    : "None",
+                style = UiStyle_Text.LIGHT,
+                text_alignment_h = EUIPositionAlignment.Start,
+                wrap = ETextWrap.None,
+            };
+        }
+        return new C2_Text
+        {
+            text = $"({t.Name})",
+            style = UiStyle_Text.MUTED,
+            text_alignment_h = EUIPositionAlignment.Start,
+            wrap = ETextWrap.None,
             cursor_filter = ECursorFilter.Ignore,
         };
     }
 
-    C2_CheckBox Editor_Bool()
+    C2_VectorEdit Editor_Vector(int count)
     {
-        var box = new C2_CheckBox();
-        box.on_toggled = b => Value_Set(b.is_checked);
-        return box;
-    }
-
-    C2_Dropdown Editor_Enum(Type t)
-    {
-        enum_names = Enum.GetNames(t);
-
-        var drop = new C2_Dropdown { placeholder_text = "-" };
-        drop.Options_Set(enum_names);
-
-        drop.on_dropdown_change = (_, opt, _) => Value_Set(Enum.Parse(t, opt.name));
-        return drop;
-    }
-
-    // No range metadata exists yet, so numbers come up as unbounded drag-fields: press and
-    // drag left/right to change the value, or click and type one in. Integers step by 1.
-    C2_Progresser Editor_Numeric(Type t)
-    {
-        bool is_int = Type_IsInteger(t);
-
-        var prog = new C2_Progresser
+        C2_VectorEdit vec = new(count);
+        vec.on_changed = v =>
         {
-            mouse_can_edit = true,
-            can_type_edit = true,
-            text_style = EProgresserTextStyle.Value,
-            step_amount = is_int ? 1f : 0f,
-            decimals = is_int ? 0 : 3,
-            drag_sensitivity = is_int ? 0.1f : 0.01f,
+            if (count == 2) Value_Set(new Vector2(v.Value_Get(0), v.Value_Get(1)));
+            else if (count == 3) Value_Set(new Vector3(v.Value_Get(0), v.Value_Get(1), v.Value_Get(2)));
+            else Value_Set(new Vector4(v.Value_Get(0), v.Value_Get(1), v.Value_Get(2), v.Value_Get(3)));
         };
-
-        prog.on_value_changed = p => Value_Set(Number_To(p.value, t));
-        return prog;
-    }
-
-    C2_ColorPicker Editor_Color()
-    {
-        var picker = new C2_ColorPicker();
-        picker.on_color_changed = p => Value_Set(p.color);
-        return picker;
-    }
-
-    C2_VectorEdit Editor_Vector(Type t, int count)
-    {
-        var vec = new C2_VectorEdit(count);
-        vec.on_changed = v => Value_Set(Vector_Pack(v, t));
         return vec;
     }
 
-    // The two directions a vector crosses the editor. Vector4 doubles as a quaternion-free
-    // catch-all; nothing needs W today but splitting the cases would cost more than it saves.
-    static object Vector_Pack(C2_VectorEdit v, Type t)
+    static bool Type_IsNumeric(Type t) =>
+        t == typeof(int) || t == typeof(float) || t == typeof(double)
+        || t == typeof(uint) || t == typeof(long) || t == typeof(byte);
+
+    void ReadOnly_Apply()
     {
-        if (t == typeof(Vector2)) return new Vector2(v.Value_Get(0), v.Value_Get(1));
-        if (t == typeof(Vector3)) return new Vector3(v.Value_Get(0), v.Value_Get(1), v.Value_Get(2));
-        return new Vector4(v.Value_Get(0), v.Value_Get(1), v.Value_Get(2), v.Value_Get(3));
+        if (c_label != null) c_label.style = UiStyle_Text.MUTED;
+        if (c_pedit == null) return;
+        c_pedit.cursor_filter = ECursorFilter.Ignore;
+        if (c_pedit is C2_CheckBox box) box.is_disabled = true;
+        if (c_pedit is C2_Button btn) btn.is_disabled = true;
     }
 
-    static float[] Vector_Unpack(object? value)
+    void FitHeight()
     {
-        return value switch
+        if (c_group == null) return;
+        float h = c_group.bar_height;
+        void AddKids(List<ImpComp> kids)
         {
-            Vector2 v => new[] { v.X, v.Y },
-            Vector3 v => new[] { v.X, v.Y, v.Z },
-            Vector4 v => new[] { v.X, v.Y, v.Z, v.W },
-            _ => Array.Empty<float>(),
-        };
+            for (int i = 0; i < kids.Count; i++)
+            {
+                if (kids[i] is C2_List or C2_Box or C2_Button) continue;
+                if (kids[i] is ImpComp2D d && d.is_visible) h += d.size.Y + 2;
+            }
+        }
+        AddKids(c_group.children);
+        if (c_group.content_box != null) AddKids(c_group.content_box.children);
+        c_group.size = new Vector2(0, h);
+        c_group.size_min = c_group.size;
+        size = c_group.size;
+        size_min = size;
     }
-
-    C2_TextEdit Editor_String()
-    {
-        var edit = new C2_TextEdit { placeholder_text = "..." };
-        edit.on_text_changed = s => Value_Set(s);
-        return edit;
-    }
-
-    static bool Type_IsNumeric(Type t) => Type_IsInteger(t) || t == typeof(float) || t == typeof(double);
-
-    static bool Type_IsInteger(Type t)
-    {
-        return t == typeof(sbyte) || t == typeof(byte)
-            || t == typeof(short) || t == typeof(ushort)
-            || t == typeof(int) || t == typeof(uint)
-            || t == typeof(long) || t == typeof(ulong);
-    }
-
-    // Converts the progresser's float back to the member's own type, clamped to its range
-    // so dragging a byte past 255 saturates instead of throwing.
-    static object Number_To(float v, Type t)
-    {
-        if (t == typeof(float)) return v;
-        if (t == typeof(double)) return (double)v;
-
-        double d = Math.Round(v);
-        double lo = Convert.ToDouble(t.GetField("MinValue")?.GetValue(null) ?? double.MinValue);
-        double hi = Convert.ToDouble(t.GetField("MaxValue")?.GetValue(null) ?? double.MaxValue);
-
-        return Convert.ChangeType(Math.Clamp(d, lo, hi), t);
-    }
-
-    // ---------------------------------------------------
-    // refresh
-    // ---------------------------------------------------
 
     public override void OnUpdate(double dt)
     {
         base.OnUpdate(dt);
+        TDimensions2 dim = Dimensions_Get();
+
+        if (c_group != null)
+        {
+            float group_inset = depth * (owner?.depth_indent ?? 8f);
+            c_group.view_alighnment_H = group_inset > 0 ? EUIViewportAlignment.Start : EUIViewportAlignment.Fill;
+            c_group.view_alighnment_V = EUIViewportAlignment.Fill;
+            if (group_inset > 0)
+            {
+                c_group.transform.position = new Vector2(group_inset, c_group.transform.position.Y);
+                c_group.size = new Vector2(MathF.Max(0, dim.size.X - group_inset), c_group.size.Y);
+            }
+            if (c_group.size.Y > 0)
+            {
+                size.Y = c_group.size.Y;
+                size_min.Y = size.Y;
+            }
+            return;
+        }
+
+        if (pedit_full_width && c_pedit != null)
+        {
+            c_pedit.view_alighnment_H = EUIViewportAlignment.Fill;
+            c_pedit.view_alighnment_V = EUIViewportAlignment.Start;
+            size.Y = MathF.Max(RowH, c_pedit.size.Y);
+            size_min.Y = size.Y;
+            return;
+        }
+
+        float ratio = label_ratio_override ?? owner?.label_ratio ?? 0.4f;
+        float pad = owner?.label_pad ?? 8f;
+        float inset = pad + depth * (owner?.depth_indent ?? 8f);
+        float lw = dim.size.X * ratio;
+        float gutter = c_revert != null ? RevertW : 0f;
+        if (c_label != null)
+        {
+            c_label.size = new Vector2(MathF.Max(0, lw - inset), dim.size.Y);
+            c_label.transform.position = new Vector2(inset, 0);
+            c_label.view_alighnment_H = EUIViewportAlignment.Start;
+            c_label.view_alighnment_V = EUIViewportAlignment.Fill;
+        }
+        if (c_pedit != null)
+        {
+            c_pedit.size = new Vector2(MathF.Max(0, dim.size.X - lw - gutter), dim.size.Y);
+            c_pedit.transform.position = new Vector2(lw, 0);
+            c_pedit.view_alighnment_H = EUIViewportAlignment.Start;
+            c_pedit.view_alighnment_V = EUIViewportAlignment.Fill;
+        }
+        if (c_revert != null)
+        {
+            c_revert.is_visible = IsModified();
+            c_revert.size = new Vector2(RevertW, MathF.Min(RevertW, dim.size.Y));
+            c_revert.transform.position = new Vector2(
+                MathF.Max(0, dim.size.X - RevertW), (dim.size.Y - c_revert.size.Y) * 0.5f);
+            c_revert.view_alighnment_H = EUIViewportAlignment.Start;
+            c_revert.view_alighnment_V = EUIViewportAlignment.Start;
+        }
+
         Refresh();
     }
 
-    // Pulls the current value into the editor widget. Skipped while the user is driving
-    // that widget, so a refresh can't fight the edit in progress.
     public void Refresh()
     {
-        if (c_pedit == null || binds.Count == 0 || Editor_IsBusy()) return;
-
-        bool mixed = Value_IsMixed();
-        var v = Value_Get();
-
+        if (binds.Count == 0 || Editor_IsBusy() || c_pedit == null) return;
+        object v = Value_Get();
         switch (c_pedit)
         {
             case C2_CheckBox box:
                 box.is_checked = v is bool b && b;
-                box.is_mixed = mixed;
                 break;
-
             case C2_Dropdown drop:
-                drop.current_option = mixed || v == null || enum_names == null
-                    ? -1
-                    : Array.IndexOf(enum_names, v.ToString());
+                drop.Option_SetQuiet(v == null || _enum_names == null ? -1 : Array.IndexOf(_enum_names, v.ToString()));
                 break;
-
-            case C2_Progresser prog:
-                prog.Value_SetQuiet(v == null ? 0f : Convert.ToSingle(v));
-                prog.text_style = mixed ? EProgresserTextStyle.None : EProgresserTextStyle.Value;
-                break;
-
             case C2_TextEdit edit:
-                edit.Text_SetQuiet(mixed ? "" : v as string ?? "");
-                edit.placeholder_text = mixed ? "-" : "...";
+                if (!edit.is_focused)
+                    edit.text = Convert.ToString(v, CultureInfo.InvariantCulture) ?? "";
                 break;
-
-            case C2_ColorPicker picker:
-                picker.is_mixed = mixed;
-                if (v is Color color) picker.Color_SetQuiet(color);
+            case C2_Slider slider:
+                if (!slider.IsBusy && v != null) slider.Value_SetQuiet(Convert.ToSingle(v));
                 break;
-
+            case C2_ColorPicker col:
+                if (v is Color c) col.Color_SetQuiet(c);
+                break;
             case C2_VectorEdit vec:
-                vec.is_mixed = mixed;
-                vec.Values_SetQuiet(mixed ? Array.Empty<float>() : Vector_Unpack(v));
+                vec.Values_SetQuiet(v switch
+                {
+                    Vector2 a => new[] { a.X, a.Y },
+                    Vector3 n => new[] { n.X, n.Y, n.Z },
+                    Vector4 q => new[] { q.X, q.Y, q.Z, q.W },
+                    _ => Array.Empty<float>(),
+                });
                 break;
         }
     }
 
-    // An editor is off-limits while the user is working it. The ancestor walk is what makes
-    // that true of the compound ones: the pointer is on a C2_Progresser inside a vector row,
-    // or in the text box a progresser opened, never on the editor this row handed out.
     bool Editor_IsBusy()
     {
-        if (Comp_IsWithin(ImpUI.focused, c_pedit) || Comp_IsWithin(ImpUI.pressed, c_pedit)) return true;
-
-        // popups keep the cursor without holding focus, and outlive the click that opened them
-        return c_pedit is C2_Dropdown d && d.IsOpen
-            || c_pedit is C2_ColorPicker p && p.IsOpen;
-    }
-
-    static bool Comp_IsWithin(ImpComp? node, ImpComp? root)
-    {
-        if (root == null) return false;
-
-        for (ImpComp? c = node; c != null; c = c.parent)
-        {
-            if (c == root) return true;
-        }
+        if (c_pedit is C2_TextEdit te && te.is_focused) return true;
+        if (c_pedit is C2_Dropdown d && d.IsOpen) return true;
+        if (c_pedit is C2_Slider sl && sl.IsBusy) return true;
+        if (c_pedit is C2_VectorEdit ve && ve.IsBusy()) return true;
+        if (c_pedit is C2_ColorPicker cp && cp.IsOpen) return true;
+        if (c_pedit is C2_Picker pk && pk.IsOpen) return true;
         return false;
     }
 
-    // ---------------------------------------------------
-    // layout
-    // ---------------------------------------------------
-
-    public override Vector2 Size_GetContentMin()
+    public override void OnDraw2D(double dt, WDrawFlags flags)
     {
-        if (c_group != null) return c_group.Size_GetContentMin();
-        return new Vector2(0, Theme_Get().item_height);
+        base.OnDraw2D(dt, flags);
+        if (c_group != null || pedit_full_width) return;
+        TDimensions2 dim = Dimensions_Get();
+        Raylib.DrawRectangleV(
+            new Vector2(dim.position.X + 6, dim.position.Y + dim.size.Y - 1),
+            new Vector2(MathF.Max(0, dim.size.X - 12), 1),
+            new Color(255, 255, 255, 18));
+    }
+}
+
+// ##############################################################################
+// REVERT BUTTON
+// ##############################################################################
+
+/// <summary>
+/// The little "put it back" arrow an inspector row shows while its value differs from the default.
+/// The arrow is drawn rather than typed - the editor fonts only carry ASCII.
+/// </summary>
+public class C2_ButtonRevert : C2_Button
+{
+    static readonly UiStyle_Button STYLE = new()
+    {
+        style_unhovered = new UiStyle_Box { texture = null, tint = new Color(0, 0, 0, 0) },
+        style_hovered = UiStyle_Box.STYLE_BTN_HOVER,
+        style_pressed = UiStyle_Box.STYLE_BTN_PRESS,
+    };
+
+    public Color icon_color = new(235, 195, 90, 255);
+
+    public C2_ButtonRevert()
+    {
+        style = STYLE;
+        content_pad = 2;
+        size = new Vector2(16, 16);
+        size_min = size;
     }
 
-    protected override void Layout_Children(Rectangle content)
+    public override void OnDraw2D(double dt, WDrawFlags flags)
     {
-        if (c_group != null)
-        {
-            c_group.OnLayout_Exact(content);
-            return;
-        }
+        base.OnDraw2D(dt, flags);
 
-        float pad = Theme_Get().padding;
-        float label_w = content.Width * (label_ratio_override ?? _owner?.label_ratio ?? 0.4f);
+        TDimensions2 dim = Dimensions_Get();
+        float r = MathF.Min(dim.size.X, dim.size.Y) * 0.32f;
+        if (r < 2f) return;
+        Vector2 c = dim.position + dim.size * 0.5f;
+        float thick = MathF.Max(1.5f, r * 0.42f);
 
-        c_label?.OnLayout_Exact(new Rectangle(
-            content.X + pad, content.Y, MathF.Max(0, label_w - pad * 2), content.Height));
+        const float start = 45f, end = 315f;
+        Raylib.DrawRing(c, MathF.Max(0, r - thick), r, start, end, 20, icon_color);
 
-        c_pedit?.OnLayout_Exact(new Rectangle(
-            content.X + label_w, content.Y, MathF.Max(0, content.Width - label_w), content.Height));
+        // Arrowhead sits on the open end of the ring, pointing back along the sweep.
+        float rad = start * MathF.PI / 180f;
+        Vector2 tip = c + new Vector2(MathF.Cos(rad), MathF.Sin(rad)) * (r - thick * 0.5f);
+        Raylib.DrawPoly(tip, 3, thick * 1.8f, start - 90f, icon_color);
     }
 }

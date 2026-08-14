@@ -1,417 +1,630 @@
 using System.Numerics;
+using System.Reflection;
 using ImperiumEngine.Assets;
 using ImperiumEngine.Enums;
-using ImperiumEngine.Main;
+using ImperiumEngine.Structs;
 using Raylib_cs;
 
 namespace ImperiumEngine.Comps._2D;
 
-// One row of a tree.
-//
-// A class rather than a struct: rows carry state the tree toggles through references it
-// holds (expanded, selected), and a struct sitting in a List<> hands out copies, so those
-// edits would land on the copy and vanish.
-public class TTreeItem
+public struct TTreeItem
 {
-    //whatever the row stands for - an ImpComp for the outliner, an asset elsewhere
-    public object? data;
-
-    public bool is_expanded = true;
-    public bool is_selected;
-
-    // Columns for the row. sections[0] is the label and takes the leftover width; the rest
-    // are drawn dim, in fixed-width columns off the right edge.
-    public List<string> sections = new List<string>();
-    public List<TTreeItem> children = new List<TTreeItem>();
-    public A_Texture? icon;
-
-    public TTreeItem? parent;
-
-    public string Label => sections.Count > 0 ? sections[0] : "";
-
-    public void Clear()
-    {
-        data = null;
-        is_expanded = true;
-        is_selected = false;
-        sections = new List<string>();
-        children = new List<TTreeItem>();
-        icon = null;
-    }
-
-    public void Child_Add(TTreeItem child)
-    {
-        child.parent = this;
-        children.Add(child);
-    }
+    public TTreeItemSection[] sections;
+    public TTreeItem[] children;
+    public object data;
 }
 
-// A scrolling, collapsible tree.
-//
-// Rows are not comps. The whole tree is one hit-testable comp that flattens its items into
-// a row list every layout and resolves clicks by looking up which row the cursor is over -
-// a comp per row would mean rebuilding the subtree on every expand and would not survive a
-// scene of any size.
+public struct TTreeItemSection
+{
+    public string text;
+    public A_Texture icon;
+    public Color color;
+}
+
+public enum ETreeDrop { Before, After, Child }
+
 public class C2_Tree : ImpComp2D
 {
-    public TTreeItem root_item = new TTreeItem();
-    public bool allow_multiselect = false;
+    public UiStyle_Box style_box = UiStyle_Box.STYLE_BKG_DARK;
+    public UiStyle_Text text_style = UiStyle_Text.LIGHT;
+    public UiStyle_Text text_style_selected = UiStyle_Text.LIGHT;
+    public Color color_row = new(40, 40, 40, 0);
+    public Color color_row_hover = new(70, 70, 74, 255);
+    public Color color_row_selected = new(0, 96, 166, 255);
+    public float row_height = 22f;
+    public float indent_size = 16f;
+    public float icon_size = 14f;
 
-    //the root usually stands for the container itself (a scene), so it can be left out
-    public bool show_root = true;
+    public Action<TTreeItem> on_item_click;
+    public Action<TTreeItem> on_item_right_click;
+    public Action<TTreeItem> on_item_double_click;
+    public Action<TTreeItem, TTreeItem, ETreeDrop> on_item_drop;
+    //Something from outside the tree was dropped onto a row (a file browser thumbnail, say).
+    public Action<object, TTreeItem> on_item_drop_external;
+    //What a row hands over when dragged elsewhere. Null (or a null result) means rows can't be dragged out.
+    public Func<TTreeItem, object> item_drag_payload;
+    public bool allow_reorder;
 
-    public float indent = 14f;
-    public float row_separation = 0f;
-    public float section_width = 96f; //width of each column after the label
+    public TTreeItem selected_item;
+    public object selected_data;
 
-    public float scroll = 0f;
-    public float scroll_speed = 40f;
+    readonly List<TreeNode> _roots = new();
+    readonly HashSet<string> _expanded = new(StringComparer.OrdinalIgnoreCase);
+    TreeNode _selected_node;
+    internal TreeNode drop_node;
+    internal ETreeDrop drop_kind;
 
-    public UIStyle_Rect? style;
-
-    public Action<C2_Tree, TTreeItem>? on_select;
-    public Action<C2_Tree, TTreeItem>? on_deselect;
-
-    public readonly List<TTreeItem> selected = new List<TTreeItem>();
-
-    // One visible row, resolved to an absolute rect. Rebuilt every layout, so collapsed
-    // rows simply stop existing and can be neither drawn nor clicked.
-    struct TTreeRow
-    {
-        public TTreeItem item;
-        public int depth;
-        public Rectangle rect;
-    }
-
-    readonly List<TTreeRow> rows = new List<TTreeRow>();
-    float content_len; //how tall the expanded rows are in total
+    C2_ScrollBox _scroll;
 
     public C2_Tree()
     {
-        clip_contents = true; //rows scroll under the edges, and must not be hit out there
+        cursor_filter = ECursorFilter.Pass;
+        view_alighnment_H = EUIViewportAlignment.Fill;
+        view_alighnment_V = EUIViewportAlignment.Fill;
+        EnsureScroll();
     }
 
-    // ---------------------------------------------------
-    // build
-    // ---------------------------------------------------
-
-    public void Build_FromComp(ImpComp comp)
+    void EnsureScroll()
     {
-        Select_Clear();
-
-        root_item.Clear();
-        AddComp(root_item, comp);
-    }
-
-    public void AddComp(TTreeItem item, ImpComp comp)
-    {
-        item.data = comp;
-        item.sections = [Comp_Label(comp), comp.GetType().Name];
-        item.icon = ImpIcon.Get(comp.GetType());
-
-        foreach (var child in comp.children)
+        if (_scroll != null) return;
+        _scroll = new C2_ScrollBox
         {
-            var child_item = new TTreeItem();
-            AddComp(child_item, child);
-            item.Child_Add(child_item);
+            view_alighnment_H = EUIViewportAlignment.Fill,
+            view_alighnment_V = EUIViewportAlignment.Fill,
+            alignment = EUIAlignment.Vertical,
+            style = style_box,
+        };
+        Child_Add(_scroll);
+    }
+
+    public override void OnUpdate(double dt)
+    {
+        base.OnUpdate(dt);
+        EnsureScroll();
+        if (!children.Contains(_scroll)) Child_Add(_scroll);
+        _scroll.style = style_box;
+    }
+
+    public override void OnDraw2D(double dt, WDrawFlags flags)
+    {
+        base.OnDraw2D(dt, flags);
+        if (style_box != null) style_box.Draw(Dimensions_Get());
+    }
+
+    public void Tree_Clear()
+    {
+        _roots.Clear();
+        _selected_node = null;
+        selected_data = null;
+        selected_item = default;
+        RebuildRows();
+    }
+
+    public void Tree_Add(TTreeItem item)
+    {
+        _roots.Add(ToNode(item, null));
+        RebuildRows();
+    }
+
+    public void Tree_SetItems(IEnumerable<TTreeItem> items)
+    {
+        _roots.Clear();
+        if (items != null)
+        {
+            foreach (TTreeItem item in items)
+                _roots.Add(ToNode(item, null));
         }
+        RebuildRows();
     }
 
-    static string Comp_Label(ImpComp comp)
+    public void Tree_ExpandAll(bool expanded = true)
     {
-        return string.IsNullOrEmpty(comp.name) ? comp.GetType().Name : comp.name;
-    }
-
-    // The item whose data is this object, or null. Lets a caller drive the tree's selection
-    // from whatever it holds rather than having to keep item references around.
-    public TTreeItem? Item_Find(object? data, TTreeItem? from = null)
-    {
-        if (data == null) return null;
-        from ??= root_item;
-
-        if (ReferenceEquals(from.data, data)) return from;
-
-        foreach (var child in from.children)
+        void Walk(TreeNode n)
         {
-            var hit = Item_Find(data, child);
-            if (hit != null) return hit;
+            if (expanded) _expanded.Add(n.key);
+            else _expanded.Remove(n.key);
+            n.expanded = expanded;
+            for (int i = 0; i < n.children.Count; i++) Walk(n.children[i]);
         }
-
-        return null;
+        for (int i = 0; i < _roots.Count; i++) Walk(_roots[i]);
+        RebuildRows();
     }
 
-    // ---------------------------------------------------
-    // selection
-    // ---------------------------------------------------
-
-    // Additive keeps what is already selected and toggles this one - what ctrl-click does.
-    // Otherwise the selection collapses to just this item.
-    public void Select(TTreeItem? item, bool additive = false)
+    public void Tree_ExpandKey(string key, bool expanded = true)
     {
-        if (!additive || !allow_multiselect) Select_Clear();
-        if (item == null) return;
-
-        //ctrl-clicking something already selected takes it back out
-        Item_SetSelected(item, !item.is_selected);
+        if (string.IsNullOrEmpty(key)) return;
+        if (expanded) _expanded.Add(key);
+        else _expanded.Remove(key);
+        RebuildRows();
     }
 
-    public void Select_Clear()
+    public void Tree_SelectData(object data)
     {
-        for (int i = selected.Count - 1; i >= 0; i--) { Item_SetSelected(selected[i], false); }
-    }
-
-    void Item_SetSelected(TTreeItem item, bool value)
-    {
-        if (item.is_selected == value) return;
-        item.is_selected = value;
-
-        if (value)
+        if (data == null)
         {
-            selected.Add(item);
-            on_select?.Invoke(this, item);
-        }
-        else
-        {
-            selected.Remove(item);
-            on_deselect?.Invoke(this, item);
-        }
-    }
-
-    // ---------------------------------------------------
-    // layout
-    // ---------------------------------------------------
-
-    public override Vector2 Size_GetContentMin()
-    {
-        return new Vector2(0, Rows_Count(root_item, show_root) * Row_Step());
-    }
-
-    protected override void Layout_Children(Rectangle content)
-    {
-        rows.Clear();
-
-        var th = Theme_Get();
-        float step = Row_Step();
-
-        content_len = Rows_Count(root_item, show_root) * step;
-
-        float overflow = MathF.Max(0f, content_len - content.Height);
-        scroll = Math.Clamp(scroll, 0f, overflow);
-
-        //the scrollbar eats into the row width only when there is something to scroll
-        float width = content.Width - (overflow > 0f ? th.scrollbar_width : 0f);
-        float y = content.Y - scroll;
-
-        if (show_root)
-        {
-            Rows_Build(root_item, 0, content.X, width, step, th.item_height, ref y);
+            _selected_node = null;
+            selected_data = null;
+            selected_item = default;
+            RebuildRows();
             return;
         }
-
-        foreach (var child in root_item.children)
+        TreeNode found = null;
+        void Walk(TreeNode n)
         {
-            Rows_Build(child, 0, content.X, width, step, th.item_height, ref y);
+            if (found != null) return;
+            if (Equals(n.item.data, data) || (n.item.data is TDirectory a && data is TDirectory b && PathsEqual(a.path, b.path)))
+                found = n;
+            for (int i = 0; i < n.children.Count; i++) Walk(n.children[i]);
         }
+        for (int i = 0; i < _roots.Count; i++) Walk(_roots[i]);
+        if (found != null) SelectNode(found, false);
+        RebuildRows();
     }
 
-    void Rows_Build(TTreeItem item, int depth, float x, float width, float step, float height, ref float y)
+    public void Tree_Populate_FromComp(ImpComp comp)
     {
-        rows.Add(new TTreeRow
+        Tree_Clear();
+        if (comp == null) return;
+        Tree_Add(FromComp(comp));
+        Tree_ExpandKey(KeyOf(comp), true);
+    }
+
+    public void Tree_Populate_FromClasses(Type type)
+    {
+        Tree_Clear();
+        if (type == null) return;
+
+        List<Type> types = new();
+        foreach (Assembly asm in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            Type[] found;
+            try { found = asm.GetTypes(); }
+            catch (ReflectionTypeLoadException ex) { found = ex.Types.Where(t => t != null).ToArray()!; }
+            foreach (Type t in found)
+            {
+                if (t == null || t.IsAbstract) continue;
+                if (!type.IsAssignableFrom(t)) continue;
+                types.Add(t);
+            }
+        }
+        if (!type.IsAbstract && !types.Contains(type)) types.Add(type);
+
+        Dictionary<Type, TTreeItem> map = new();
+        foreach (Type t in types)
+        {
+            map[t] = new TTreeItem
+            {
+                sections = new[] { new TTreeItemSection { text = t.Name } },
+                data = t,
+                children = Array.Empty<TTreeItem>(),
+            };
+        }
+
+        List<TTreeItem> roots = new();
+        foreach (Type t in types)
+        {
+            Type parent = t.BaseType;
+            while (parent != null && !map.ContainsKey(parent))
+                parent = parent.BaseType;
+            if (parent != null && map.ContainsKey(parent) && parent != t)
+            {
+                TTreeItem p = map[parent];
+                List<TTreeItem> kids = p.children != null ? p.children.ToList() : new List<TTreeItem>();
+                kids.Add(map[t]);
+                p.children = kids.ToArray();
+                map[parent] = p;
+            }
+            else roots.Add(map[t]);
+        }
+
+        Tree_SetItems(roots);
+        if (roots.Count > 0) Tree_ExpandKey(KeyOf(roots[0].data), true);
+    }
+
+    TTreeItem FromComp(ImpComp comp)
+    {
+        TTreeItem[] kids = Array.Empty<TTreeItem>();
+        if (comp.children.Count > 0)
+        {
+            kids = new TTreeItem[comp.children.Count];
+            for (int i = 0; i < comp.children.Count; i++)
+                kids[i] = FromComp(comp.children[i]);
+        }
+        A_Texture icon = A_Texture.ICO_COMP;
+        if (comp is ImpComp3D) icon = A_Texture.ICO_COMP3D;
+        else if (comp is ImpComp2D) icon = A_Texture.ICO_COMP2D;
+        Color name_col = default;
+        if (comp.IsInstanceRoot || comp.IsPackedForeign)
+            name_col = new Color(236, 196, 82, 255);
+        if (comp.IsInstanceRoot)
+            _expanded.Add(KeyOf(comp));
+        return new TTreeItem
+        {
+            sections = new[]
+            {
+                new TTreeItemSection
+                {
+                    text = string.IsNullOrEmpty(comp.name) ? comp.GetType().Name : comp.name,
+                    icon = icon,
+                    color = name_col,
+                }
+            },
+            children = kids,
+            data = comp,
+        };
+    }
+
+    TreeNode ToNode(TTreeItem item, TreeNode parent)
+    {
+        TreeNode n = new()
         {
             item = item,
-            depth = depth,
-            rect = new Rectangle(x, y, width, height),
-        });
-        y += step;
-
-        if (!item.is_expanded) return;
-
-        foreach (var child in item.children)
+            parent = parent,
+            key = KeyOf(item.data, item),
+        };
+        n.expanded = _expanded.Contains(n.key);
+        if (item.children != null)
         {
-            Rows_Build(child, depth + 1, x, width, step, height, ref y);
+            for (int i = 0; i < item.children.Length; i++)
+                n.children.Add(ToNode(item.children[i], n));
+        }
+        return n;
+    }
+
+    public void RebuildRows()
+    {
+        EnsureScroll();
+        _scroll.Child_RemoveAll();
+
+        List<TreeNode> flat = new();
+        void Walk(TreeNode n)
+        {
+            n.expanded = _expanded.Contains(n.key);
+            flat.Add(n);
+            if (!n.expanded) return;
+            for (int i = 0; i < n.children.Count; i++) Walk(n.children[i]);
+        }
+        for (int i = 0; i < _roots.Count; i++) Walk(_roots[i]);
+
+        for (int i = 0; i < flat.Count; i++)
+        {
+            TreeNode n = flat[i];
+            int depth = 0;
+            TreeNode p = n.parent;
+            while (p != null) { depth++; p = p.parent; }
+            C2_TreeRow row = new(this, n, depth)
+            {
+                size = new Vector2(0, row_height),
+                size_min = new Vector2(0, row_height),
+                view_alighnment_H = EUIViewportAlignment.Fill,
+            };
+            _scroll.Child_Add(row);
         }
     }
 
-    static int Rows_Count(TTreeItem item, bool count_self)
+    internal void ToggleExpand(TreeNode node)
     {
-        int count = count_self ? 1 : 0;
-        if (count_self && !item.is_expanded) return count;
-
-        foreach (var child in item.children) { count += Rows_Count(child, true); }
-        return count;
+        if (node.children.Count == 0) return;
+        if (_expanded.Contains(node.key)) _expanded.Remove(node.key);
+        else _expanded.Add(node.key);
+        node.expanded = _expanded.Contains(node.key);
+        RebuildRows();
     }
 
-    float Row_Step() => Theme_Get().item_height + row_separation;
-
-    // The clickable arrow box for a row. Rows with no children have no arrow, but the space
-    // is still reserved so labels at the same depth line up.
-    Rectangle Rect_Arrow(TTreeRow row)
+    internal void SelectNode(TreeNode node, bool fire)
     {
-        const float size = 10f;
-
-        return new Rectangle(
-            row.rect.X + row.depth * indent + (indent - size) * 0.5f,
-            row.rect.Y + (row.rect.Height - size) * 0.5f,
-            size, size);
+        _selected_node = node;
+        selected_item = node.item;
+        selected_data = node.item.data;
+        if (fire) on_item_click?.Invoke(node.item);
     }
 
-    int Row_At(Vector2 point)
+    internal void OpenNode(TreeNode node)
     {
-        for (int i = 0; i < rows.Count; i++)
+        on_item_double_click?.Invoke(node.item);
+    }
+
+    internal void RightClickNode(TreeNode node)
+    {
+        _selected_node = node;
+        selected_item = node.item;
+        selected_data = node.item.data;
+        on_item_right_click?.Invoke(node.item);
+        RebuildRows();
+    }
+
+    internal bool IsSelected(TreeNode node) => _selected_node == node || (node != null && _selected_node != null && node.key == _selected_node.key);
+
+    internal void SetDrop(TreeNode n, ETreeDrop k)
+    {
+        drop_node = n;
+        drop_kind = k;
+    }
+
+    internal void ClearDrop()
+    {
+        drop_node = null;
+    }
+
+    internal void CommitDropExternal(object payload, TreeNode dst)
+    {
+        ClearDrop();
+        if (payload == null || dst == null) return;
+        on_item_drop_external?.Invoke(payload, dst.item);
+    }
+
+    internal void CommitDrop(TreeNode src, TreeNode dst, ETreeDrop kind)
+    {
+        ClearDrop();
+        if (src == null || dst == null || src == dst) return;
+        for (TreeNode p = dst; p != null; p = p.parent)
+            if (p == src) return;
+        on_item_drop?.Invoke(src.item, dst.item, kind);
+    }
+
+    public static string KeyOf(object data, TTreeItem item = default)
+    {
+        if (data is TDirectory dir && !string.IsNullOrEmpty(dir.path)) return dir.path;
+        if (data is TFile file && !string.IsNullOrEmpty(file.path)) return file.path;
+        if (data is Type t) return t.FullName ?? t.Name;
+        if (data is ImpComp c) return "comp:" + c.GetHashCode();
+        if (data is ImpAsset a && !string.IsNullOrEmpty(a.filepath)) return a.filepath;
+        if (item.sections is { Length: > 0 } && !string.IsNullOrEmpty(item.sections[0].text))
+            return item.sections[0].text;
+        return data?.ToString() ?? "";
+    }
+
+    static bool PathsEqual(string a, string b)
+    {
+        if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return false;
+        try { return string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase); }
+        catch { return string.Equals(a, b, StringComparison.OrdinalIgnoreCase); }
+    }
+
+    internal class TreeNode
+    {
+        public TTreeItem item;
+        public bool expanded;
+        public string key;
+        public TreeNode parent;
+        public List<TreeNode> children = new();
+    }
+}
+
+class C2_TreeRow : ImpComp2D
+{
+    readonly C2_Tree _tree;
+    readonly C2_Tree.TreeNode _node;
+    readonly int _depth;
+    bool _hover;
+    double _last_click;
+
+    public C2_TreeRow(C2_Tree tree, C2_Tree.TreeNode node, int depth)
+    {
+        _tree = tree;
+        _node = node;
+        _depth = depth;
+        cursor_filter = ECursorFilter.Hit;
+        option_button = null;
+    }
+
+    public override void OnDraw2D(double dt, WDrawFlags flags)
+    {
+        base.OnDraw2D(dt, flags);
+        TDimensions2 dim = Dimensions_Get();
+        if (dim.size.X <= 0 || dim.size.Y <= 0) return;
+
+        Color bg = _tree.IsSelected(_node)
+            ? _tree.color_row_selected
+            : (_hover ? _tree.color_row_hover : _tree.color_row);
+        if (bg.A > 0) Raylib.DrawRectangleV(dim.position, dim.size, bg);
+
+        if (_tree.drop_node == _node)
         {
-            if (Raylib.CheckCollisionPointRec(point, rows[i].rect)) return i;
+            Color acc = new(0, 170, 255, 255);
+            if (_tree.drop_kind == ETreeDrop.Child)
+                Raylib.DrawRectangleLinesEx(new Rectangle(dim.position.X + 1, dim.position.Y + 1, dim.size.X - 2, dim.size.Y - 2), 2f, acc);
+            else
+            {
+                float y = _tree.drop_kind == ETreeDrop.Before ? dim.position.Y : dim.position.Y + dim.size.Y - 2;
+                Raylib.DrawRectangleV(new Vector2(dim.position.X + 4, y), new Vector2(dim.size.X - 8, 2), acc);
+            }
         }
-        return -1;
+
+        float x = dim.position.X + 4 + _depth * _tree.indent_size;
+        float mid_y = dim.position.Y + dim.size.Y * 0.5f;
+
+        bool has_kids = _node.children.Count > 0;
+        A_Texture arrow = has_kids
+            ? (_node.expanded ? A_Texture.ICO_ARROW_D : A_Texture.ICO_ARROW_R)
+            : null;
+        bool drew_arrow = false;
+        if (arrow != null)
+        {
+            Texture2D tex = arrow.texture;
+            if (tex.Id != 0)
+            {
+                float s = 10;
+                Raylib.DrawTexturePro(tex,
+                    new Rectangle(0, 0, tex.Width, tex.Height),
+                    new Rectangle(x, mid_y - s * 0.5f, s, s),
+                    Vector2.Zero, 0f, Color.White);
+                drew_arrow = true;
+            }
+        }
+        if (has_kids && !drew_arrow)
+        {
+            Color ac = new(200, 200, 200, 255);
+            if (_node.expanded)
+                Raylib.DrawTriangle(
+                    new Vector2(x + 1, mid_y - 3),
+                    new Vector2(x + 9, mid_y - 3),
+                    new Vector2(x + 5, mid_y + 4), ac);
+            else
+                Raylib.DrawTriangle(
+                    new Vector2(x + 2, mid_y - 5),
+                    new Vector2(x + 2, mid_y + 5),
+                    new Vector2(x + 9, mid_y), ac);
+        }
+        x += 14;
+
+        TTreeItemSection[] sections = _node.item.sections;
+        if (sections != null)
+        {
+            for (int i = 0; i < sections.Length; i++)
+            {
+                TTreeItemSection s = sections[i];
+                if (s.icon != null)
+                {
+                    Texture2D tex = s.icon.texture;
+                    if (tex.Id != 0)
+                    {
+                        float sz = _tree.icon_size;
+                        Raylib.DrawTexturePro(tex,
+                            new Rectangle(0, 0, tex.Width, tex.Height),
+                            new Rectangle(x, mid_y - sz * 0.5f, sz, sz),
+                            Vector2.Zero, 0f, Color.White);
+                        x += sz + 4;
+                    }
+                }
+                if (!string.IsNullOrEmpty(s.text))
+                {
+                    UiStyle_Text style = _tree.IsSelected(_node) ? _tree.text_style_selected : _tree.text_style;
+                    Color prev = default;
+                    bool tint = s.color.A > 0 && style != null;
+                    if (tint) { prev = style.color; style.color = s.color; }
+                    float remain = dim.position.X + dim.size.X - x - 4;
+                    if (remain > 0)
+                        style?.Draw(s.text, new Vector2(x, dim.position.Y), new Vector2(remain, dim.size.Y),
+                            0, ETextWrap.None, EUIPositionAlignment.Center, EUIPositionAlignment.Start);
+                    if (tint) style.color = prev;
+                    Vector2 m = Raylib.MeasureTextEx(
+                        style?.font != null ? style.font.font : Raylib.GetFontDefault(),
+                        s.text, style != null && style.size > 0 ? style.size : 13, 1f);
+                    x += m.X + 8;
+                }
+            }
+        }
     }
 
-    // ---------------------------------------------------
-    // input
-    // ---------------------------------------------------
-
-    public override bool Cursor_WantsWheel() => true;
-
-    public override void Cursor_OnEvent(ECursorEvent ev)
+    public override void Cursor_OnEnter(ImpPlayer player)
     {
-        if (ev == ECursorEvent.Wheel)
+        base.Cursor_OnEnter(player);
+        _hover = true;
+    }
+
+    public override void Cursor_OnExit(ImpPlayer player)
+    {
+        base.Cursor_OnExit(player);
+        _hover = false;
+    }
+
+    public override void Cursor_OnEvent(ImpPlayer player, ECursorEvent evnt)
+    {
+        base.Cursor_OnEvent(player, evnt);
+        if (evnt == ECursorEvent.Select_B)
         {
-            scroll -= ImpUI.wheel * scroll_speed;
+            _tree.RightClickNode(_node);
+            return;
+        }
+        if (evnt != ECursorEvent.Select_A) return;
+
+        TDimensions2 dim = Dimensions_Get();
+        float arrow_x = dim.position.X + 4 + _depth * _tree.indent_size;
+        if (_node.children.Count > 0
+            && player.cursor.position.X >= arrow_x - 2
+            && player.cursor.position.X <= arrow_x + 16)
+        {
+            _tree.ToggleExpand(_node);
             return;
         }
 
-        if (ev != ECursorEvent.Clicked) return;
+        double now = Raylib.GetTime();
+        bool dbl = now - _last_click < 0.35;
+        _last_click = now;
+        _tree.SelectNode(_node, true);
+        if (dbl) _tree.OpenNode(_node);
+    }
 
-        int index = Row_At(ImpUI.mouse_pos);
-        if (index < 0)
+    public override bool CursorGrab_IsEnabled(ImpPlayer player)
+    {
+        if (CursorGrab_Payload() != null) return true;
+        return _tree.allow_reorder && _tree.on_item_drop != null
+            && _node.item.data is ImpComp c && !c.IsPackedForeign;
+    }
+
+    public override object CursorGrab_Payload()
+    {
+        return _tree.item_drag_payload?.Invoke(_node.item);
+    }
+
+    public override void CursorGrab_Begin(ImpPlayer player)
+    {
+        base.CursorGrab_Begin(player);
+        _tree.SelectNode(_node, false);
+    }
+
+    public override void CursorGrab_Update(ImpPlayer player, double dt)
+    {
+        base.CursorGrab_Update(player, dt);
+        if (player.cursor_target is C2_TreeRow row && row._tree == _tree)
+            row.ApplyDropHover(player);
+        else _tree.ClearDrop();
+    }
+
+    public override void CursorGrab_Drop(ImpPlayer player, ImpComp target)
+    {
+        base.CursorGrab_Drop(player, target);
+        if (target is C2_TreeRow row && row._tree == _tree)
+            _tree.CommitDrop(_node, row._node, row.DropKind(player));
+        else _tree.ClearDrop();
+    }
+
+    // Reorder is the row-to-row drag inside a tree that owns on_item_drop; everything else
+    // (another tree, a file thumbnail, a sibling row in a tree with no reorder) is a payload drop.
+    bool IsReorder(ImpComp dropped)
+    {
+        return dropped is C2_TreeRow src && src._tree == _tree && _tree.on_item_drop != null;
+    }
+
+    public override void CursorGrab_HoveredAsTarget(ImpPlayer player, ImpComp dropped, bool hovered)
+    {
+        base.CursorGrab_HoveredAsTarget(player, dropped, hovered);
+        bool reorder = IsReorder(dropped);
+        bool external = !reorder && _tree.on_item_drop_external != null
+            && dropped != this && dropped?.CursorGrab_Payload() != null;
+        if (!reorder && !external) return;
+        if (!hovered)
         {
-            Select_Clear(); //clicking the empty space below the rows drops the selection
+            if (_tree.drop_node == _node) _tree.ClearDrop();
             return;
         }
-
-        var row = rows[index];
-
-        // the arrow column expands; anywhere else on the row selects
-        if (row.item.children.Count > 0 && Raylib.CheckCollisionPointRec(ImpUI.mouse_pos, Rect_Arrow(row)))
-        {
-            row.item.is_expanded = !row.item.is_expanded;
-            return;
-        }
-
-        Select(row.item, ImpPlayer.Key_IsDown(EInputKey.Key_LeftControl)
-                      || ImpPlayer.Key_IsDown(EInputKey.Key_RightControl));
+        // Outside content always lands inside the row, never between rows.
+        if (external) _tree.SetDrop(_node, ETreeDrop.Child);
+        else ApplyDropHover(player);
     }
 
-    // ---------------------------------------------------
-    // draw
-    // ---------------------------------------------------
-
-    protected override void Draw_Self(double dt, EDrawFlags flags)
+    public override void CursorGrab_DroppedOn(ImpPlayer player, ImpComp dropped)
     {
-        var th = Theme_Get();
-
-        if (style != null) ImpUI.Rect(rect, style.color);
-
-        //clip_contents only wraps the children pass, and the rows are drawn here
-        ImpUI.Clip_Push(rect_content);
-
-        int hot = ImpUI.IsHovered(this) ? Row_At(ImpUI.mouse_pos) : -1;
-
-        float clip_top = rect_content.Y;
-        float clip_bottom = rect_content.Y + rect_content.Height;
-
-        for (int i = 0; i < rows.Count; i++)
-        {
-            var row = rows[i];
-            if (row.rect.Y + row.rect.Height < clip_top) continue;
-            if (row.rect.Y > clip_bottom) break; //rows are in order, so the rest are below too
-
-            Row_Draw(row, i == hot, th);
-        }
-
-        ImpUI.Clip_Pop();
-
-        Scrollbar_Draw(th);
+        base.CursorGrab_DroppedOn(player, dropped);
+        if (IsReorder(dropped)) return; //the source row commits this one
+        if (dropped == this) { _tree.ClearDrop(); return; }
+        object payload = dropped?.CursorGrab_Payload();
+        if (payload != null) _tree.CommitDropExternal(payload, _node);
     }
 
-    void Row_Draw(TTreeRow row, bool is_hot, ImpUITheme th)
+    void ApplyDropHover(ImpPlayer player)
     {
-        if (row.item.is_selected) ImpUI.Rect(row.rect, th.col_accent);
-        else if (is_hot) ImpUI.Rect(row.rect, th.col_hover);
-
-        if (row.item.children.Count > 0) Arrow_Draw(Rect_Arrow(row), row.item.is_expanded, th);
-
-        float text_x = row.rect.X + (row.depth + 1) * indent + th.padding * 0.5f;
-
-        // the icon sits in the label column and pushes the text along, so a row without one
-        // (trees that aren't built from comps) simply starts its label further left
-        if (row.item.icon != null)
-        {
-            float icon_size = MathF.Max(0f, row.rect.Height - th.padding);
-
-            ImpUI.TextureFit(row.item.icon, new Rectangle(
-                text_x,
-                row.rect.Y + (row.rect.Height - icon_size) * 0.5f,
-                icon_size, icon_size), Color.White);
-
-            text_x += icon_size + th.padding * 0.5f;
-        }
-
-        float columns_w = MathF.Max(0, row.item.sections.Count - 1) * section_width;
-        float label_w = row.rect.X + row.rect.Width - text_x - columns_w - th.padding;
-
-        ImpUI.TextInRect(row.item.Label,
-            new Rectangle(text_x, row.rect.Y, MathF.Max(0, label_w), row.rect.Height),
-            th.style_text, 0f);
-
-        for (int s = 1; s < row.item.sections.Count; s++)
-        {
-            var column = new Rectangle(
-                row.rect.X + row.rect.Width - columns_w + (s - 1) * section_width,
-                row.rect.Y,
-                MathF.Max(0, section_width - th.padding),
-                row.rect.Height);
-
-            ImpUI.TextInRect(row.item.sections[s], column, th.style_text_dim, 0f);
-        }
+        _tree.SetDrop(_node, DropKind(player));
     }
 
-    static void Arrow_Draw(Rectangle box, bool is_expanded, ImpUITheme th)
+    ETreeDrop DropKind(ImpPlayer player)
     {
-        float cx = box.X + box.Width * 0.5f;
-        float cy = box.Y + box.Height * 0.5f;
-        float s = box.Width;
-
-        if (is_expanded)
-        {
-            ImpUI.Line(new Vector2(cx - s * 0.4f, cy - s * 0.2f), new Vector2(cx, cy + s * 0.3f), 1.5f, th.col_text);
-            ImpUI.Line(new Vector2(cx, cy + s * 0.3f), new Vector2(cx + s * 0.4f, cy - s * 0.2f), 1.5f, th.col_text);
-        }
-        else
-        {
-            ImpUI.Line(new Vector2(cx - s * 0.2f, cy - s * 0.4f), new Vector2(cx + s * 0.3f, cy), 1.5f, th.col_text);
-            ImpUI.Line(new Vector2(cx + s * 0.3f, cy), new Vector2(cx - s * 0.2f, cy + s * 0.4f), 1.5f, th.col_text);
-        }
-    }
-
-    void Scrollbar_Draw(ImpUITheme th)
-    {
-        float overflow = MathF.Max(0f, content_len - rect_content.Height);
-        if (overflow <= 0f) return;
-
-        var track = new Rectangle(
-            rect_content.X + rect_content.Width - th.scrollbar_width,
-            rect_content.Y,
-            th.scrollbar_width,
-            rect_content.Height);
-
-        ImpUI.Rect(track, th.col_panel);
-
-        float grip_h = MathF.Max(24f, track.Height * (rect_content.Height / content_len));
-        float t = scroll / overflow;
-
-        ImpUI.Rect(new Rectangle(
-            track.X + 2f,
-            track.Y + (track.Height - grip_h) * t,
-            track.Width - 4f,
-            grip_h), th.col_line);
+        if (_node.parent == null) return ETreeDrop.Child;
+        TDimensions2 dim = Dimensions_Get();
+        float t = dim.size.Y > 0 ? (player.cursor.position.Y - dim.position.Y) / dim.size.Y : 0.5f;
+        if (t < 0.28f) return ETreeDrop.Before;
+        if (t > 0.72f) return ETreeDrop.After;
+        return ETreeDrop.Child;
     }
 }

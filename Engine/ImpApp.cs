@@ -1,81 +1,99 @@
-﻿using System.Data;
+﻿//using raygui_cs;
+
 using System.Numerics;
-using ImperiumEngine.Main;
+using ImperiumEngine.Enums;
 using R3D_cs;
+using raygui_cs;
 using Raylib_cs;
 
 namespace ImperiumEngine;
 
-//coremost class for am Imperium engine app. Used in the game, editor, and launcher
-
 public class ImpApp
 {
+    // #################################################################################
+    // Static
+    // #################################################################################
+    
     public static ImpApp app;
-    public static string name="ImpApp";
-
-    //default framing a new C2_SceneView starts from, until something points it elsewhere
-    public static Camera3D camera=new Camera3D(){
+    
+    
+// Setup camera
+    public Camera3D camera = new Camera3D() {
         Position = new Vector3(0, 2, 2),
         Target = Vector3.Zero,
         Up = new Vector3(0, 1, 0),
         FovY = 60
     };
+    // #################################################################################
+    // Class
+    // #################################################################################
     
-    public void Run(Action? pre_loop=null)
+    [System.STAThread]
+    public void Run(Action on_pre_init=null,Action on_post_init=null)
     {
+        // init
         app = this;
-
-        //must precede InitWindow: raylib reads the flags when it creates the GL context.
-        //multisampling is what keeps gizmo lines and 3D silhouettes from stair-stepping.
-        Raylib.SetConfigFlags(ConfigFlags.Msaa4xHint);
-        Raylib.InitWindow(1280, 720, name);
-        R3D.Init(Raylib.GetScreenWidth(), Raylib.GetScreenHeight());
-
         
-        //local player 0: every Key_/Action_ query is routed through a player
-        ImpPlayer.Create();
-
-        pre_loop?.Invoke();
-
+        on_pre_init?.Invoke();
+        
+        Raylib.SetConfigFlags(ConfigFlags.Msaa4xHint | ConfigFlags.HighDpiWindow);
+        Raylib.InitWindow(1280, 720, "Imperium");
+        
+        Raylib.SetTargetFPS(60);
+        Raylib.SetExitKey(KeyboardKey.Null);
+        R3D.Init(Raylib.GetScreenWidth(), Raylib.GetScreenHeight());
+        ImpPlayer.Init();
+        
+        on_post_init?.Invoke();
+        
         while (!Raylib.WindowShouldClose())
         {
+            // ----- BEGIN ------------------------------------------------------------------------------------
             double dt = Raylib.GetFrameTime();
-
-            // INPUT ----------------------------------
-            // Sampled once, up front, so every query for the rest of the frame agrees.
-            ImpPlayer.Input_Poll(dt);
-            ImpUI.Frame_Begin(dt);
-
-            // UPDATE ----------------------------------
-            ImpScene.current.Update(dt);
-            ImpScene.global.Update(dt);
-
-            // BEGIN ----------------------------------
+            ImpProfiler.Frame_Begin();
             Raylib.BeginDrawing();
-            Raylib.ClearBackground(ImpUITheme.game_theme.col_background);
+            Raylib.ClearBackground(Color.White);
 
-            // UI ------------------------------------
-            // Three ordered passes: layout resolves every comp's screen rect, input
-            // hit-tests those rects, then draw paints using them. Input sits between so
-            // a comp can render its pressed state on the same frame it was pressed.
-            //
-            // 3D goes out during the draw pass too: a C2_SceneView opens its own R3D
-            // session over its rect, so scenes reach the screen through a viewport comp
-            // in a game exactly as they do in the editor.
-            ImpScene.current.Layout(ImpUI.screen);
-            ImpScene.global.Layout(ImpUI.screen);
+            // ----- INPUT (keys first) -----------------------------------------------------------------------
+            // Each phase starts on a fresh layout epoch: the previous phase may have moved
+            // things around through paths the setters cannot see (direct size/transform writes).
+            ImpComp2D.Layout_Invalidate();
+            ImpProfiler.Phase_Begin(ImpProfiler.EPhase.Input);
+            foreach (var p in ImpPlayer.players)
+                p.Update_Input(dt);
 
-            ImpUI.Input_Process(ImpScene.current.root, ImpScene.global.root);
+            // ----- UPDATE (layout) --------------------------------------------------------------------------
+            ImpComp2D.Layout_Invalidate();
+            ImpProfiler.Phase_Begin(ImpProfiler.EPhase.Update);
+            ImpScene.current.Update(dt);
 
-            ImpScene.current.Draw(dt, EDrawFlags.None);
-            ImpScene.global.Draw(dt, EDrawFlags.None);
+            // ----- CURSOR (after layout so hit rects match drawn widgets) ------------------------------------
+            ImpComp2D.Layout_Invalidate();
+            ImpProfiler.Phase_Begin(ImpProfiler.EPhase.Cursor);
+            foreach (var p in ImpPlayer.players)
+                p.Update_Cursor(dt);
 
-            ImpUI.Frame_End();
+            // ----- DRAW ------------------------------------------------------------------------------------
+            ImpComp2D.Layout_Invalidate();
+            ImpProfiler.Phase_Begin(ImpProfiler.EPhase.Draw3D);
+            R3D.Begin(camera);
+            ImpScene.current.Draw(dt,0); //3D
+            R3D.End();
 
-            // END ----------------------------------
+            ImpProfiler.Phase_Begin(ImpProfiler.EPhase.Draw2D);
+            ImpScene.current.Draw(dt,1); //2D
+
+            // ----- END ------------------------------------------------------------------------------------
+
+            ImpProfiler.Phase_End();
+            ImpProfiler.Frame_End();
+            ImpProfiler.Draw();
             Raylib.EndDrawing();
         }
+
         R3D.Close();
+        Raylib.ShowCursor();
         Raylib.CloseWindow();
     }
+    
 }

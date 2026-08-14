@@ -1,65 +1,80 @@
-using System.Numerics;
-using ImperiumEngine.Main;
+﻿using System.Numerics;
+using ImperiumEngine.Comps._2D;
+using ImperiumEngine.Comps._3D;
+using ImperiumEngine.Structs;
 using R3D_cs;
-using Raylib_cs;
-using Mesh = R3D_cs.Mesh;
 
 namespace ImperiumEngine.Assets;
 
-public enum EMeshPrimitive
-{
-    None, Cube, Sphere, Plane, Capsule, Cylinder,
-}
-
 public class A_Mesh : ImpAsset
 {
-    // Built-in shape, generated on the GPU the first time the mesh is drawn. Assets that
-    // import geometry off disc leave this at None and go through source_file instead.
-    [ImpVar][Export] public EMeshPrimitive primitive = EMeshPrimitive.None;
-    [ImpVar][Export] public Vector3 primitive_size = Vector3.One;
+    public Mesh mesh;
 
-    Mesh r3d_mesh;
-    bool is_built;
+    static A_Mesh? _geo_cube;
+    static A_Mesh? _geo_plane;
 
-    public static A_Mesh Primitive(EMeshPrimitive shape, Vector3? size = null)
+    public static A_Mesh GEO_CUBE => _geo_cube ??= new A_Mesh
     {
-        return new A_Mesh { primitive = shape, primitive_size = size ?? Vector3.One };
+        mesh = R3D.GenMeshCube(1f, 1f, 1f),
+        filepath = BuiltinPrefix + "A_Mesh.GEO_CUBE",
+    };
+    public static A_Mesh GEO_PLANE => _geo_plane ??= new A_Mesh
+    {
+        mesh = R3D.GenMeshPlane(1f, 1f, 1, 1),
+        filepath = BuiltinPrefix + "A_Mesh.GEO_PLANE",
+    };
+
+    C2_SceneView _drop_view;
+    C3_Mesh _drop_ghost;
+
+    public override void SceneDrop_Enter(C2_SceneView view, ImpPlayer player)
+    {
+        SceneDrop_Exit(view, player);
+        if (view?.scene == null) return;
+        _drop_view = view;
+        _drop_ghost = new C3_Mesh { name = GetName(), mesh = this };
+        view.drop_preview = _drop_ghost;
+        _drop_ghost.scene = view.scene;
+        SceneDrop_Update(view, 0, player);
     }
 
-    // The R3D mesh this asset draws with, built on first use. Building uploads vertex
-    // buffers, so it is deferred until there is a window (and therefore a GL context) -
-    // same reasoning as ImpAsset.Resource_Ensure.
-    public Mesh? get_Mesh()
+    public override void SceneDrop_Exit(C2_SceneView view, ImpPlayer player)
     {
-        if (!is_built)
-        {
-            if (!Raylib.IsWindowReady()) return null;
+        if (view != null && view.drop_preview == _drop_ghost) view.drop_preview = null;
+        _drop_ghost?.Destroy();
+        _drop_ghost = null;
+        _drop_view = null;
+    }
 
-            is_built = true;
-            r3d_mesh = Mesh_Build();
+    public override void SceneDrop_Update(C2_SceneView view, float dt, ImpPlayer player)
+    {
+        if (_drop_ghost == null || view == null) return;
+        if (view.Drop_World3(player, out Vector3 pos, out _))
+            _drop_ghost.Position_Set(pos, true);
+    }
+
+    public override void SceneDrop_DropOnComp(ImpComp comp, ImpPlayer player)
+    {
+        if (_drop_ghost == null) return;
+        ImpComp dest = comp;
+        ImpScene dest_scene = _drop_view?.scene ?? dest?.scene;
+        if (dest == null || dest == _drop_ghost || _drop_ghost.IsAncestorOf(dest))
+            dest = dest_scene?.root;
+        if (dest == null)
+        {
+            SceneDrop_Exit(_drop_view, player);
+            return;
         }
 
-        return r3d_mesh.VertexCount > 0 ? r3d_mesh : null;
-    }
+        TTransform3 world = _drop_ghost.Transform_Get(true);
+        if (_drop_view != null && _drop_view.drop_preview == _drop_ghost)
+            _drop_view.drop_preview = null;
 
-    Mesh Mesh_Build()
-    {
-        var s = primitive_size;
-
-        // Radii come from the size's diameter so every primitive reads as a bounding box.
-        return primitive switch
-        {
-            EMeshPrimitive.Cube     => R3D.GenMeshCube(s.X, s.Y, s.Z),
-            EMeshPrimitive.Sphere   => R3D.GenMeshSphere(s.X * 0.5f, 32, 16),
-            EMeshPrimitive.Plane    => R3D.GenMeshPlane(s.X, s.Z, 1, 1),
-            EMeshPrimitive.Capsule  => R3D.GenMeshCapsule(s.X * 0.5f, s.Y, 32, 8),
-            EMeshPrimitive.Cylinder => R3D.GenMeshCylinder(s.X * 0.5f, s.Y, 32),
-            _                       => default,
-        };
-    }
-
-    public override string File_GetExtension()
-    {
-        return "ImpMesh";
+        dest.Child_Add(_drop_ghost);
+        _drop_ghost.Transform_Set(world, true);
+        ImpUndo.Comp_Moved(_drop_ghost, default, "Drop " + GetName());
+        _drop_view?.gizmo_data?.Selection_Set(new[] { (ImpComp)_drop_ghost });
+        _drop_ghost = null;
+        _drop_view = null;
     }
 }

@@ -1,82 +1,45 @@
 using System.Numerics;
 using ImperiumEngine.Enums;
-using ImperiumEngine.Main;
+using ImperiumEngine.Structs;
 using Raylib_cs;
 
 namespace ImperiumEngine.Comps._2D;
 
-// A colour swatch that opens a picker panel: saturation/value square, hue strip, and an
-// alpha strip.
-//
-// Hue, saturation and value are held here as the real state rather than being read back
-// out of the colour each frame. RGB carries no hue at all once saturation or value reaches
-// zero, so a round trip through it would snap the cursor to red the instant the user
-// dragged into black or white.
-//
-// The panel paints through ImpUI's overlay layer so it escapes the inspector's scroll clip
-// and sits above the rest of the tree - the same approach C2_Dropdown uses.
 public class C2_ColorPicker : ImpComp2D
 {
-    // panel metrics
-    const float PANEL_WIDTH = 224f;
-    const float SV_HEIGHT = 128f;
-    const float BAR_HEIGHT = 14f;
-    const float PANEL_PAD = 6f;
-    const float CHECKER_CELL = 5f;
-
-    //which strip a drag started in; strips keep the pointer until release
-    const int AREA_NONE = -1;
-    const int AREA_SV = 0;
-    const int AREA_HUE = 1;
-    const int AREA_ALPHA = 2;
+    const float PanelW = 224f;
+    const float SvH = 128f;
+    const float BarH = 14f;
+    const float Pad = 6f;
 
     [ImpVar] public Color color = Color.White;
     [ImpVar] public bool show_alpha = true;
+    public Action<C2_ColorPicker> on_color_changed;
 
-    //multi-selection disagreement; the swatch shows nothing rather than a lie
-    public bool is_mixed;
+    bool _open;
+    bool _hover;
+    C2_ColorPickerPanel _panel;
+    float _hue, _sat = 1, _val = 1, _alpha = 1;
 
-    public UIStyle_Rect? style;
-
-    public Action<C2_ColorPicker>? on_color_changed;
-
-    bool is_open;
-    int drag_area = AREA_NONE;
-
-    float hue;   //0-360
-    float sat;   //0-1
-    float val;   //0-1
-    float alpha = 1f;
-
-    public bool IsOpen => is_open;
+    public bool IsOpen => _open;
 
     public C2_ColorPicker()
     {
         cursor_filter = ECursorFilter.Hit;
+        option_button = null;
         HSV_Sync();
     }
-
-    public override Vector2 Size_GetContentMin() => new Vector2(0, Theme_Get().item_height);
-
-    // ---------------------------------------------------
-    // value
-    // ---------------------------------------------------
 
     public void Color_Set(Color value, bool notify = true)
     {
         color = value;
         HSV_Sync();
-
         if (notify) on_color_changed?.Invoke(this);
     }
 
-    // Pushing a value in from outside. The early out matters while the panel is open: the
-    // inspector writes back the colour this picker just produced, and re-deriving HSV from
-    // it would undo the hue the user is holding.
     public void Color_SetQuiet(Color value)
     {
         if (value.R == color.R && value.G == color.G && value.B == color.B && value.A == color.A) return;
-
         color = value;
         HSV_Sync();
     }
@@ -84,295 +47,200 @@ public class C2_ColorPicker : ImpComp2D
     void HSV_Sync()
     {
         Vector3 hsv = Raylib.ColorToHSV(color);
-
-        //hue is undefined on greys, so hold onto whatever is already showing
-        if (hsv.Y > 0f && hsv.Z > 0f) hue = hsv.X;
-
-        sat = hsv.Y;
-        val = hsv.Z;
-        alpha = color.A / 255f;
+        if (hsv.Y > 0f && hsv.Z > 0f) _hue = hsv.X;
+        _sat = hsv.Y;
+        _val = hsv.Z;
+        _alpha = color.A / 255f;
     }
 
-    void HSV_Apply()
+    internal void HSV_Apply(float hue, float sat, float val, float alpha)
     {
-        Color rgb = Raylib.ColorFromHSV(hue, sat, val);
-
-        color = new Color(rgb.R, rgb.G, rgb.B, (byte)Math.Clamp(alpha * 255f, 0f, 255f));
-        is_mixed = false;
-
+        _hue = hue; _sat = sat; _val = val; _alpha = alpha;
+        Color rgb = Raylib.ColorFromHSV(_hue, _sat, _val);
+        color = new Color(rgb.R, rgb.G, rgb.B, (byte)Math.Clamp(_alpha * 255f, 0, 255));
         on_color_changed?.Invoke(this);
     }
 
-    Color Color_Opaque() => new Color(color.R, color.G, color.B, (byte)255);
-
-    // ---------------------------------------------------
-    // input
-    // ---------------------------------------------------
-
-    public override void Cursor_OnEvent(ECursorEvent ev)
+    internal void GetHSV(out float hue, out float sat, out float val, out float alpha)
     {
-        if (ev != ECursorEvent.Clicked) return;
-        Open_Set(!is_open);
+        hue = _hue; sat = _sat; val = _val; alpha = _alpha;
+    }
+
+    public override void OnDraw2D(double dt, WDrawFlags flags)
+    {
+        base.OnDraw2D(dt, flags);
+        TDimensions2 dim = Dimensions_Get();
+        if (dim.size.X <= 0 || dim.size.Y <= 0) return;
+        UiStyle_Box bg = _open ? UiStyle_Box.STYLE_BTN_PRESS : _hover ? UiStyle_Box.STYLE_BTN_HOVER : UiStyle_Box.STYLE_BKG_MID;
+        bg.Draw(dim);
+        var sw = new Rectangle(dim.position.X + 2, dim.position.Y + 2, MathF.Max(0, dim.size.X - 4), MathF.Max(0, dim.size.Y - 4));
+        if (color.A < 255)
+        {
+            for (int y = 0; y < sw.Height; y += 5)
+            for (int x = 0; x < sw.Width; x += 5)
+                Raylib.DrawRectangle((int)(sw.X + x), (int)(sw.Y + y), 5, 5,
+                    ((x / 5 + y / 5) & 1) == 0 ? new Color(70, 70, 70, 255) : new Color(50, 50, 50, 255));
+        }
+        Raylib.DrawRectangleRec(sw, color);
+        Raylib.DrawRectangleLinesEx(new Rectangle(dim.position.X, dim.position.Y, dim.size.X, dim.size.Y), 1,
+            _open ? new Color(0, 120, 215, 255) : new Color(80, 80, 80, 255));
+    }
+
+    public override void Cursor_OnEnter(ImpPlayer player) { base.Cursor_OnEnter(player); _hover = true; }
+    public override void Cursor_OnExit(ImpPlayer player) { base.Cursor_OnExit(player); _hover = false; }
+
+    public override void Cursor_OnEvent(ImpPlayer player, ECursorEvent evnt)
+    {
+        base.Cursor_OnEvent(player, evnt);
+        if (evnt != ECursorEvent.Select_A) return;
+        Open_Set(!_open);
     }
 
     void Open_Set(bool open)
     {
-        if (open == is_open) return;
-
-        is_open = open;
-        drag_area = AREA_NONE;
-
-        //re-derive on open so the panel starts from whatever the value is now
-        if (open) HSV_Sync();
-    }
-
-    // ---------------------------------------------------
-    // panel
-    // ---------------------------------------------------
-
-    struct TPanel
-    {
-        public Rectangle panel;
-        public Rectangle sv;
-        public Rectangle hue;
-        public Rectangle alpha;
-        public Rectangle preview;
-    }
-
-    TPanel Panel_Layout(ImpUITheme th)
-    {
-        var p = new TPanel();
-
-        float w = MathF.Max(PANEL_WIDTH, rect.Width);
-        float inner = w - PANEL_PAD * 2;
-
-        float h = PANEL_PAD
-                + SV_HEIGHT + PANEL_PAD
-                + BAR_HEIGHT + PANEL_PAD
-                + (show_alpha ? BAR_HEIGHT + PANEL_PAD : 0f)
-                + th.item_height + PANEL_PAD;
-
-        float x = rect.X;
-        float y = rect.Y + rect.Height;
-
-        //keep the panel on screen when the row sits near an edge
-        if (y + h > ImpUI.screen.Height) y = MathF.Max(0, rect.Y - h);
-        if (x + w > ImpUI.screen.Width) x = MathF.Max(0, ImpUI.screen.Width - w);
-
-        p.panel = new Rectangle(x, y, w, h);
-
-        float cy = y + PANEL_PAD;
-        p.sv = new Rectangle(x + PANEL_PAD, cy, inner, SV_HEIGHT);
-        cy += SV_HEIGHT + PANEL_PAD;
-
-        p.hue = new Rectangle(x + PANEL_PAD, cy, inner, BAR_HEIGHT);
-        cy += BAR_HEIGHT + PANEL_PAD;
-
-        if (show_alpha)
+        if (open == _open) return;
+        _open = open;
+        if (!open)
         {
-            p.alpha = new Rectangle(x + PANEL_PAD, cy, inner, BAR_HEIGHT);
-            cy += BAR_HEIGHT + PANEL_PAD;
-        }
-
-        p.preview = new Rectangle(x + PANEL_PAD, cy, inner, th.item_height);
-        return p;
-    }
-
-    void Panel_Update(ImpUITheme th)
-    {
-        var p = Panel_Layout(th);
-
-        if (ImpUI.mouse_pressed) drag_area = Area_At(p, ImpUI.mouse_pos);
-        if (!ImpUI.mouse_down) drag_area = AREA_NONE;
-
-        if (drag_area != AREA_NONE)
-        {
-            // the press owns the pointer until release, so a fast drag that runs off the
-            // edge of a strip keeps picking instead of stopping dead at the boundary
-            Drag_Apply(p, ImpUI.mouse_pos);
-        }
-        else if (ImpUI.mouse_pressed
-                 && !Raylib.CheckCollisionPointRec(ImpUI.mouse_pos, p.panel)
-                 && !Raylib.CheckCollisionPointRec(ImpUI.mouse_pos, rect))
-        {
-            //a press on the swatch itself is Cursor_OnEvent's business, so only close here
-            Open_Set(false);
+            _panel?.Destroy();
+            _panel = null;
             return;
         }
-
-        ImpUI.Overlay_Push(p.panel, () => Panel_Draw(th, p));
-    }
-
-    int Area_At(TPanel p, Vector2 point)
-    {
-        if (Raylib.CheckCollisionPointRec(point, p.sv)) return AREA_SV;
-        if (Raylib.CheckCollisionPointRec(point, p.hue)) return AREA_HUE;
-        if (show_alpha && Raylib.CheckCollisionPointRec(point, p.alpha)) return AREA_ALPHA;
-        return AREA_NONE;
-    }
-
-    void Drag_Apply(TPanel p, Vector2 point)
-    {
-        switch (drag_area)
+        HSV_Sync();
+        ImpComp host = C2_MenuBar.PopupHost();
+        if (host == null) { _open = false; return; }
+        TDimensions2 dim = Dimensions_Get();
+        _panel = new C2_ColorPickerPanel(this)
         {
-            case AREA_SV:
-                sat = Fraction(point.X, p.sv.X, p.sv.Width);
-                val = 1f - Fraction(point.Y, p.sv.Y, p.sv.Height);
-                break;
-
-            case AREA_HUE:
-                hue = Fraction(point.X, p.hue.X, p.hue.Width) * 360f;
-                break;
-
-            case AREA_ALPHA:
-                alpha = Fraction(point.X, p.alpha.X, p.alpha.Width);
-                break;
-
-            default: return;
-        }
-
-        HSV_Apply();
+            view_alighnment_H = EUIViewportAlignment.Start,
+            view_alighnment_V = EUIViewportAlignment.Start,
+        };
+        float h = Pad + SvH + Pad + BarH + Pad + (show_alpha ? BarH + Pad : 0) + 22 + Pad;
+        _panel.size = new Vector2(MathF.Max(PanelW, dim.size.X), h);
+        _panel.size_min = _panel.size;
+        _panel.transform.position = new Vector2(dim.position.X, dim.position.Y + dim.size.Y);
+        host.Child_Add(_panel);
     }
 
-    static float Fraction(float v, float start, float length)
+    internal void Close() => Open_Set(false);
+}
+
+class C2_ColorPickerPanel : C2_Box
+{
+    readonly C2_ColorPicker _owner;
+    int _area = -1;
+
+    public C2_ColorPickerPanel(C2_ColorPicker owner)
     {
-        return length <= 0f ? 0f : Math.Clamp((v - start) / length, 0f, 1f);
+        _owner = owner;
+        cursor_filter = ECursorFilter.Hit;
+        style = new UiStyle_Box { texture = null, tint = new Color(40, 40, 42, 255) };
     }
 
-    // ---------------------------------------------------
-    // draw
-    // ---------------------------------------------------
-
-    protected override void Draw_Self(double dt, EDrawFlags flags)
+    public override void OnUpdate(double dt)
     {
-        var th = Theme_Get();
+        base.OnUpdate(dt);
+        if (ImpPlayer.players.Count == 0) return;
+        ImpPlayer p = ImpPlayer.players[0];
+        TDimensions2 dim = Dimensions_Get();
+        Layout(dim, out Rectangle sv, out Rectangle hue, out Rectangle alpha, out _);
 
-        var bg = style?.color
-                 ?? (is_open ? th.col_pressed
-                     : ImpUI.IsHovered(this) ? th.col_hover
-                     : th.col_panel_alt);
-
-        ImpUI.Rect(rect, bg);
-
-        //the swatch is inset so the row's background still reads as the field
-        var swatch = new Rectangle(rect.X + 2f, rect.Y + 2f,
-                                   MathF.Max(0, rect.Width - 4f), MathF.Max(0, rect.Height - 4f));
-
-        if (is_mixed)
+        if (ImpPlayer.Key_IsPressed(EInputKey.Mouse_Left))
         {
-            ImpUI.TextInRect("-", rect, th.style_text_dim, 0.5f);
+            Vector2 m = p.cursor.position;
+            if (Raylib.CheckCollisionPointRec(m, sv)) _area = 0;
+            else if (Raylib.CheckCollisionPointRec(m, hue)) _area = 1;
+            else if (_owner.show_alpha && Raylib.CheckCollisionPointRec(m, alpha)) _area = 2;
+            else if (!p.Cursor_IsInDimensions(dim) && p.cursor_target != _owner)
+            {
+                _owner.Close();
+                return;
+            }
         }
-        else
+        if (!ImpPlayer.Key_IsHeld(EInputKey.Mouse_Left)) _area = -1;
+        if (_area < 0) return;
+
+        Vector2 pos = p.cursor.position;
+        _owner.GetHSV(out float h, out float s, out float v, out float a);
+        if (_area == 0)
         {
-            Swatch_Draw(swatch, th);
+            s = Frac(pos.X, sv.X, sv.Width);
+            v = 1f - Frac(pos.Y, sv.Y, sv.Height);
         }
-
-        ImpUI.RectOutline(rect, 1f, is_open ? th.col_accent : th.col_line);
-
-        if (is_open) Panel_Update(th);
+        else if (_area == 1) h = Frac(pos.X, hue.X, hue.Width) * 360f;
+        else a = Frac(pos.X, alpha.X, alpha.Width);
+        _owner.HSV_Apply(h, s, v, a);
     }
 
-    void Swatch_Draw(Rectangle r, ImpUITheme th)
+    public override void OnDraw2D(double dt, WDrawFlags flags)
     {
-        if (color.A < 255) ImpUI.RectChecker(r, th.col_panel, th.col_panel_alt, CHECKER_CELL);
-        ImpUI.Rect(r, color);
-    }
+        base.OnDraw2D(dt, flags);
+        TDimensions2 dim = Dimensions_Get();
+        Layout(dim, out Rectangle sv, out Rectangle hue, out Rectangle alpha, out Rectangle preview);
+        Raylib.DrawRectangleLinesEx(new Rectangle(dim.position.X, dim.position.Y, dim.size.X, dim.size.Y), 1, new Color(80, 80, 80, 255));
 
-    void Panel_Draw(ImpUITheme th, TPanel p)
-    {
-        ImpUI.Rect(p.panel, th.col_panel_alt);
-        ImpUI.RectOutline(p.panel, 1f, th.col_line);
+        _owner.GetHSV(out float huev, out float sat, out float val, out float alp);
+        Color pure = Raylib.ColorFromHSV(huev, 1, 1);
+        Raylib.DrawRectangleGradientH((int)sv.X, (int)sv.Y, (int)sv.Width, (int)sv.Height, Color.White, pure);
+        Raylib.DrawRectangleGradientV((int)sv.X, (int)sv.Y, (int)sv.Width, (int)sv.Height, new Color(0, 0, 0, 0), Color.Black);
+        Raylib.DrawRectangleLinesEx(sv, 1, new Color(80, 80, 80, 255));
+        Cursor(new Vector2(sv.X + sat * sv.Width, sv.Y + (1 - val) * sv.Height));
 
-        SV_Draw(p.sv, th);
-        Hue_Draw(p.hue);
-        if (show_alpha) Alpha_Draw(p.alpha, th);
-
-        Preview_Draw(p.preview, th);
-    }
-
-    // White to full hue across, then a black fade down. Two blended passes rather than a
-    // per-pixel fill: the gradient primitive does it on the GPU for free.
-    void SV_Draw(Rectangle r, ImpUITheme th)
-    {
-        Color pure = Raylib.ColorFromHSV(hue, 1f, 1f);
-        var clear = new Color(0, 0, 0, 0);
-
-        ImpUI.RectGradient(r, Color.White, Color.White, pure, pure);
-        ImpUI.RectGradient(r, clear, Color.Black, Color.Black, clear);
-        ImpUI.RectOutline(r, 1f, th.col_line);
-
-        Cursor_Draw(new Vector2(r.X + sat * r.Width, r.Y + (1f - val) * r.Height));
-    }
-
-    // A ring, drawn as two boxes: the outline primitive is all there is, and a light box
-    // inside a dark one stays visible over both ends of the square.
-    static void Cursor_Draw(Vector2 at)
-    {
-        const float s = 9f;
-        var box = new Rectangle(at.X - s * 0.5f, at.Y - s * 0.5f, s, s);
-
-        ImpUI.RectOutline(box, 2f, Color.Black);
-        ImpUI.RectOutline(new Rectangle(box.X + 1f, box.Y + 1f, box.Width - 2f, box.Height - 2f),
-                          1f, Color.White);
-    }
-
-    // Six gradient segments, because a hue sweep is six linear ramps and not one.
-    void Hue_Draw(Rectangle r)
-    {
         const int steps = 6;
-        float w = r.Width / steps;
-
+        float w = hue.Width / steps;
         for (int i = 0; i < steps; i++)
         {
-            Color a = Raylib.ColorFromHSV(i * 60f, 1f, 1f);
-            Color b = Raylib.ColorFromHSV((i + 1) * 60f, 1f, 1f);
+            Color a = Raylib.ColorFromHSV(i * 60f, 1, 1);
+            Color b = Raylib.ColorFromHSV((i + 1) * 60f, 1, 1);
+            Raylib.DrawRectangleGradientH((int)(hue.X + i * w), (int)hue.Y, (int)MathF.Ceiling(w), (int)hue.Height, a, b);
+        }
+        Marker(hue, huev / 360f);
 
-            ImpUI.RectGradient(new Rectangle(r.X + i * w, r.Y, w, r.Height), a, a, b, b);
+        if (_owner.show_alpha)
+        {
+            Color op = new Color(_owner.color.R, _owner.color.G, _owner.color.B, (byte)255);
+            Raylib.DrawRectangleGradientH((int)alpha.X, (int)alpha.Y, (int)alpha.Width, (int)alpha.Height,
+                new Color(op.R, op.G, op.B, (byte)0), op);
+            Marker(alpha, alp);
         }
 
-        Marker_Draw(r, hue / 360f);
+        Raylib.DrawRectangleRec(preview, _owner.color);
+        Raylib.DrawRectangleLinesEx(preview, 1, new Color(80, 80, 80, 255));
+        UiStyle_Text.LIGHT.Draw($"#{_owner.color.R:X2}{_owner.color.G:X2}{_owner.color.B:X2}{_owner.color.A:X2}",
+            new Vector2(preview.X + preview.Height * 1.6f + 6, preview.Y),
+            new Vector2(MathF.Max(0, preview.Width - preview.Height * 1.6f - 8), preview.Height),
+            0, ETextWrap.None, EUIPositionAlignment.Center, EUIPositionAlignment.Start);
     }
 
-    void Alpha_Draw(Rectangle r, ImpUITheme th)
+    void Layout(TDimensions2 dim, out Rectangle sv, out Rectangle hue, out Rectangle alpha, out Rectangle preview)
     {
-        ImpUI.RectChecker(r, th.col_panel, th.col_background, CHECKER_CELL);
-
-        Color opaque = Color_Opaque();
-        var clear = new Color(opaque.R, opaque.G, opaque.B, (byte)0);
-
-        ImpUI.RectGradient(r, clear, clear, opaque, opaque);
-        Marker_Draw(r, alpha);
+        float x = dim.position.X + 6;
+        float y = dim.position.Y + 6;
+        float inner = dim.size.X - 12;
+        sv = new Rectangle(x, y, inner, 128);
+        y += 134;
+        hue = new Rectangle(x, y, inner, 14);
+        y += 20;
+        if (_owner.show_alpha) { alpha = new Rectangle(x, y, inner, 14); y += 20; }
+        else alpha = default;
+        preview = new Rectangle(x, y, inner, 22);
     }
 
-    static void Marker_Draw(Rectangle bar, float t)
-    {
-        float x = bar.X + Math.Clamp(t, 0f, 1f) * bar.Width;
+    static float Frac(float v, float start, float length) =>
+        length <= 0 ? 0 : Math.Clamp((v - start) / length, 0, 1);
 
-        var box = new Rectangle(x - 2f, bar.Y - 2f, 4f, bar.Height + 4f);
-        ImpUI.RectOutline(box, 2f, Color.Black);
-        ImpUI.RectOutline(new Rectangle(box.X + 1f, box.Y + 1f, box.Width - 2f, box.Height - 2f),
-                          1f, Color.White);
+    static void Cursor(Vector2 at)
+    {
+        var box = new Rectangle(at.X - 4.5f, at.Y - 4.5f, 9, 9);
+        Raylib.DrawRectangleLinesEx(box, 2, Color.Black);
+        Raylib.DrawRectangleLinesEx(new Rectangle(box.X + 1, box.Y + 1, box.Width - 2, box.Height - 2), 1, Color.White);
     }
 
-    void Preview_Draw(Rectangle r, ImpUITheme th)
+    static void Marker(Rectangle bar, float t)
     {
-        float sw = r.Height * 1.6f;
-        var swatch = new Rectangle(r.X, r.Y, sw, r.Height);
-
-        if (color.A < 255) ImpUI.RectChecker(swatch, th.col_panel, th.col_background, CHECKER_CELL);
-        ImpUI.Rect(swatch, color);
-        ImpUI.RectOutline(swatch, 1f, th.col_line);
-
-        var text = new Rectangle(r.X + sw + PANEL_PAD, r.Y,
-                                 MathF.Max(0, r.Width - sw - PANEL_PAD), r.Height);
-
-        ImpUI.TextInRect(Hex_Get(), text, th.style_text, 0f);
-    }
-
-    string Hex_Get()
-    {
-        return show_alpha
-            ? $"#{color.R:X2}{color.G:X2}{color.B:X2}{color.A:X2}"
-            : $"#{color.R:X2}{color.G:X2}{color.B:X2}";
+        float x = bar.X + Math.Clamp(t, 0, 1) * bar.Width;
+        var box = new Rectangle(x - 2, bar.Y - 2, 4, bar.Height + 4);
+        Raylib.DrawRectangleLinesEx(box, 2, Color.Black);
+        Raylib.DrawRectangleLinesEx(new Rectangle(box.X + 1, box.Y + 1, box.Width - 2, box.Height - 2), 1, Color.White);
     }
 }

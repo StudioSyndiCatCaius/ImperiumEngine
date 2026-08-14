@@ -1,30 +1,30 @@
+using System.Numerics;
 using ImperiumEngine.Assets;
-using ImperiumEngine.Main;
+using ImperiumEngine.Structs;
 using R3D_cs;
-using Mesh = R3D_cs.Mesh;
 
 namespace ImperiumEngine.Comps._3D;
 
 public class C3_Mesh : ImpComp3D
 {
-    [ImpVar][Export] public A_Mesh? mesh;
-    [ImpVar][Export] public A_Material[] materials = [];
+    [ImpVar] public A_Mesh mesh=A_Mesh.GEO_CUBE;
+    [ImpVar] public List<A_Material> materials;
+    [ImpVar] public bool cast_shadows=true;
 
-    // Submits the mesh to whichever R3D session is open around this draw. Nothing is
-    // rasterised here: R3D collects draw calls and renders them all in R3D.End().
-    public override void OnDraw(double dt, EDrawFlags flags)
+    public C3_Mesh()
     {
-        base.OnDraw(dt, flags);
-        if (!is_visible) return;
+        physics_enabled=true;
+        collision_preset=A_CollisionPreset.PRESET_MESH;
+    }
+    
+    public override void OnDraw3D(double dt, WDrawFlags flags)
+    {
+        base.OnDraw3D(dt, flags);
+        if (mesh == null || mesh.mesh.VertexCount <= 0) return;
 
-        if (mesh?.get_Mesh() is not Mesh r3d_mesh) return;
-
-        // R3D draws one material per mesh; the array is there for multi-part models to
-        // grow into, so the first slot is the one that counts.
-        var material = materials.Length > 0 && materials[0] != null
-            ? materials[0].get_Material()
-            : R3D.GetDefaultMaterial();
-
-        R3D.DrawMeshPro(r3d_mesh, material, Matrix_GetWorld());
+        TTransform3 t = Transform_Get(true);
+        float d = MathF.PI / 180f;
+        Quaternion rot = Quaternion.CreateFromYawPitchRoll(t.rotation.Y * d, t.rotation.X * d, t.rotation.Z * d);
+        R3D.DrawMeshEx(mesh.mesh, R3D.GetDefaultMaterial(), t.position, rot, t.scale);
     }
 }

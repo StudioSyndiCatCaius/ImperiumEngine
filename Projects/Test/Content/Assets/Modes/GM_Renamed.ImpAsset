@@ -1,0 +1,11 @@
+{
+  "_class": "A_GameMode",
+  "vars": {
+    "starting_state": {
+      "class_name": "State_Explore"
+    },
+    "default_state": {},
+    "source_file": "",
+    "source_index": 0
+  }
+}

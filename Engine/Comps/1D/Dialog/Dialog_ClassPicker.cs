@@ -2,23 +2,38 @@
 
 namespace ImperiumEngine.Comps._1D.Dialog;
 
-
-// displays a tree list of all child classes from a given object
 public class Dialog_ClassPicker : C1_Dialog
 {
-    [ImpVar] public string title;
-    [ImpVar] public string description;
+    public C2_Box box=new ();
+    public C2_Tree class_tree=new ();
+    public C2_Text class_name=new ();
     
-    [ImpVar] public Type[] types;
-    [ImpVar] public Type[] exclude = [];
-    [ImpVar] public int allowed_depth=-1; //if >=0, only shows classes at this depth or below. 0= only show top level. 
+    public C2_TextEdit txtedit_create_name=new ();
     
-    public Type? selected;
+    public bool is_create_new = false; // if true, shows the bar to edit the new class name
     
-    public C2_Tree class_tree;
-    public C2_Button btn_ok;
-    public C2_Button btn_cancel;
+    public C2_Button btn_confirm=new ();
+    public C2_Button btn_cancel=new ();
     
-    public Action<Type>? on_confirm;
-    public Action? on_cancel;
+    public  Type root_type;
+    public  Type selected_type;
+    
+    public Action<Dialog_ClassPicker> on_confirm;
+    public Action<Dialog_ClassPicker> on_cancel;
+    
+    public Dialog_ClassPicker()
+    {
+        
+    }
+    
+    // sets the root type of the tree and rebuilds it
+    public void BuildRootType(Type type, Action<Type> filter=null)
+    {
+        root_type = type;
+    }
+    
+    public void BuildTree()
+    {
+        
+    }
 }

@@ -1,0 +1,93 @@
+{
+  "_class": "ImpScene",
+  "vars": {
+    "root_class": {
+      "class_name": "ImpComp"
+    },
+    "override_game_mode": null,
+    "background_color": "#1A1E24",
+    "ambient_color": "#658AC2",
+    "ambient_intensity": 0.35,
+    "sun_enabled": true,
+    "sun_color": "#FFEBCA",
+    "sun_intensity": 1,
+    "sun_rotation": {
+      "X": -45,
+      "Y": -35,
+      "Z": 0
+    },
+    "sun_specular": 1,
+    "sun_cast_shadows": true,
+    "sky_texture": {
+      "path": "{engine}\\Textures\\HDRI\\sky_1.ImpAsset"
+    },
+    "sky_lights_scene": true,
+    "sky_energy": 1,
+    "sky_blur": 0,
+    "sky_rotation": 0,
+    "fog_mode": "Disabled",
+    "fog_color": "#96A0AF",
+    "fog_start": 0.91999996,
+    "fog_end": 50,
+    "fog_density": 0.05,
+    "fog_sky_affect": 0.5,
+    "tonemap_mode": "Reinhard",
+    "tonemap_exposure": 1,
+    "tonemap_white": 1,
+    "bloom_mode": "Mix",
+    "bloom_intensity": 0.1,
+    "bloom_levels": 0.5,
+    "bloom_threshold": 0,
+    "bloom_soft_threshold": 0.49999997,
+    "bloom_filter_radius": 1,
+    "ssao_enabled": true,
+    "ssao_radius": 1,
+    "ssao_intensity": 1,
+    "ssao_power": 1,
+    "ssao_bias": 0.05,
+    "ssao_samples": 16,
+    "source_file": "",
+    "source_index": 0,
+    "root": {
+      "_class": "ImpComp",
+      "name": "[*untitled]",
+      "vars": {
+        "is_visible": true,
+        "Pulse": null,
+        "update_mode": "Inherit"
+      },
+      "children": [
+        {
+          "_class": "C3_Mesh",
+          "name": "C3_Mesh",
+          "vars": {
+            "mesh": "{engine}\\Meshes\\Geo\\sm_editor_geo_cube.ImpMesh",
+            "materials": [],
+            "transform": {
+              "position": {
+                "X": 0,
+                "Y": 0,
+                "Z": 0
+              },
+              "rotation": {
+                "X": 0,
+                "Y": 0,
+                "Z": 0
+              },
+              "scale": {
+                "X": 1,
+                "Y": 1,
+                "Z": 0.99999994
+              }
+            },
+            "physics_enabled": false,
+            "is_visible": true,
+            "Pulse": null,
+            "update_mode": "Inherit"
+          },
+          "children": []
+        }
+      ]
+    }
+  }
+}
