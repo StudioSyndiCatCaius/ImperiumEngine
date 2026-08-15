@@ -2,7 +2,7 @@
 
 namespace ImperiumEngine.Comps._3D;
 
-public class C3_SpringArm : ImpComp3D
+public class C3_SpringArm : Imp3D
 {
     [ImpVar]  public double distance;
 

@@ -1,4 +1,4 @@
-﻿using System.Numerics;
+using System.Numerics;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Structs;
 
@@ -49,16 +49,20 @@ public struct TMenuBarSubption
     }
 }
 
-public class C2_MenuBar : ImpComp2D
+[ImpClass(Hidden = true)]
+public class C2_MenuBar : Imp2D
 {
     public List<TMenuBarOption> options = new();
 
     public C2_List list_options = new()
     {
-        alignment = EUIAlignment.Horizontal,
+        orentation = EUIOrentation.H,
         is_scrollable = false,
-        view_alighnment_H = EUIViewportAlignment.Fill,
-        view_alighnment_V = EUIViewportAlignment.Fill,
+        layout = new TLayout2
+        {
+            orient_H = EUIViewportAlignment.Fill,
+            orient_V = EUIViewportAlignment.Fill,
+        },
     };
 
     public C2_MenuBar_List open_list;
@@ -95,7 +99,7 @@ public class C2_MenuBar : ImpComp2D
 
         if (IsMenuOpen && ImpPlayer.Key_IsPressed(EInputKey.Mouse_Left))
         {
-            ImpComp target = ImpPlayer.players.Count > 0 ? ImpPlayer.players[0].cursor_target : null;
+            ImpComp target = ImpPlayer.players.Count > 0 ? ImpPlayer.players[0].target_cursor : null;
             // open_list / cascades may live on the scene root (above other UI)
             if (!IsMenuUi(target))
                 CloseAll();
@@ -110,19 +114,22 @@ public class C2_MenuBar : ImpComp2D
         list_options.Child_RemoveAll();
         for (int i = 0; i < options.Count; i++)
         {
-            float h = size.Y > 0 ? size.Y : row_height;
+            float h = layout.size.Y > 0 ? layout.size.Y : row_height;
             C2_Button btn = new()
             {
                 text = options[i].text ?? "",
-                size = new Vector2(option_width, h),
-                size_min = new Vector2(option_width, h),
-                style = new UiStyle_Button
+                layout = new TLayout2
+                {
+                    size = new Vector2(option_width, h),
+                    size_min = new Vector2(option_width, h),
+                },
+                style = new UI_Button
                 {
                     style_unhovered = style_options_idle,
                     style_hovered = style_options_hovered,
                     style_pressed = style_options_pressed,
                 },
-                text_style = UiStyle_Text.DEFAULT,
+                text_style = UI_Text.DEFAULT,
             };
             list_options.Child_Add(btn);
         }
@@ -140,7 +147,7 @@ public class C2_MenuBar : ImpComp2D
         open_index = -1;
     }
 
-    void OnTopSelect(ImpComp2D c, int i)
+    void OnTopSelect(Imp2D c, int i)
     {
         if (i < 0 || i >= options.Count) return;
         TMenuBarOption opt = options[i];
@@ -161,7 +168,7 @@ public class C2_MenuBar : ImpComp2D
         OpenRoot(i);
     }
 
-    void OnTopHover(ImpComp2D c, int i)
+    void OnTopHover(Imp2D c, int i)
     {
         if (!IsMenuOpen) return;
         if (i < 0 || i >= options.Count) return;
@@ -176,7 +183,10 @@ public class C2_MenuBar : ImpComp2D
         open_index = i;
         open_list = new C2_MenuBar_List(this, options[i].suboptions)
         {
-            size = new Vector2(dropdown_width, 0),
+            layout = new TLayout2
+                {
+                    size = new Vector2(dropdown_width, 0),
+                },
         };
         // parent to scene root so dropdown draws above TabBox / other siblings
         ImpComp host = PopupHost() ?? this;
@@ -188,11 +198,11 @@ public class C2_MenuBar : ImpComp2D
     void PlaceUnderTop(int i, C2_MenuBar_List list)
     {
         if (i < 0 || i >= list_options.children.Count) return;
-        if (list_options.children[i] is not ImpComp2D btn) return;
+        if (list_options.children[i] is not Imp2D btn) return;
 
         // screen-space when parented to non-2D root; local if fallback parent is the bar
         TDimensions2 b = btn.Dimensions_Get();
-        if (list.parent is ImpComp2D p2)
+        if (list.parent is Imp2D p2)
         {
             TDimensions2 host = p2.Dimensions_Get();
             list.transform.position = new Vector2(
@@ -261,7 +271,7 @@ public class C2_MenuBar_List : C2_List
     {
         this.bar = bar;
         this.items = items ?? new List<TMenuBarSubption>();
-        alignment = EUIAlignment.Vertical;
+        orentation = EUIOrentation.V;
         is_scrollable = false;
         spacing = 0;
         cursor_filter = ECursorFilter.Pass;
@@ -277,7 +287,7 @@ public class C2_MenuBar_List : C2_List
         cascade = null;
         cascade_index = -1;
 
-        float w = size.X > 0 ? size.X : bar.dropdown_width;
+        float w = layout.size.X > 0 ? layout.size.X : bar.dropdown_width;
         float h = bar.row_height;
         float total_h = 0;
 
@@ -286,9 +296,12 @@ public class C2_MenuBar_List : C2_List
             TMenuBarSubption s = items[i];
             if (s.is_separator)
             {
-                ImpComp2D sep = new()
+                Imp2D sep = new()
                 {
-                    size = new Vector2(w, 6),
+                    layout = new TLayout2
+                    {
+                        size = new Vector2(w, 6),
+                    },
                     cursor_filter = ECursorFilter.Ignore,
                 };
                 Child_Add(sep);
@@ -299,9 +312,12 @@ public class C2_MenuBar_List : C2_List
             C2_Button btn = new()
             {
                 text = s.text ?? "",
-                size = new Vector2(w, h),
+                layout = new TLayout2
+                {
+                    size = new Vector2(w, h),
+                },
                 is_disabled = s.is_disabled,
-                style = new UiStyle_Button
+                style = new UI_Button
                 {
                     style_unhovered = bar.style_options_idle,
                     style_hovered = bar.style_options_hovered,
@@ -312,10 +328,10 @@ public class C2_MenuBar_List : C2_List
             total_h += h;
         }
 
-        size = new Vector2(w, total_h);
+        layout.size = new Vector2(w, total_h);
     }
 
-    void OnRowSelect(ImpComp2D c, int i)
+    void OnRowSelect(Imp2D c, int i)
     {
         if (i < 0 || i >= items.Count) return;
         TMenuBarSubption s = items[i];
@@ -331,7 +347,7 @@ public class C2_MenuBar_List : C2_List
         bar.CloseAll();
     }
 
-    void OnRowHover(ImpComp2D c, int i)
+    void OnRowHover(Imp2D c, int i)
     {
         if (i < 0 || i >= items.Count) return;
         TMenuBarSubption s = items[i];
@@ -347,7 +363,7 @@ public class C2_MenuBar_List : C2_List
             CloseCascade();
     }
 
-    void OnRowUnhover(ImpComp2D c, int i)
+    void OnRowUnhover(Imp2D c, int i)
     {
         // cascade stays until hover moves to another row / outside
     }
@@ -359,18 +375,21 @@ public class C2_MenuBar_List : C2_List
         cascade_index = i;
         cascade = new C2_MenuBar_List(bar, items[i].suboptions)
         {
-            size = new Vector2(bar.dropdown_width, 0),
+            layout = new TLayout2
+                {
+                    size = new Vector2(bar.dropdown_width, 0),
+                },
         };
         // same popup host as root dropdown (not this list — layout would stack it as a row)
         ImpComp host = C2_MenuBar.PopupHost() ?? bar;
         host.Child_Add(cascade);
         cascade.RebuildRows();
 
-        if (i < children.Count && children[i] is ImpComp2D row)
+        if (i < children.Count && children[i] is Imp2D row)
         {
             TDimensions2 self = Dimensions_Get();
             TDimensions2 r = row.Dimensions_Get();
-            cascade.transform.position = new Vector2(self.position.X + size.X, r.position.Y);
+            cascade.transform.position = new Vector2(self.position.X + layout.size.X, r.position.Y);
         }
     }
 
@@ -384,4 +403,10 @@ public class C2_MenuBar_List : C2_List
         }
         cascade_index = -1;
     }
+}
+
+
+public class UI_MenuBar : ImpAsset
+{
+    public static UI_MenuBar DEFAULT = new();
 }

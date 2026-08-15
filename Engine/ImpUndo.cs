@@ -1,4 +1,5 @@
 using System.Numerics;
+using ImperiumEngine.Comps;
 using ImperiumEngine.Comps._2D;
 using ImperiumEngine.Structs;
 using Raylib_cs;
@@ -219,15 +220,15 @@ public class ImpUndo
 
     public static object Transform_Get(ImpComp comp) => comp switch
     {
-        ImpComp3D c3 => c3.transform,
-        ImpComp2D c2 => c2.transform,
+        Imp3D c3 => c3.transform,
+        Imp2D c2 => c2.transform,
         _ => null,
     };
 
     public static void Transform_Set(ImpComp comp, object value)
     {
-        if (comp is ImpComp3D c3 && value is TTransform3 t3) c3.transform = t3;
-        else if (comp is ImpComp2D c2 && value is TTransform2 t2) c2.transform = t2;
+        if (comp is Imp3D c3 && value is TTransform3 t3) c3.transform = t3;
+        else if (comp is Imp2D c2 && value is TTransform2 t2) c2.transform = t2;
     }
 
     public static TCompPlace Place_Get(ImpComp comp)
@@ -264,7 +265,7 @@ public class ImpUndo
     }
 
     /// <summary>Records a 2D comp's local transform and pivot as one step (gizmo drags).</summary>
-    public static void Comp_Transformed(ImpComp2D comp, TTransform2 before, Vector2 before_pivot, string label)
+    public static void Comp_Transformed(Imp2D comp, TTransform2 before, Vector2 before_pivot, string label)
     {
         if (comp == null) return;
         TTransform2 after = comp.transform;
@@ -276,7 +277,7 @@ public class ImpUndo
     }
 
     /// <summary>Records a 3D comp's local transform as one step (gizmo drags).</summary>
-    public static void Comp_Transformed(ImpComp3D comp, TTransform3 before, string label)
+    public static void Comp_Transformed(Imp3D comp, TTransform3 before, string label)
     {
         if (comp == null) return;
         TTransform3 after = comp.transform;

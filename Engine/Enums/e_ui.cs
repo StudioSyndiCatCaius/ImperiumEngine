@@ -3,9 +3,10 @@
 namespace ImperiumEngine.Enums;
 
 
-public enum EUIAlignment
+public enum EUIOrentation
 {
-    Vertical, Horizontal,
+    [Title("V")] V, 
+    [Title("H")] H, 
 }
 
 

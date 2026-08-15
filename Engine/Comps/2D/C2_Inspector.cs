@@ -123,7 +123,8 @@ public class TPropertyBind
 // INSPECTOR
 // ##############################################################################
 
-public class C2_Inspector : ImpComp2D
+[ImpClass(Hidden = true)]
+public class C2_Inspector : Imp2D
 {
     public List<object> selected_objects = new();
     [ImpVar] public bool allow_multi_select = true;
@@ -133,6 +134,7 @@ public class C2_Inspector : ImpComp2D
     [ImpVar] public bool show_advanced;
     [ImpVar] public bool declared_only;
     [ImpVar] public bool show_header = true;
+    [ImpVar] public bool show_search = true;
     public float label_pad = 8f;
     public float depth_indent = 8f;
 
@@ -141,28 +143,50 @@ public class C2_Inspector : ImpComp2D
 
     public C2_List list_properties = new()
     {
-        alignment = EUIAlignment.Vertical,
+        orentation = EUIOrentation.V,
         is_scrollable = true,
         spacing = 2,
-        view_alighnment_H = EUIViewportAlignment.Fill,
-        view_alighnment_V = EUIViewportAlignment.Fill,
+        layout = new TLayout2
+        {
+            orient_H = EUIViewportAlignment.Fill,
+            orient_V = EUIViewportAlignment.Fill,
+        },
     };
 
     C2_List _header = new()
     {
-        alignment = EUIAlignment.Horizontal,
-        view_alighnment_H = EUIViewportAlignment.Fill,
-        size = new Vector2(0, 24),
-        size_min = new Vector2(0, 24),
+        orentation = EUIOrentation.H,
+        layout = new TLayout2
+        {
+            orient_H = EUIViewportAlignment.Fill,
+            size = new Vector2(0, 24),
+            size_min = new Vector2(0, 24),
+        },
         spacing = 4,
     };
 
     C2_CheckBox _check_advanced = new()
     {
         text = "Advanced",
-        size = new Vector2(120, 22),
-        size_min = new Vector2(80, 22),
+        layout = new TLayout2
+        {
+            size = new Vector2(120, 22),
+            size_min = new Vector2(80, 22),
+        },
     };
+
+    C2_SearchBar _search = new()
+    {
+        placeholder = "Search",
+        layout = new TLayout2
+        {
+            orient_H = EUIViewportAlignment.Fill,
+            size = new Vector2(0, 24),
+            size_min = new Vector2(0, 24),
+        },
+    };
+
+    string _search_query = "";
 
     UiStyle_Box style_box = UiStyle_Box.STYLE_BKG_DARK;
     readonly HashSet<string> _collapsed = new();
@@ -174,23 +198,32 @@ public class C2_Inspector : ImpComp2D
     public C2_Inspector()
     {
         cursor_filter = ECursorFilter.Pass;
-        view_alighnment_H = EUIViewportAlignment.Fill;
-        view_alighnment_V = EUIViewportAlignment.Fill;
+        layout.orient_H = EUIViewportAlignment.Fill;
+        layout.orient_V = EUIViewportAlignment.Fill;
 
         _check_advanced.on_changed = next =>
         {
             show_advanced = next;
             Rebuild();
         };
+        _search.on_search = q =>
+        {
+            _search_query = q ?? "";
+            Rebuild();
+        };
 
         C2_List body = new()
         {
-            alignment = EUIAlignment.Vertical,
-            view_alighnment_H = EUIViewportAlignment.Fill,
-            view_alighnment_V = EUIViewportAlignment.Fill,
+            orentation = EUIOrentation.V,
+            layout = new TLayout2
+            {
+                orient_H = EUIViewportAlignment.Fill,
+                orient_V = EUIViewportAlignment.Fill,
+            },
             spacing = 2,
         };
         _header.Child_Add(_check_advanced);
+        body.Child_Add(_search);
         body.Child_Add(_header);
         body.Child_Add(list_properties);
         Child_Add(body);
@@ -241,6 +274,7 @@ public class C2_Inspector : ImpComp2D
     {
         _check_advanced.is_checked = show_advanced;
         _header.is_visible = show_header;
+        _search.is_visible = show_search;
         if (list_properties.scroll_box != null) list_properties.scroll_box.Child_RemoveAll();
         else list_properties.Child_RemoveAll();
 
@@ -250,12 +284,15 @@ public class C2_Inspector : ImpComp2D
             AddRow(new C2_Text
             {
                 text = "Nothing selected",
-                style = UiStyle_Text.MUTED,
+                style = UI_Text.MUTED,
                 wrap = ETextWrap.None,
-                view_alighnment_H = EUIViewportAlignment.Fill,
-                size = new Vector2(0, 22),
-                size_min = new Vector2(0, 22),
-            });
+                layout = new TLayout2
+                    {
+                        orient_H = EUIViewportAlignment.Fill,
+                        size = new Vector2(0, 22),
+                        size_min = new Vector2(0, 22),
+                    },
+        });
             return;
         }
 
@@ -268,6 +305,25 @@ public class C2_Inspector : ImpComp2D
                 if (m.DeclaringType == declared) cut.Add(m);
             members = cut;
         }
+
+        bool searching = !string.IsNullOrWhiteSpace(_search_query);
+        if (members.Count == 0 && searching)
+        {
+            AddRow(new C2_Text
+            {
+                text = "No matching properties",
+                style = UI_Text.MUTED,
+                wrap = ETextWrap.None,
+                layout = new TLayout2
+                {
+                    orient_H = EUIViewportAlignment.Fill,
+                    size = new Vector2(0, 22),
+                    size_min = new Vector2(0, 22),
+                },
+            });
+            return;
+        }
+
         if (!use_categories)
         {
             foreach (MemberInfo m in members)
@@ -277,17 +333,21 @@ public class C2_Inspector : ImpComp2D
             }
             return;
         }
-
         foreach (var (category, list) in Categories_Group(members))
         {
+            Type cat_type = Category_Type(category, list);
             C2_Expandable box = new()
             {
                 name = category,
-                is_expanded = !_collapsed.Contains(category),
+                icon = C2_Tree.Class_Icon(cat_type),
+                is_expanded = searching || !_collapsed.Contains(category),
                 bar_height = 22,
                 content_indent = 10f,
-                view_alighnment_H = EUIViewportAlignment.Fill,
-                view_alighnment_V = EUIViewportAlignment.Start,
+                layout = new TLayout2
+                {
+                    orient_H = EUIViewportAlignment.Fill,
+                    orient_V = EUIViewportAlignment.Start,
+                },
             };
             box.on_expand = open =>
             {
@@ -301,14 +361,14 @@ public class C2_Inspector : ImpComp2D
                 C2_InspectorProperty row = Row_Build(targets, m);
                 if (row == null) continue;
                 box.Child_Add(row);
-                h += row.size.Y + 2;
+                h += row.layout.size.Y + 2;
             }
-            box.size = new Vector2(0, h);
-            box.size_min = box.size;
+            box.layout.size = new Vector2(0, h);
+            box.layout.size_min = box.layout.size;
             AddRow(box);
         }
 
-        if (targets.Count == 1 && targets[0] is ImpComp host
+        if (!searching && targets.Count == 1 && targets[0] is ImpComp host
             && host.children.Count > 0 && !host.IsInstanceRoot && !host.IsPackedForeign)
             AddChildrenTree(host);
     }
@@ -319,11 +379,15 @@ public class C2_Inspector : ImpComp2D
         C2_Expandable box = new()
         {
             name = key,
+            icon = C2_Tree.Class_Icon(typeof(ImpComp)),
             is_expanded = !_collapsed.Contains(key),
             bar_height = 22,
             content_indent = 10f,
-            view_alighnment_H = EUIViewportAlignment.Fill,
-            view_alighnment_V = EUIViewportAlignment.Start,
+            layout = new TLayout2
+            {
+                orient_H = EUIViewportAlignment.Fill,
+                orient_V = EUIViewportAlignment.Start,
+            },
         };
         box.on_expand = open =>
         {
@@ -336,9 +400,12 @@ public class C2_Inspector : ImpComp2D
         C2_Tree tree = new()
         {
             allow_reorder = true,
-            view_alighnment_H = EUIViewportAlignment.Fill,
-            size = new Vector2(0, h),
-            size_min = new Vector2(0, 48),
+            layout = new TLayout2
+            {
+                orient_H = EUIViewportAlignment.Fill,
+                size = new Vector2(0, h),
+                size_min = new Vector2(0, 48),
+            },
         };
         tree.on_item_drop = (src, dst, where) =>
         {
@@ -347,8 +414,8 @@ public class C2_Inspector : ImpComp2D
         };
         tree.Tree_Populate_FromComp(host);
         box.Child_Add(tree);
-        box.size = new Vector2(0, box.bar_height + h + 4);
-        box.size_min = box.size;
+        box.layout.size = new Vector2(0, box.bar_height + h + 4);
+        box.layout.size_min = box.layout.size;
         AddRow(box);
     }
 
@@ -359,7 +426,7 @@ public class C2_Inspector : ImpComp2D
         return n;
     }
 
-    void AddRow(ImpComp2D row)
+    void AddRow(Imp2D row)
     {
         if (list_properties.scroll_box != null) list_properties.scroll_box.Child_Add(row);
         else list_properties.Child_Add(row);
@@ -391,16 +458,86 @@ public class C2_Inspector : ImpComp2D
         return list;
     }
 
-    public List<MemberInfo> Members_Filter(List<MemberInfo> members)
+    public List<MemberInfo> Members_Filter(List<MemberInfo> members, bool search = true)
     {
-        if (show_advanced) return members;
         List<MemberInfo> list = new();
         foreach (MemberInfo m in members)
         {
-            if (m.GetCustomAttribute<ImpVarAttribute>()?.Advanced == true) continue;
+            if (!show_advanced && m.GetCustomAttribute<ImpVarAttribute>()?.Advanced == true)
+            {
+                continue;
+            }
+            if (search && !Member_MatchesSearch(m))
+            {
+                continue;
+            }
             list.Add(m);
         }
         return list;
+    }
+
+    bool Member_MatchesSearch(MemberInfo m)
+    {
+        string q = _search_query != null ? _search_query.Trim() : "";
+        if (q.Length == 0)
+        {
+            return true;
+        }
+        return Member_Hits(m, q, 0);
+    }
+
+    bool Member_Hits(MemberInfo m, string q, int depth)
+    {
+        if (m == null)
+        {
+            return false;
+        }
+        if (m.Name.Contains(q, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+        if (Name_Pretty(m.Name).Contains(q, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+        if (depth == 0)
+        {
+            string cat = Category_Of(m);
+            if (!string.IsNullOrEmpty(cat) && cat.Contains(q, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+        if (depth >= max_depth)
+        {
+            return false;
+        }
+        Type t = Member_Type(m);
+        if (t == null || t.IsPrimitive || t.IsEnum)
+        {
+            return false;
+        }
+        if (t == typeof(string) || t == typeof(decimal) || t == typeof(DateTime) || t == typeof(TimeSpan))
+        {
+            return false;
+        }
+        if (t == typeof(Vector2) || t == typeof(Vector3) || t == typeof(Vector4) || t == typeof(Color))
+        {
+            return false;
+        }
+        List<MemberInfo> nested = Members_GetNested(t);
+        for (int i = 0; i < nested.Count; i++)
+        {
+            if (nested[i] == m)
+            {
+                continue;
+            }
+            if (Member_Hits(nested[i], q, depth + 1))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     List<MemberInfo> Members_Shared(List<object> targets)
@@ -432,6 +569,38 @@ public class C2_Inspector : ImpComp2D
         CategoryAttribute attr = m.GetCustomAttribute<CategoryAttribute>();
         if (!string.IsNullOrEmpty(attr?.Name)) return attr.Name;
         return m.DeclaringType?.Name ?? "";
+    }
+
+    static Type Category_Type(string category, List<MemberInfo> list)
+    {
+        if (list != null)
+        {
+            for (int i = 0; i < list.Count; i++)
+            {
+                Type d = list[i].DeclaringType;
+                if (d == null)
+                {
+                    continue;
+                }
+                if (d.Name == category)
+                {
+                    return d;
+                }
+                if (C2_Tree.Class_DisplayName(d) == category)
+                {
+                    return d;
+                }
+            }
+            if (list.Count > 0 && list[0].DeclaringType != null)
+            {
+                return list[0].DeclaringType;
+            }
+        }
+        if (string.IsNullOrEmpty(category))
+        {
+            return null;
+        }
+        return ImpComp.Type_FromName(category);
     }
 
     static List<(string cat, List<MemberInfo> list)> Categories_Group(List<MemberInfo> members)
@@ -559,12 +728,13 @@ public class C2_Inspector : ImpComp2D
 // PROPERTY
 // ##############################################################################
 
-public class C2_InspectorProperty : ImpComp2D
+[ImpClass(Hidden = true)]
+public class C2_InspectorProperty : Imp2D
 {
     public C2_Inspector owner;
     public List<TPropertyBind> binds = new();
     public string label = "";
-    public ImpComp2D c_pedit;
+    public Imp2D c_pedit;
     public C2_Text c_label;
     public C2_Expandable c_group;
     public C2_ButtonRevert c_revert;
@@ -609,9 +779,9 @@ public class C2_InspectorProperty : ImpComp2D
         name = binds.Count > 0 ? binds[0].name : "";
         label = C2_Inspector.Name_Pretty(name);
         cursor_filter = ECursorFilter.Pass;
-        view_alighnment_H = EUIViewportAlignment.Fill;
-        size = new Vector2(0, RowH);
-        size_min = size;
+        layout.orient_H = EUIViewportAlignment.Fill;
+        layout.size = new Vector2(0, RowH);
+        layout.size_min = layout.size;
     }
 
     public object Value_Get() => binds.Count > 0 ? binds[0].Get() : null;
@@ -687,12 +857,12 @@ public class C2_InspectorProperty : ImpComp2D
         return stand != null && stand.Inspector_IsCustom() ? stand : null;
     }
 
-    public void Editor_Set(ImpComp2D editor, float? label_ratio = null)
+    public void Editor_Set(Imp2D editor, float? label_ratio = null)
     {
         c_label = new C2_Text
         {
             text = label,
-            style = UiStyle_Text.LIGHT,
+            style = UI_Text.LIGHT,
             wrap = ETextWrap.None,
             text_alignment_h = EUIPositionAlignment.Start,
             text_alignment_v = EUIPositionAlignment.Center,
@@ -703,8 +873,8 @@ public class C2_InspectorProperty : ImpComp2D
         if (editor != null) Child_Add(editor);
         Revert_Build();
         label_ratio_override = label_ratio;
-        size = new Vector2(0, RowH);
-        size_min = size;
+        layout.size = new Vector2(0, RowH);
+        layout.size_min = layout.size;
     }
 
     void Revert_Build()
@@ -715,21 +885,21 @@ public class C2_InspectorProperty : ImpComp2D
         Child_Add(c_revert);
     }
 
-    public void Editor_SetFull(ImpComp2D editor)
+    public void Editor_SetFull(Imp2D editor)
     {
         c_pedit = editor;
         pedit_full_width = true;
         if (editor != null) Child_Add(editor);
-        size = new Vector2(0, MathF.Max(RowH, editor?.size.Y ?? RowH));
-        size_min = size;
+        layout.size = new Vector2(0, MathF.Max(RowH, editor?.layout.size.Y ?? RowH));
+        layout.size_min = layout.size;
     }
 
-    public List<ImpComp2D> Rows_ForObject(object target)
+    public List<Imp2D> Rows_ForObject(object target)
     {
-        List<ImpComp2D> rows = new();
+        List<Imp2D> rows = new();
         if (target == null) return rows;
         List<MemberInfo> members = C2_Inspector.Members_Get(target.GetType());
-        if (owner != null) members = owner.Members_Filter(members);
+        if (owner != null) members = owner.Members_Filter(members, false);
         foreach (MemberInfo m in members)
         {
             TPropertyBind bind = TPropertyBind.Member(target, m);
@@ -758,7 +928,7 @@ public class C2_InspectorProperty : ImpComp2D
     {
         c_group = MakeGroup();
         List<MemberInfo> members = C2_Inspector.Members_GetNested(t);
-        if (owner != null) members = owner.Members_Filter(members);
+        if (owner != null) members = owner.Members_Filter(members, false);
         foreach (MemberInfo m in members) AddNested(m);
         Child_Add(c_group);
     }
@@ -771,10 +941,13 @@ public class C2_InspectorProperty : ImpComp2D
             is_expanded = true,
             bar_height = 22,
             content_indent = 10f + depth * 4f,
-            view_alighnment_H = EUIViewportAlignment.Fill,
-            view_alighnment_V = EUIViewportAlignment.Start,
-            size = new Vector2(0, 22),
-            size_min = new Vector2(0, 22),
+            layout = new TLayout2
+                {
+                    orient_H = EUIViewportAlignment.Fill,
+                    orient_V = EUIViewportAlignment.Start,
+                    size = new Vector2(0, 22),
+                    size_min = new Vector2(0, 22),
+                },
         };
     }
 
@@ -809,7 +982,7 @@ public class C2_InspectorProperty : ImpComp2D
     static bool Type_HasEditor(Type t) =>
         t == typeof(Color) || t == typeof(Vector2) || t == typeof(Vector3) || t == typeof(Vector4);
 
-    ImpComp2D Editor_Build(Type t)
+    Imp2D Editor_Build(Type t)
     {
         if (t == typeof(bool))
         {
@@ -872,7 +1045,7 @@ public class C2_InspectorProperty : ImpComp2D
                 text = Value_Get() is ImpAsset a
                     ? (string.IsNullOrEmpty(a.filepath) ? a.GetType().Name : a.GetName())
                     : "None",
-                style = UiStyle_Text.LIGHT,
+                style = UI_Text.LIGHT,
                 text_alignment_h = EUIPositionAlignment.Start,
                 wrap = ETextWrap.None,
             };
@@ -880,7 +1053,7 @@ public class C2_InspectorProperty : ImpComp2D
         return new C2_Text
         {
             text = $"({t.Name})",
-            style = UiStyle_Text.MUTED,
+            style = UI_Text.MUTED,
             text_alignment_h = EUIPositionAlignment.Start,
             wrap = ETextWrap.None,
             cursor_filter = ECursorFilter.Ignore,
@@ -905,7 +1078,7 @@ public class C2_InspectorProperty : ImpComp2D
 
     void ReadOnly_Apply()
     {
-        if (c_label != null) c_label.style = UiStyle_Text.MUTED;
+        if (c_label != null) c_label.style = UI_Text.MUTED;
         if (c_pedit == null) return;
         c_pedit.cursor_filter = ECursorFilter.Ignore;
         if (c_pedit is C2_CheckBox box) box.is_disabled = true;
@@ -921,15 +1094,15 @@ public class C2_InspectorProperty : ImpComp2D
             for (int i = 0; i < kids.Count; i++)
             {
                 if (kids[i] is C2_List or C2_Box or C2_Button) continue;
-                if (kids[i] is ImpComp2D d && d.is_visible) h += d.size.Y + 2;
+                if (kids[i] is Imp2D d && d.is_visible) h += d.layout.size.Y + 2;
             }
         }
         AddKids(c_group.children);
         if (c_group.content_box != null) AddKids(c_group.content_box.children);
-        c_group.size = new Vector2(0, h);
-        c_group.size_min = c_group.size;
-        size = c_group.size;
-        size_min = size;
+        c_group.layout.size = new Vector2(0, h);
+        c_group.layout.size_min = c_group.layout.size;
+        layout.size = c_group.layout.size;
+        layout.size_min = layout.size;
     }
 
     public override void OnUpdate(double dt)
@@ -940,27 +1113,27 @@ public class C2_InspectorProperty : ImpComp2D
         if (c_group != null)
         {
             float group_inset = depth * (owner?.depth_indent ?? 8f);
-            c_group.view_alighnment_H = group_inset > 0 ? EUIViewportAlignment.Start : EUIViewportAlignment.Fill;
-            c_group.view_alighnment_V = EUIViewportAlignment.Fill;
+            c_group.layout.orient_H = group_inset > 0 ? EUIViewportAlignment.Start : EUIViewportAlignment.Fill;
+            c_group.layout.orient_V = EUIViewportAlignment.Fill;
             if (group_inset > 0)
             {
                 c_group.transform.position = new Vector2(group_inset, c_group.transform.position.Y);
-                c_group.size = new Vector2(MathF.Max(0, dim.size.X - group_inset), c_group.size.Y);
+                c_group.layout.size = new Vector2(MathF.Max(0, dim.size.X - group_inset), c_group.layout.size.Y);
             }
-            if (c_group.size.Y > 0)
+            if (c_group.layout.size.Y > 0)
             {
-                size.Y = c_group.size.Y;
-                size_min.Y = size.Y;
+                layout.size = new Vector2(layout.size.X, c_group.layout.size.Y);
+                layout.size_min = new Vector2(layout.size_min.X, layout.size.Y);
             }
             return;
         }
 
         if (pedit_full_width && c_pedit != null)
         {
-            c_pedit.view_alighnment_H = EUIViewportAlignment.Fill;
-            c_pedit.view_alighnment_V = EUIViewportAlignment.Start;
-            size.Y = MathF.Max(RowH, c_pedit.size.Y);
-            size_min.Y = size.Y;
+            c_pedit.layout.orient_H = EUIViewportAlignment.Fill;
+            c_pedit.layout.orient_V = EUIViewportAlignment.Start;
+            layout.size = new Vector2(layout.size.X, MathF.Max(RowH, c_pedit.layout.size.Y));
+            layout.size_min = new Vector2(layout.size_min.X, layout.size.Y);
             return;
         }
 
@@ -971,26 +1144,26 @@ public class C2_InspectorProperty : ImpComp2D
         float gutter = c_revert != null ? RevertW : 0f;
         if (c_label != null)
         {
-            c_label.size = new Vector2(MathF.Max(0, lw - inset), dim.size.Y);
+            c_label.layout.size = new Vector2(MathF.Max(0, lw - inset), dim.size.Y);
             c_label.transform.position = new Vector2(inset, 0);
-            c_label.view_alighnment_H = EUIViewportAlignment.Start;
-            c_label.view_alighnment_V = EUIViewportAlignment.Fill;
+            c_label.layout.orient_H = EUIViewportAlignment.Start;
+            c_label.layout.orient_V = EUIViewportAlignment.Fill;
         }
         if (c_pedit != null)
         {
-            c_pedit.size = new Vector2(MathF.Max(0, dim.size.X - lw - gutter), dim.size.Y);
+            c_pedit.layout.size = new Vector2(MathF.Max(0, dim.size.X - lw - gutter), dim.size.Y);
             c_pedit.transform.position = new Vector2(lw, 0);
-            c_pedit.view_alighnment_H = EUIViewportAlignment.Start;
-            c_pedit.view_alighnment_V = EUIViewportAlignment.Fill;
+            c_pedit.layout.orient_H = EUIViewportAlignment.Start;
+            c_pedit.layout.orient_V = EUIViewportAlignment.Fill;
         }
         if (c_revert != null)
         {
             c_revert.is_visible = IsModified();
-            c_revert.size = new Vector2(RevertW, MathF.Min(RevertW, dim.size.Y));
+            c_revert.layout.size = new Vector2(RevertW, MathF.Min(RevertW, dim.size.Y));
             c_revert.transform.position = new Vector2(
-                MathF.Max(0, dim.size.X - RevertW), (dim.size.Y - c_revert.size.Y) * 0.5f);
-            c_revert.view_alighnment_H = EUIViewportAlignment.Start;
-            c_revert.view_alighnment_V = EUIViewportAlignment.Start;
+                MathF.Max(0, dim.size.X - RevertW), (dim.size.Y - c_revert.layout.size.Y) * 0.5f);
+            c_revert.layout.orient_H = EUIViewportAlignment.Start;
+            c_revert.layout.orient_V = EUIViewportAlignment.Start;
         }
 
         Refresh();
@@ -1063,7 +1236,7 @@ public class C2_InspectorProperty : ImpComp2D
 /// </summary>
 public class C2_ButtonRevert : C2_Button
 {
-    static readonly UiStyle_Button STYLE = new()
+    static readonly UI_Button STYLE = new()
     {
         style_unhovered = new UiStyle_Box { texture = null, tint = new Color(0, 0, 0, 0) },
         style_hovered = UiStyle_Box.STYLE_BTN_HOVER,
@@ -1076,8 +1249,8 @@ public class C2_ButtonRevert : C2_Button
     {
         style = STYLE;
         content_pad = 2;
-        size = new Vector2(16, 16);
-        size_min = size;
+        layout.size = new Vector2(16, 16);
+        layout.size_min = layout.size;
     }
 
     public override void OnDraw2D(double dt, WDrawFlags flags)

@@ -5,7 +5,8 @@ using Raylib_cs;
 
 namespace ImperiumEngine.Comps._2D;
 
-public class C2_AssetSlot : ImpComp2D
+[ImpClass(Hidden = true)]
+public class C2_AssetSlot : Imp2D
 {
     const float HeadH = 26f;
     const float BtnW = 62f;
@@ -14,7 +15,7 @@ public class C2_AssetSlot : ImpComp2D
     public string label = "";
     public Func<ImpAsset> value_get;
     public Action<ImpAsset> value_set;
-    public Func<ImpAsset, List<ImpComp2D>> rows_build;
+    public Func<ImpAsset, List<Imp2D>> rows_build;
     public bool is_expanded;
 
     public C2_Picker c_picker;
@@ -31,10 +32,10 @@ public class C2_AssetSlot : ImpComp2D
     public C2_AssetSlot()
     {
         cursor_filter = ECursorFilter.Hit;
-        view_alighnment_H = EUIViewportAlignment.Fill;
-        view_alighnment_V = EUIViewportAlignment.Start;
-        size = new Vector2(0, HeadH);
-        size_min = size;
+        layout.orient_H = EUIViewportAlignment.Fill;
+        layout.orient_V = EUIViewportAlignment.Start;
+        layout.size = new Vector2(0, HeadH);
+        layout.size_min = layout.size;
 
         c_picker = new C2_Picker
         {
@@ -55,19 +56,25 @@ public class C2_AssetSlot : ImpComp2D
         c_btn_mode = new C2_Button
         {
             text = "New",
-            text_style = UiStyle_Text.LIGHT,
-            size = new Vector2(BtnW, 22),
-            size_min = new Vector2(BtnW, 22),
+            text_style = UI_Text.LIGHT,
             on_click = Mode_Toggle,
+            layout = new TLayout2
+                {
+                    size = new Vector2(BtnW, 22),
+                    size_min = new Vector2(BtnW, 22),
+                },
         };
         Child_Add(c_btn_mode);
 
         c_rows = new C2_List
         {
-            alignment = EUIAlignment.Vertical,
+            orentation = EUIOrentation.V,
             spacing = 2,
-            view_alighnment_H = EUIViewportAlignment.Fill,
-            view_alighnment_V = EUIViewportAlignment.Start,
+            layout = new TLayout2
+                {
+                    orient_H = EUIViewportAlignment.Fill,
+                    orient_V = EUIViewportAlignment.Start,
+                },
         };
         Child_Add(c_rows);
     }
@@ -119,7 +126,7 @@ public class C2_AssetSlot : ImpComp2D
         _rows_for = asset;
         c_rows.Child_RemoveAll();
         if (asset != null && rows_build != null)
-            foreach (ImpComp2D row in rows_build(asset)) c_rows.Child_Add(row);
+            foreach (Imp2D row in rows_build(asset)) c_rows.Child_Add(row);
     }
 
     public override void OnUpdate(double dt)
@@ -133,13 +140,13 @@ public class C2_AssetSlot : ImpComp2D
         c_btn_mode.is_visible = show_mode;
         c_btn_mode.text = Value == null ? "New" : "Inline";
         c_btn_mode.transform.position = new Vector2(dim.size.X - BtnW, 2);
-        c_btn_mode.view_alighnment_H = EUIViewportAlignment.Start;
-        c_btn_mode.view_alighnment_V = EUIViewportAlignment.Start;
+        c_btn_mode.layout.orient_H = EUIViewportAlignment.Start;
+        c_btn_mode.layout.orient_V = EUIViewportAlignment.Start;
 
         c_picker.transform.position = new Vector2(label_w, 2);
-        c_picker.size = new Vector2(MathF.Max(0, dim.size.X - label_w - (show_mode ? BtnW + 4 : 0)), 22);
-        c_picker.view_alighnment_H = EUIViewportAlignment.Start;
-        c_picker.view_alighnment_V = EUIViewportAlignment.Start;
+        c_picker.layout.size = new Vector2(MathF.Max(0, dim.size.X - label_w - (show_mode ? BtnW + 4 : 0)), 22);
+        c_picker.layout.orient_H = EUIViewportAlignment.Start;
+        c_picker.layout.orient_V = EUIViewportAlignment.Start;
 
         bool show_rows = is_expanded && CanExpand && c_rows.children.Count > 0;
         c_rows.is_visible = show_rows;
@@ -148,14 +155,14 @@ public class C2_AssetSlot : ImpComp2D
         {
             c_rows.transform.position = new Vector2(10, HeadH + 2);
             for (int i = 0; i < c_rows.children.Count; i++)
-                if (c_rows.children[i] is ImpComp2D d && d.is_visible) rows_h += d.size.Y + 2;
-            c_rows.size = new Vector2(MathF.Max(0, dim.size.X - 10), rows_h);
-            c_rows.view_alighnment_H = EUIViewportAlignment.Start;
-            c_rows.view_alighnment_V = EUIViewportAlignment.Start;
+                if (c_rows.children[i] is Imp2D d && d.is_visible) rows_h += d.layout.size.Y + 2;
+            c_rows.layout.size = new Vector2(MathF.Max(0, dim.size.X - 10), rows_h);
+            c_rows.layout.orient_H = EUIViewportAlignment.Start;
+            c_rows.layout.orient_V = EUIViewportAlignment.Start;
         }
 
-        size.Y = HeadH + (show_rows ? rows_h + 4 : 0);
-        size_min.Y = size.Y;
+        layout.size = new Vector2(layout.size.X, HeadH + (show_rows ? rows_h + 4 : 0));
+        layout.size_min = new Vector2(layout.size_min.X, layout.size.Y);
     }
 
     public override void OnDraw2D(double dt, WDrawFlags flags)
@@ -172,7 +179,7 @@ public class C2_AssetSlot : ImpComp2D
             else
                 Raylib.DrawTriangle(new Vector2(cx - 3, cy - 5), new Vector2(cx - 3, cy + 5), new Vector2(cx + 5, cy), ac);
         }
-        UiStyle_Text.LIGHT.Draw(label, new Vector2(dim.position.X + 16, dim.position.Y),
+        UI_Text.LIGHT.Draw(label, new Vector2(dim.position.X + 16, dim.position.Y),
             new Vector2(MathF.Max(0, dim.size.X * 0.38f - 16), HeadH),
             0, ETextWrap.None, EUIPositionAlignment.Center, EUIPositionAlignment.Start);
         base.OnDraw2D(dt, flags);

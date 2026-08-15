@@ -1,2 +1,62 @@
-# Imperium Editor preferences (edited via Editor Config window)
-theme_path = "{engine}/Themes/ThemeDark.ImpTheme"
+saved_at = "2026-08-15T05:12:36.2011968Z"
+
+[window]
+main_tab = "Scene"
+inspector_tab = 0
+outliner_tab = 0
+file_browser_expanded = true
+file_browser_asset_expanded = true
+panel_width = 403
+browser_stretch = 0.5
+browser_asset_stretch = 275
+outliner_stretch = 1
+inspector_stretch = 1.20000005
+
+[tabs]
+active_scene = 0
+active_asset = 0
+
+[file_browser]
+current_dir = "{game}/Scenes/cameras"
+dir_tab = 0
+search = ""
+show_source_files = false
+show_file_extensions = false
+show_engine_content = true
+thumbnail_size = 80
+settings_open = true
+favorites_expanded = false
+sidebar_width = 220
+favorites = []
+expanded = ["{game}", "{game}/Scenes", "{game}/Scenes/cameras", "{engine}"]
+
+[file_browser_asset]
+current_dir = "{game}/Assets/Textures"
+dir_tab = 0
+search = ""
+show_source_files = true
+show_file_extensions = false
+show_engine_content = true
+thumbnail_size = 49.1999855
+settings_open = true
+favorites_expanded = false
+sidebar_width = 220
+favorites = []
+expanded = ["{game}", "{game}/Assets", "{game}/Assets/Textures", "{engine}"]
+
+[[open_scenes]]
+path = "{game}/Scenes/test_scene_1.ImpScene"
+edit_mode = "Mode_3D"
+gizmo_mode = "Rotate"
+gizmo_space = "Local"
+snap_translate = 0.25
+snap_translate_2d = 8
+cam3_position = [6.42606544, 4.73921967, 12.1175308]
+cam3_target = [-4.39679337, -3.382658, -5.08176613]
+cam3_fovy = 50
+cam2_position = [283.374695, 115.656273]
+cam2_zoom = 0.696198821
+selected = []
+
+[[open_assets]]
+path = "{game}/Assets/Textures/po_F2_1.ImpAsset"

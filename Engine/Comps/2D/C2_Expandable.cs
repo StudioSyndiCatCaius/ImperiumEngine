@@ -1,4 +1,4 @@
-﻿using System.Numerics;
+using System.Numerics;
 using ImperiumEngine.Assets;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Structs;
@@ -6,24 +6,31 @@ using Raylib_cs;
 
 namespace ImperiumEngine.Comps._2D;
 
-public class C2_Expandable : ImpComp2D
+public class C2_Expandable : Imp2D
 {
     public bool is_expanded = true;
     public float bar_height = 24f;
     public float content_indent = 10f;
+    public A_Texture icon;
     public Action<bool> on_expand;
 
     public C2_List list = new()
     {
-        alignment = EUIAlignment.Vertical,
-        view_alighnment_H = EUIViewportAlignment.Fill,
-        view_alighnment_V = EUIViewportAlignment.Fill,
+        orentation = EUIOrentation.V,
+        layout = new TLayout2
+        {
+            orient_H = EUIViewportAlignment.Fill,
+            orient_V = EUIViewportAlignment.Fill,
+        },
     };
     public C2_List content_box = new()
     {
-        alignment = EUIAlignment.Vertical,
-        view_alighnment_H = EUIViewportAlignment.Start,
-        view_alighnment_V = EUIViewportAlignment.Fill,
+        orentation = EUIOrentation.V,
+        layout = new TLayout2
+        {
+            orient_H = EUIViewportAlignment.Start,
+            orient_V = EUIViewportAlignment.Fill,
+        },
         spacing = 2,
     };
 
@@ -31,10 +38,13 @@ public class C2_Expandable : ImpComp2D
 
     C2_Button bar = new()
     {
-        view_alighnment_H = EUIViewportAlignment.Fill,
-        layout = EButtonLayout.Icon_Text_H,
+        layout = new TLayout2
+        {
+            orient_H = EUIViewportAlignment.Fill,
+        },
+        button_layout = EButtonLayout.Icon_Text_H,
         content_align_h = EUIPositionAlignment.Start,
-        style = new UiStyle_Button(),
+        style = new UI_Button(),
     };
 
     bool _was_expanded = true;
@@ -82,23 +92,24 @@ public class C2_Expandable : ImpComp2D
 
         if (style != null)
         {
-            bar.text_style = style.name_style;
+            bar.text_style = style.Name;
             bar.style.style_unhovered = style.style_expand_bar;
             bar.style.style_hovered = style.style_expand_bar;
             bar.style.style_pressed = style.style_expand_bar;
         }
 
         bar.icon = is_expanded ? style?.icon_expand : style?.icon_collapse;
+        bar.icon2 = icon;
         bar.text = name ?? "";
-        bar.size = new Vector2(bar.size.X, bar_height);
-        bar.size_min = new Vector2(0, bar_height);
+        bar.layout.size = new Vector2(bar.layout.size.X, bar_height);
+        bar.layout.size_min = new Vector2(0, bar_height);
 
         content_box.is_visible = is_expanded;
         if (content_indent > 0)
         {
-            content_box.view_alighnment_H = EUIViewportAlignment.Start;
+            content_box.layout.orient_H = EUIViewportAlignment.Start;
             TDimensions2 dim = Dimensions_Get();
-            content_box.size = new Vector2(MathF.Max(0, dim.size.X - content_indent), content_box.size.Y);
+            content_box.layout.size = new Vector2(MathF.Max(0, dim.size.X - content_indent), content_box.layout.size.Y);
             content_box.transform.position = new Vector2(content_indent, content_box.transform.position.Y);
         }
 
@@ -106,37 +117,37 @@ public class C2_Expandable : ImpComp2D
         {
             if (!_shrunk)
             {
-                _saved_align_v = view_alighnment_V;
-                _saved_size_y = size.Y;
+                _saved_align_v = layout.orient_V;
+                _saved_size_y = layout.size.Y;
                 _shrunk = true;
             }
-            view_alighnment_V = EUIViewportAlignment.Start;
-            size.Y = bar_height;
-            size_min.Y = bar_height;
+            layout.orient_V = EUIViewportAlignment.Start;
+            layout.size = new Vector2(layout.size.X, bar_height);
+            layout.size_min = new Vector2(layout.size_min.X, bar_height);
         }
         else
         {
             if (_shrunk)
             {
-                view_alighnment_V = _saved_align_v;
-                size.Y = _saved_size_y;
+                layout.orient_V = _saved_align_v;
+                layout.size = new Vector2(layout.size.X, _saved_size_y);
                 _shrunk = false;
             }
-            if (view_alighnment_V != EUIViewportAlignment.Fill)
+            if (layout.orient_V != EUIViewportAlignment.Fill)
             {
                 float inner = 0;
                 int vis = 0;
                 List<ImpComp> kids = content_box.scroll_box != null ? content_box.scroll_box.children : content_box.children;
                 for (int i = 0; i < kids.Count; i++)
                 {
-                    if (kids[i] is not ImpComp2D d || !d.is_visible) continue;
-                    float h = d.size_min.Y > 0 ? d.size_min.Y : d.size.Y;
+                    if (kids[i] is not Imp2D d || !d.is_visible) continue;
+                    float h = d.layout.size_min.Y > 0 ? d.layout.size_min.Y : d.layout.size.Y;
                     inner += h;
                     vis++;
                 }
                 if (vis > 1) inner += content_box.spacing * (vis - 1);
-                size.Y = bar_height + inner;
-                size_min.Y = size.Y;
+                layout.size = new Vector2(layout.size.X, bar_height + inner);
+                layout.size_min = new Vector2(layout.size_min.X, layout.size.Y);
             }
         }
 
@@ -175,6 +186,6 @@ public class UiStyle_Expandable : ImpAsset
     [ImpVar] public A_Texture icon_expand = A_Texture.ICO_ARROW_D;
     [ImpVar] public UiStyle_Box style_expand_bar = UiStyle_Box.STYLE_BKG_MID;
     [ImpVar] public UiStyle_Box style_content_box = UiStyle_Box.STYLE_BKG_DARK;
-    [ImpVar] public UiStyle_Text name_style = UiStyle_Text.LIGHT;
+    [ImpVar] public UI_Text Name = UI_Text.LIGHT;
     
 }

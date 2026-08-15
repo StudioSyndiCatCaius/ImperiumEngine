@@ -1,4 +1,7 @@
-﻿using Raylib_cs;
+﻿using System.Numerics;
+using ImperiumEngine.Enums;
+using ImperiumEngine.Structs;
+using Raylib_cs;
 
 namespace ImperiumEngine.Assets;
 
@@ -14,6 +17,7 @@ public class A_Texture : ImpAsset
     [ImpVar] public float hue;
     [ImpVar] public float saturation=0.1f;
     [ImpVar] public float brightness=1.0f;
+    [ImpVar] public EImageLayout ui_layout=EImageLayout.Stretch;
     
     public override void Source_OnReload(ImpFile file)
     {
@@ -27,7 +31,15 @@ public class A_Texture : ImpAsset
     // #################################################################################
     // Static
     // #################################################################################
+
+    public static void Draw(A_Texture texture, TLayout2 config)
+    {
+        
+    }
     
+    // -------------------------------------
+    // Built-ins
+    // -------------------------------------
     public static A_Texture? PANEL_A = ImpAsset.Import<A_Texture>("{engine}/Textures/UI/UI_Editor_Panel_A.png");
     public static A_Texture? PANEL_B = ImpAsset.Import<A_Texture>("{engine}/Textures/UI/UI_Editor_Panel_B.png");
     
@@ -40,15 +52,15 @@ public class A_Texture : ImpAsset
     public static A_Texture? ICO_SCENE = ImpAsset.Import<A_Texture>("{engine}/Icons/ico_editor_scene.png");
     public static A_Texture? ICO_ARROW_R = Import<A_Texture>("{engine}/Icons/ico_editor_arrowR.png");
     public static A_Texture? ICO_ARROW_D = Import<A_Texture>("{engine}/Icons/ico_editor_arrowD.png");
-    public static A_Texture? ICO_COMP = Import<A_Texture>("{engine}/Icons/Types/ImpComp.png");
-    public static A_Texture? ICO_COMP2D = Import<A_Texture>("{engine}/Icons/Types/ImpComp2D.png");
-    public static A_Texture? ICO_COMP3D = Import<A_Texture>("{engine}/Icons/Types/ImpComp3D.png");
     
     public static A_Texture? CHECKBOX_T = Import<A_Texture>("{engine}/Textures/UI/UI_Editor_CheckBox_T.png");
     public static A_Texture? CHECKBOX_F = Import<A_Texture>("{engine}/Textures/UI/UI_Editor_CheckBox_F.png");
     
     public static A_Texture? SEPERATOR_V = ImpAsset.Import<A_Texture>("{engine}/Textures/UI/UI_Editor_SeperatorV.png");
-
+    
+    public static A_Texture? ICO_COMP = Import<A_Texture>("{engine}/Thumbnails/ImpComp.png");
+    public static A_Texture? ICO_COMP2D = Import<A_Texture>("{engine}/Thumbnails/Imp2D.png");
+    public static A_Texture? ICO_COMP3D = Import<A_Texture>("{engine}/Thumbnails/Imp3D.png");
     public static A_Texture? THUMB_FILE = ImpAsset.Import<A_Texture>("{engine}/Thumbnails/_file.png");
     public static A_Texture? THUMB_FOLDER = ImpAsset.Import<A_Texture>("{engine}/Thumbnails/_folder.png");
     

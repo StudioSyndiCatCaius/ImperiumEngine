@@ -5,7 +5,8 @@ using Raylib_cs;
 
 public enum ELightType { Point, Spot }
 
-public class C3_Light : ImpComp3D
+[ImpClass(Common = true)]
+public class C3_Light : Imp3D
 {
     [ImpVar] public ELightType light_type = ELightType.Point;
     [ImpVar] public Color color = Color.White;

@@ -3,7 +3,11 @@ using Raylib_cs;
 
 namespace ImperiumEngine.Structs;
 
-public enum ESceneEditorMode { Mode_3D, Mode_2D }
+public enum ESceneEditorMode
+{
+    [Title("3D")] Mode_3D,
+    [Title("2D")] Mode_2D,
+}
 
 public enum EGizmoMode
 {

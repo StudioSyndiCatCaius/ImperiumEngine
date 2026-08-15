@@ -1,4 +1,4 @@
-﻿using System.Numerics;
+using System.Numerics;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Structs;
 using Raylib_cs;
@@ -7,7 +7,7 @@ namespace ImperiumEngine.Comps._2D;
 
 public class C2_ScrollBox : C2_Box
 {
-    public EUIAlignment alignment = EUIAlignment.Vertical;
+    public EUIOrentation orentation = EUIOrentation.V;
     public float scroll = 0;
     public float scroll_step = 40f;
     public float spacing = 0;
@@ -29,10 +29,10 @@ public class C2_ScrollBox : C2_Box
 
     public bool IsWrapped => section_count > 0 || auto_scale_section_count;
 
-    public EUIAlignment ScrollAxis =>
+    public EUIOrentation ScrollAxis =>
         IsWrapped
-            ? (alignment == EUIAlignment.Horizontal ? EUIAlignment.Vertical : EUIAlignment.Horizontal)
-            : alignment;
+            ? (orentation == EUIOrentation.H ? EUIOrentation.V : EUIOrentation.H)
+            : orentation;
 
     public override void OnUpdate(double dt)
     {
@@ -43,7 +43,7 @@ public class C2_ScrollBox : C2_Box
         else LayoutLinear();
 
         TDimensions2 dim = Dimensions_Get();
-        bool scroll_v = ScrollAxis == EUIAlignment.Vertical;
+        bool scroll_v = ScrollAxis == EUIOrentation.V;
         float view_len = scroll_v ? dim.size.Y : dim.size.X;
         float max_scroll = MathF.Max(0, content_length - view_len);
 
@@ -142,7 +142,7 @@ public class C2_ScrollBox : C2_Box
     void LayoutLinear()
     {
         TDimensions2 dim = Dimensions_Get();
-        bool horizontal = alignment == EUIAlignment.Horizontal;
+        bool horizontal = orentation == EUIOrentation.H;
         content_length = C2_List.LayoutMainAxis(
             children, horizontal, horizontal ? dim.size.X : dim.size.Y, spacing, scroll);
     }
@@ -150,15 +150,15 @@ public class C2_ScrollBox : C2_Box
     void LayoutWrap()
     {
         TDimensions2 dim = Dimensions_Get();
-        bool horizontal = alignment == EUIAlignment.Horizontal;
+        bool horizontal = orentation == EUIOrentation.H;
 
         float cell_w = 0, cell_h = 0;
         int visible = 0;
         for (int i = 0; i < children.Count; i++)
         {
-            if (children[i] is not ImpComp2D child || !child.is_visible) continue;
-            float iw = child.size_min.X > 0 ? child.size_min.X : child.size.X;
-            float ih = child.size_min.Y > 0 ? child.size_min.Y : child.size.Y;
+            if (children[i] is not Imp2D child || !child.is_visible) continue;
+            float iw = child.layout.size_min.X > 0 ? child.layout.size_min.X : child.layout.size.X;
+            float ih = child.layout.size_min.Y > 0 ? child.layout.size_min.Y : child.layout.size.Y;
             cell_w = MathF.Max(cell_w, iw);
             cell_h = MathF.Max(cell_h, ih);
             visible++;
@@ -187,17 +187,17 @@ public class C2_ScrollBox : C2_Box
         int index = 0;
         for (int i = 0; i < children.Count; i++)
         {
-            if (children[i] is not ImpComp2D child || !child.is_visible) continue;
+            if (children[i] is not Imp2D child || !child.is_visible) continue;
             int col = index % cols;
             int row = index / cols;
             if (horizontal)
             {
-                child.size = new Vector2(cell_w, child.size.Y);
+                child.layout.size = new Vector2(cell_w, child.layout.size.Y);
                 child.transform.position = new Vector2(col * (cell_w + spacing), row * (cell_h + spacing) - scroll);
             }
             else
             {
-                child.size = new Vector2(child.size.X, cell_h);
+                child.layout.size = new Vector2(child.layout.size.X, cell_h);
                 child.transform.position = new Vector2(row * (cell_w + spacing) - scroll, col * (cell_h + spacing));
             }
             index++;
@@ -213,7 +213,7 @@ public class C2_ScrollBox : C2_Box
         base.OnDraw2DForeground(dt, flags);
 
         TDimensions2 dim = Dimensions_Get();
-        bool scroll_v = ScrollAxis == EUIAlignment.Vertical;
+        bool scroll_v = ScrollAxis == EUIOrentation.V;
         float view_len = scroll_v ? dim.size.Y : dim.size.X;
         if (content_length <= view_len || view_len <= 0 || scroll_style == null) return;
 

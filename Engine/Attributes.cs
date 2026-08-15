@@ -27,6 +27,16 @@ public sealed class CategoryAttribute : Attribute
     public CategoryAttribute(string name) => Name = name;
 }
 
+// overrides display name in the editor
+[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property | AttributeTargets.Enum)]
+public sealed class TitleAttribute : Attribute
+{
+    
+    public string? Name { get; }
+
+    public TitleAttribute(string name) => Name = name;
+}
+
 
 
 
@@ -46,6 +56,18 @@ public sealed class ImpConfigAttribute : Attribute
     public string? Name { get; }
     public ImpConfigAttribute(string? name = null) => Name = name;
 }
+
+
+[AttributeUsage(AttributeTargets.Struct | AttributeTargets.Class)]
+public sealed class ImpClassAttribute : Attribute
+{
+
+    
+    public bool Hidden { get; init; } //hides from the editor
+
+    public bool Common { get; init; }  // for ImpComps. appears in the "Comps" tab next to the scene tree
+}
+
 
 // ========================================================================================================
 // Methods

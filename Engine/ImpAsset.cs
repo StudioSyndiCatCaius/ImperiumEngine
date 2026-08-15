@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
+using ImperiumEngine.Assets;
 using ImperiumEngine.Comps._1D;
 using ImperiumEngine.Comps._2D;
 using ImperiumEngine.Files;
@@ -50,6 +51,24 @@ public class ImpAsset : I_File, I_Property
             string moved = exact ? to : to + key[from.Length..];
             asset.filepath = moved;
             _loaded[moved] = asset;
+        }
+    }
+
+    /// <summary>Drops cached assets at this path and anything underneath it after a delete.</summary>
+    public static void Cache_Drop(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return;
+        string from;
+        try { from = Path.GetFullPath(path); }
+        catch { return; }
+
+        List<string> keys = new(_loaded.Keys);
+        foreach (string key in keys)
+        {
+            bool exact = key.Equals(from, StringComparison.OrdinalIgnoreCase);
+            bool under = key.StartsWith(from + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+            if (!exact && !under) continue;
+            _loaded.Remove(key);
         }
     }
 
@@ -126,7 +145,12 @@ public class ImpAsset : I_File, I_Property
 
                     string key = t.Name + "." + m.Name;
                     if (_builtins.ContainsKey(key)) continue;
-                    if (string.IsNullOrEmpty(asset.filepath)) asset.filepath = BuiltinPrefix + key;
+                    // A_Game.GAME_TEST (and similar) already point at a real project file
+                    // via gamepath. Stamping builtin: here made GetRootDir forget the project.
+                    if (string.IsNullOrEmpty(asset.filepath) && asset is not A_Game)
+                    {
+                        asset.filepath = BuiltinPrefix + key;
+                    }
                     _builtins[key] = asset;
                 }
             }
@@ -251,6 +275,14 @@ public class ImpAsset : I_File, I_Property
         return File.Exists(ImpFile.Path_Resolve(filepath));
     }
 
+    // Has a real disk path we can write. Builtins and never-saved untitled assets cannot.
+    public bool File_CanWrite()
+    {
+        if (string.IsNullOrWhiteSpace(filepath)) return false;
+        if (Path_IsBuiltin(filepath)) return false;
+        return true;
+    }
+
     ImpFile? File_CreateParser()
     {
         if (Activator.CreateInstance(File_GetParser()) is not ImpFile parser) return null;
@@ -273,11 +305,33 @@ public class ImpAsset : I_File, I_Property
 
     public virtual bool File_Write()
     {
-        if (string.IsNullOrWhiteSpace(filepath) || Path_IsBuiltin(filepath)) return false;
+        if (!File_CanWrite()) return false;
         ImpFile? parser = File_CreateParser();
         if (parser == null || !parser.File_Write(this)) return false;
         is_dirty = false;
+        _loaded[CacheKey(filepath)] = this;
         return true;
+    }
+
+    // Point this asset at a new path, write it, and rebind the load cache.
+    public bool File_SaveTo(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || Path_IsBuiltin(path)) return false;
+        string dest = ImpFile.Path_Resolve(path);
+        try { dest = Path.GetFullPath(dest); }
+        catch { }
+
+        if (File_CanWrite())
+        {
+            string old_key = CacheKey(filepath);
+            if (_loaded.TryGetValue(old_key, out ImpAsset? cached) && cached == this)
+            {
+                _loaded.Remove(old_key);
+            }
+        }
+
+        filepath = dest;
+        return File_Write();
     }
 
     public virtual string File_GetExtension() { return "ImpAsset"; }
@@ -431,11 +485,11 @@ public class ImpAsset : I_File, I_Property
     // ------------------------------------
     // Scene View
     // ------------------------------------
-    public virtual void SceneDrop_Enter(C2_SceneView scene, ImpPlayer player) { }
-    public virtual void SceneDrop_Exit(C2_SceneView scene, ImpPlayer player) { }
-    public virtual void SceneDrop_Update(C2_SceneView scene, float dt, ImpPlayer player) { }
+    public virtual void SceneDrop_Enter(Imp2D view, ImpPlayer player) { }
+    public virtual void SceneDrop_Exit(Imp2D view, ImpPlayer player) { }
+    public virtual void SceneDrop_Update(Imp2D view, float dt, ImpPlayer player) { }
     
     public virtual void SceneDrop_CompEnter(ImpComp comp, ImpPlayer player) { }
     public virtual void SceneDrop_CompExit(ImpComp comp, ImpPlayer player) { }
-    public virtual void SceneDrop_DropOnComp(ImpComp comp, ImpPlayer player) { }
+    public virtual ImpComp SceneDrop_DropOnComp(ImpComp comp, ImpPlayer player) { return null; }
 }

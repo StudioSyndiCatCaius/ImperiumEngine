@@ -1,6 +1,7 @@
 ﻿//using raygui_cs;
 
 using System.Numerics;
+using ImperiumEngine.Comps;
 using ImperiumEngine.Enums;
 using R3D_cs;
 using raygui_cs;
@@ -29,7 +30,7 @@ public class ImpApp
     // #################################################################################
     
     [System.STAThread]
-    public void Run(Action on_pre_init=null,Action on_post_init=null)
+    public void Run(Action on_pre_init=null,Action on_post_init=null,Action on_shutdown=null)
     {
         // init
         app = this;
@@ -57,24 +58,24 @@ public class ImpApp
             // ----- INPUT (keys first) -----------------------------------------------------------------------
             // Each phase starts on a fresh layout epoch: the previous phase may have moved
             // things around through paths the setters cannot see (direct size/transform writes).
-            ImpComp2D.Layout_Invalidate();
+            Imp2D.Layout_Invalidate();
             ImpProfiler.Phase_Begin(ImpProfiler.EPhase.Input);
             foreach (var p in ImpPlayer.players)
                 p.Update_Input(dt);
 
             // ----- UPDATE (layout) --------------------------------------------------------------------------
-            ImpComp2D.Layout_Invalidate();
+            Imp2D.Layout_Invalidate();
             ImpProfiler.Phase_Begin(ImpProfiler.EPhase.Update);
             ImpScene.current.Update(dt);
 
             // ----- CURSOR (after layout so hit rects match drawn widgets) ------------------------------------
-            ImpComp2D.Layout_Invalidate();
+            Imp2D.Layout_Invalidate();
             ImpProfiler.Phase_Begin(ImpProfiler.EPhase.Cursor);
             foreach (var p in ImpPlayer.players)
                 p.Update_Cursor(dt);
 
             // ----- DRAW ------------------------------------------------------------------------------------
-            ImpComp2D.Layout_Invalidate();
+            Imp2D.Layout_Invalidate();
             ImpProfiler.Phase_Begin(ImpProfiler.EPhase.Draw3D);
             R3D.Begin(camera);
             ImpScene.current.Draw(dt,0); //3D
@@ -90,6 +91,8 @@ public class ImpApp
             ImpProfiler.Draw();
             Raylib.EndDrawing();
         }
+
+        on_shutdown?.Invoke();
 
         R3D.Close();
         Raylib.ShowCursor();

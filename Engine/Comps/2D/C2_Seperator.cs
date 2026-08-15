@@ -7,9 +7,9 @@ using Raylib_cs;
 namespace ImperiumEngine.Comps._2D;
 
 // A component for creating separators in the UI that can be dragged to resize UI elements.
-public class C2_Seperator : ImpComp2D
+public class C2_Seperator : Imp2D
 {
-    [ImpVar] public EUIAlignment alignment = EUIAlignment.Horizontal;
+    [ImpVar] public EUIOrentation orentation = EUIOrentation.H;
     [ImpVar] public float thickness = 10f;
     [ImpVar] public bool is_draggable = true;
     public UiStyle_Seperator style = UiStyle_Seperator.DEFAULT;
@@ -17,8 +17,8 @@ public class C2_Seperator : ImpComp2D
     bool _hover;
     bool _drag;
     Vector2 _drag_origin;
-    ImpComp2D? _prev;
-    ImpComp2D? _next;
+    Imp2D? _prev;
+    Imp2D? _next;
     float _prev_main;
     float _next_main;
 
@@ -26,7 +26,7 @@ public class C2_Seperator : ImpComp2D
     {
         cursor_filter = ECursorFilter.Hit;
         option_button = null;
-        size = new Vector2(8, 8);
+        layout.size = new Vector2(8, 8);
     }
 
     public override void OnUpdate(double dt)
@@ -35,27 +35,27 @@ public class C2_Seperator : ImpComp2D
         cursor_filter = ECursorFilter.Hit;
 
         if (parent is C2_List list)
-            alignment = list.alignment;
+            orentation = list.orentation;
 
-        bool horizontal = alignment == EUIAlignment.Horizontal;
+        bool horizontal = orentation == EUIOrentation.H;
         float thick = thickness > 0 ? thickness : 8f;
         if (horizontal)
         {
-            size.X = thick;
-            view_alighnment_H = EUIViewportAlignment.Start;
-            view_alighnment_V = EUIViewportAlignment.Fill;
+            layout.size = new Vector2(thick, layout.size.Y);
+            layout.orient_H = EUIViewportAlignment.Start;
+            layout.orient_V = EUIViewportAlignment.Fill;
         }
         else
         {
-            size.Y = thick;
-            view_alighnment_H = EUIViewportAlignment.Fill;
-            view_alighnment_V = EUIViewportAlignment.Start;
+            layout.size = new Vector2(layout.size.X, thick);
+            layout.orient_H = EUIViewportAlignment.Fill;
+            layout.orient_V = EUIViewportAlignment.Start;
         }
 
         if (!is_draggable || ImpPlayer.players.Count == 0) return;
         ImpPlayer player = ImpPlayer.players[0];
         bool held = ImpPlayer.Key_IsHeld(EInputKey.Mouse_Left);
-        bool targeted = player.cursor_target == this;
+        bool targeted = player.target_cursor == this;
 
         if (!_drag && targeted && ImpPlayer.Key_IsPressed(EInputKey.Mouse_Left)
             && (player.input_hog == null || player.input_hog == this))
@@ -100,7 +100,7 @@ public class C2_Seperator : ImpComp2D
 
         style ??= UiStyle_Seperator.DEFAULT;
         Color tint = _drag ? style.tint_pressed : _hover ? style.tint_hovered : style.tint;
-        bool horizontal = alignment == EUIAlignment.Horizontal;
+        bool horizontal = orentation == EUIOrentation.H;
 
         if (style.image != null && style.image.texture.Id != 0)
         {
@@ -125,24 +125,22 @@ public class C2_Seperator : ImpComp2D
             Raylib.DrawRectangleV(dim.position, dim.size, tint);
     }
 
-    public override void Cursor_OnEnter(ImpPlayer player)
+    public override void _Notify_AsCursorTarget(ImpPlayer player, ENotifyGeneric notify, double dt)
     {
-        base.Cursor_OnEnter(player);
-        _hover = true;
-        if (is_draggable) Cursor_Set(alignment == EUIAlignment.Horizontal);
-    }
-
-    public override void Cursor_OnExit(ImpPlayer player)
-    {
-        base.Cursor_OnExit(player);
-        if (!_drag)
+        base._Notify_AsCursorTarget(player, notify, dt);
+        if (notify == ENotifyGeneric.Begin)
+        {
+            _hover = true;
+            if (is_draggable) Cursor_Set(orentation == EUIOrentation.H);
+        }
+        else if (notify == ENotifyGeneric.End && !_drag)
         {
             _hover = false;
             Cursor_Clear();
         }
     }
 
-    void Neighbors(out ImpComp2D? prev, out ImpComp2D? next)
+    void Neighbors(out Imp2D? prev, out Imp2D? next)
     {
         prev = null;
         next = null;
@@ -152,7 +150,7 @@ public class C2_Seperator : ImpComp2D
         if (self < 0) return;
         for (int i = self - 1; i >= 0; i--)
         {
-            if (kids[i] is ImpComp2D d && d.is_visible && d is not C2_Seperator)
+            if (kids[i] is Imp2D d && d.is_visible && d is not C2_Seperator)
             {
                 prev = d;
                 break;
@@ -160,7 +158,7 @@ public class C2_Seperator : ImpComp2D
         }
         for (int i = self + 1; i < kids.Count; i++)
         {
-            if (kids[i] is ImpComp2D d && d.is_visible && d is not C2_Seperator)
+            if (kids[i] is Imp2D d && d.is_visible && d is not C2_Seperator)
             {
                 next = d;
                 break;
@@ -193,32 +191,32 @@ public class C2_Seperator : ImpComp2D
         if (next_fill) _next.stretch_ratio = MathF.Max(0.001f, new_n);
     }
 
-    static bool IsFill(ImpComp2D c, bool horizontal) =>
+    static bool IsFill(Imp2D c, bool horizontal) =>
         horizontal
-            ? c.view_alighnment_H == EUIViewportAlignment.Fill
-            : c.view_alighnment_V == EUIViewportAlignment.Fill;
+            ? c.layout.orient_H == EUIViewportAlignment.Fill
+            : c.layout.orient_V == EUIViewportAlignment.Fill;
 
-    static float MainOf(ImpComp2D c, bool horizontal)
+    static float MainOf(Imp2D c, bool horizontal)
     {
         TDimensions2 d = c.Dimensions_Get();
         return horizontal ? d.size.X : d.size.Y;
     }
 
-    static float MinOf(ImpComp2D c, bool horizontal)
+    static float MinOf(Imp2D c, bool horizontal)
     {
-        float min = horizontal ? c.size_min.X : c.size_min.Y;
+        float min = horizontal ? c.layout.size_min.X : c.layout.size_min.Y;
         return min > 0 ? min : 48f;
     }
 
-    static float MaxOf(ImpComp2D c, bool horizontal)
+    static float MaxOf(Imp2D c, bool horizontal)
     {
-        return horizontal ? c.size_max.X : c.size_max.Y;
+        return horizontal ? c.layout.size_max.X : c.layout.size_max.Y;
     }
 
-    static void SetMain(ImpComp2D c, bool horizontal, float v)
+    static void SetMain(Imp2D c, bool horizontal, float v)
     {
-        if (horizontal) c.size.X = v;
-        else c.size.Y = v;
+        if (horizontal) c.layout.size = new Vector2(v, c.layout.size.Y);
+        else c.layout.size = new Vector2(c.layout.size.X, v);
     }
 
     static void Cursor_Set(bool horizontal)

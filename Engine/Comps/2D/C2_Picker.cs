@@ -24,7 +24,7 @@ public struct TPickerOption
     }
 }
 
-public class C2_Picker : ImpComp2D
+public class C2_Picker : Imp2D
 {
     const int PopupRowsMax = 10;
     const float PopupMinW = 260f;
@@ -113,8 +113,8 @@ public class C2_Picker : ImpComp2D
 
     static A_Texture Icon_For(Type t)
     {
-        if (typeof(ImpComp3D).IsAssignableFrom(t)) return A_Texture.ICO_COMP3D;
-        if (typeof(ImpComp2D).IsAssignableFrom(t)) return A_Texture.ICO_COMP2D;
+        if (typeof(Imp3D).IsAssignableFrom(t)) return A_Texture.ICO_COMP3D;
+        if (typeof(Imp2D).IsAssignableFrom(t)) return A_Texture.ICO_COMP2D;
         if (typeof(ImpComp).IsAssignableFrom(t)) return A_Texture.ICO_COMP;
         return A_Texture.THUMB_FILE;
     }
@@ -152,7 +152,7 @@ public class C2_Picker : ImpComp2D
 
         bool set = !string.IsNullOrEmpty(text);
         float clear_w = show_clear && set ? 16 : 0;
-        UiStyle_Text ts = set ? UiStyle_Text.LIGHT : UiStyle_Text.MUTED;
+        UI_Text ts = set ? UI_Text.LIGHT : UI_Text.MUTED;
         ts.Draw(set ? text : placeholder, new Vector2(x, dim.position.Y),
             new Vector2(MathF.Max(0, dim.position.X + dim.size.X - clear_w - 4 - x), dim.size.Y),
             0, ETextWrap.None, EUIPositionAlignment.Center, EUIPositionAlignment.Start);
@@ -174,8 +174,12 @@ public class C2_Picker : ImpComp2D
         }
     }
 
-    public override void Cursor_OnEnter(ImpPlayer player) { base.Cursor_OnEnter(player); _hover = true; }
-    public override void Cursor_OnExit(ImpPlayer player) { base.Cursor_OnExit(player); _hover = false; }
+    public override void _Notify_AsCursorTarget(ImpPlayer player, ENotifyGeneric notify, double dt)
+    {
+        base._Notify_AsCursorTarget(player, notify, dt);
+        if (notify == ENotifyGeneric.Begin) _hover = true;
+        else if (notify == ENotifyGeneric.End) _hover = false;
+    }
 
     public override void Cursor_OnEvent(ImpPlayer player, ECursorEvent evnt)
     {
@@ -205,18 +209,19 @@ public class C2_Picker : ImpComp2D
         return Drop_Accepts(path) ? path : null;
     }
 
-    public override void CursorGrab_DroppedOn(ImpPlayer player, ImpComp dropped)
+    public override void _Notify_OnGrabDrop(ImpPlayer player, ENotifyGrabTarget notify, ImpComp other, double dt)
     {
-        base.CursorGrab_DroppedOn(player, dropped);
-        _drop_hover = false;
-        string path = Drop_Path(dropped);
-        if (path != null) on_dropped(path);
-    }
-
-    public override void CursorGrab_HoveredAsTarget(ImpPlayer player, ImpComp dropped, bool hovered)
-    {
-        base.CursorGrab_HoveredAsTarget(player, dropped, hovered);
-        _drop_hover = hovered && Drop_Path(dropped) != null;
+        base._Notify_OnGrabDrop(player, notify, other, dt);
+        if (notify == ENotifyGrabTarget.Hover_AsInstigator_Start)
+            _drop_hover = Drop_Path(other) != null;
+        else if (notify == ENotifyGrabTarget.Hover_AsInstigator_End)
+            _drop_hover = false;
+        else if (notify == ENotifyGrabTarget.Drop_AsInstigator)
+        {
+            _drop_hover = false;
+            string path = Drop_Path(other);
+            if (path != null) on_dropped(path);
+        }
     }
 
     void Open_Set(bool open)
@@ -238,8 +243,11 @@ public class C2_Picker : ImpComp2D
         List<TPickerOption> opts = options_build != null ? options_build() : new List<TPickerOption>();
         _popup = new C2_PickerPopup(this, opts)
         {
-            view_alighnment_H = EUIViewportAlignment.Start,
-            view_alighnment_V = EUIViewportAlignment.Start,
+            layout = new TLayout2
+                {
+                    orient_H = EUIViewportAlignment.Start,
+                    orient_V = EUIViewportAlignment.Start,
+                },
         };
         _popup.transform.position = new Vector2(dim.position.X, dim.position.Y + dim.size.Y + 2);
         host.Child_Add(_popup);
@@ -285,8 +293,8 @@ class C2_PickerPopup : C2_Box
             _shown.Add(o);
         }
         int rows = Math.Min(_shown.Count, MaxRows);
-        size = new Vector2(MathF.Max(260, _owner.Dimensions_Get().size.X), RowH + MathF.Max(RowH, rows * RowH));
-        size_min = size;
+        layout.size = new Vector2(MathF.Max(260, _owner.Dimensions_Get().size.X), RowH + MathF.Max(RowH, rows * RowH));
+        layout.size_min = layout.size;
         _scroll = Math.Clamp(_scroll, 0, MathF.Max(0, _shown.Count - MaxRows));
     }
 
@@ -322,7 +330,7 @@ class C2_PickerPopup : C2_Box
         if (!ImpPlayer.Key_IsPressed(EInputKey.Mouse_Left)) return;
         if (!p.Cursor_IsInDimensions(dim))
         {
-            if (p.cursor_target != _owner) _owner.Close();
+            if (p.target_cursor != _owner) _owner.Close();
             return;
         }
 
@@ -337,14 +345,14 @@ class C2_PickerPopup : C2_Box
         Raylib.DrawRectangleLinesEx(new Rectangle(dim.position.X, dim.position.Y, dim.size.X, dim.size.Y), 1, new Color(0, 120, 215, 255));
 
         UiStyle_Box.STYLE_BKG_DARK.Draw(new TDimensions2 { position = dim.position, size = new Vector2(dim.size.X, RowH) });
-        UiStyle_Text ts = _filter.Length > 0 ? UiStyle_Text.LIGHT : UiStyle_Text.MUTED;
+        UI_Text ts = _filter.Length > 0 ? UI_Text.LIGHT : UI_Text.MUTED;
         ts.Draw(_filter.Length > 0 ? _filter + "|" : "Type to search",
             dim.position + new Vector2(6, 0), new Vector2(dim.size.X - 12, RowH),
             0, ETextWrap.None, EUIPositionAlignment.Center, EUIPositionAlignment.Start);
 
         if (_shown.Count == 0)
         {
-            UiStyle_Text.MUTED.Draw(_all.Count == 0 ? "Nothing to pick" : "No matches",
+            UI_Text.MUTED.Draw(_all.Count == 0 ? "Nothing to pick" : "No matches",
                 dim.position + new Vector2(0, RowH), new Vector2(dim.size.X, dim.size.Y - RowH),
                 0, ETextWrap.None, EUIPositionAlignment.Center, EUIPositionAlignment.Center);
             return;
@@ -373,10 +381,10 @@ class C2_PickerPopup : C2_Box
                 x += s + 4;
             }
             float dw = string.IsNullOrEmpty(o.detail) ? 0 : 110;
-            UiStyle_Text.LIGHT.Draw(o.name, new Vector2(x, r.Y), new Vector2(MathF.Max(0, r.Width - dw - (x - r.X) - 6), r.Height),
+            UI_Text.LIGHT.Draw(o.name, new Vector2(x, r.Y), new Vector2(MathF.Max(0, r.Width - dw - (x - r.X) - 6), r.Height),
                 0, ETextWrap.None, EUIPositionAlignment.Center, EUIPositionAlignment.Start);
             if (dw > 0)
-                UiStyle_Text.MUTED.Draw(o.detail, new Vector2(r.X + r.Width - dw - 6, r.Y), new Vector2(dw, r.Height),
+                UI_Text.MUTED.Draw(o.detail, new Vector2(r.X + r.Width - dw - 6, r.Y), new Vector2(dw, r.Height),
                     0, ETextWrap.None, EUIPositionAlignment.Center, EUIPositionAlignment.End);
         }
     }

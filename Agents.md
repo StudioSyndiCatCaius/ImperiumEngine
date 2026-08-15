@@ -39,6 +39,8 @@ Agent Keywords
 
 ## Notes
 * don't use oneshot functions when it can be avoided. just put code in main function instead of amaking a second oneshot. If you need to repeat a function but ONLY in a function, declare it in that function. or you can't then you can make it its own func.
+* Avoid syntactic sugar unless it is really necessary — prefer the standard form. Ternaries (`a ? b : c`), nested `?:`, and similar shortcuts are harder to read than a normal `if`/`else`.
+* Always brace `if` / `else` / `for` / `while` / etc. Do not use indent-only single-line bodies.
 
 
 ## Reference Repos:

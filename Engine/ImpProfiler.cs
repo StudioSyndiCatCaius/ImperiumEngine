@@ -18,7 +18,7 @@ public static class ImpProfiler
     public static bool enabled;
 
     /// <summary>
-    /// F4. Turns the ImpComp2D layout cache off so the old uncached cost can be measured
+    /// F4. Turns the Imp2D layout cache off so the old uncached cost can be measured
     /// against the new one in the same session, on the same scene, without a rebuild.
     /// Purely a measurement aid - results are identical either way, only the cost differs.
     /// </summary>
@@ -76,8 +76,7 @@ public static class ImpProfiler
     // is the only thing this block exists to answer.
     static readonly Dictionary<Type, double> _draw_ms = new();
 
-    // C2_SceneView owns the 3D viewport (R3D.End + blit + gizmo). Split so the
-    // 80ms+ "C2_SceneView" line can be told apart: submit vs GPU pass vs overlay.
+    // Viewport3D owns RT + R3D.End + blit. Gizmo overlay is timed on PNL_SceneView.
     public static double sv_rt, sv_r3d, sv_blit, sv_gizmo;
 
     /// <summary>Adds time spent inside one comp's own OnDraw2D/OnDraw3D/OnDraw2DForeground call, keyed by its type.</summary>

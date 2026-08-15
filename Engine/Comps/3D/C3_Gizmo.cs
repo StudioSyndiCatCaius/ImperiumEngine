@@ -5,7 +5,8 @@ using Raylib_cs;
 
 namespace ImperiumEngine.Comps._3D;
 
-public class C3_Gizmo : ImpComp3D
+[ImpClass(Hidden = true)]
+public class C3_Gizmo : Imp3D
 {
     public TGizmoData gizmo_data;
     public bool is_dragging;
@@ -19,12 +20,12 @@ public class C3_Gizmo : ImpComp3D
     float _grab_angle;
     float _axis_len;
 
-    readonly List<ImpComp3D> _sel = new();
+    readonly List<Imp3D> _sel = new();
     readonly List<TTransform3> _start = new();
 
     // Local transforms as the drag began. _start is world space and the live selection can
     // change under us, so undo keeps its own snapshot of what it has to put back.
-    readonly List<ImpComp3D> _undo_sel = new();
+    readonly List<Imp3D> _undo_sel = new();
     readonly List<TTransform3> _undo_start = new();
 
     public bool IsBusy => is_dragging || hover_handle != EGizmoHandle.None;
@@ -124,9 +125,9 @@ public class C3_Gizmo : ImpComp3D
         void Walk(ImpComp n)
         {
             if (n == null || !n.is_visible) return;
-            if (n is ImpComp3D c3 && n is not C3_Gizmo && Imp3D.Pickable(c3))
+            if (n is Imp3D c3 && n is not C3_Gizmo && Pickable(c3))
             {
-                Imp3D.Comp3D_WorldCorners(c3, corners);
+                Comp3D_WorldCorners(c3, corners);
                 Vector2 lo = new(float.MaxValue);
                 Vector2 hi = new(float.MinValue);
                 bool any = false;
@@ -151,7 +152,7 @@ public class C3_Gizmo : ImpComp3D
         if (gizmo_data == null) return;
         for (int i = 0; i < gizmo_data.selected_comps.Count; i++)
         {
-            if (gizmo_data.selected_comps[i] is not ImpComp3D c || c is C3_Gizmo) continue;
+            if (gizmo_data.selected_comps[i] is not Imp3D c || c is C3_Gizmo) continue;
             if (AncestorSelected(c)) continue;
             _sel.Add(c);
         }
@@ -171,7 +172,7 @@ public class C3_Gizmo : ImpComp3D
         return _sel.Count > 0 ? p / _sel.Count : Vector3.Zero;
     }
 
-    void Axes(ImpComp3D first, out Vector3 ax, out Vector3 ay, out Vector3 az)
+    void Axes(Imp3D first, out Vector3 ax, out Vector3 ay, out Vector3 az)
     {
         ax = Vector3.UnitX;
         ay = Vector3.UnitY;
@@ -310,7 +311,7 @@ public class C3_Gizmo : ImpComp3D
 
         Vector3 axis = HandleAxis(drag_handle, ax, ay, az);
         Vector3 plane_n = DragPlaneNormal(drag_handle, ax, ay, az, ray.Direction, gizmo_data.mode);
-        if (Imp3D.Ray_Plane(ray, origin, plane_n, out Vector3 hit))
+        if (Ray_Plane(ray, origin, plane_n, out Vector3 hit))
             _grab = hit;
         else
             _grab = origin;
@@ -328,7 +329,7 @@ public class C3_Gizmo : ImpComp3D
     {
         Vector3 axis = HandleAxis(drag_handle, _ax, _ay, _az);
         Vector3 plane_n = DragPlaneNormal(drag_handle, _ax, _ay, _az, ray.Direction, gizmo_data.mode);
-        Imp3D.Ray_Plane(ray, _origin0, plane_n, out Vector3 hit);
+        Ray_Plane(ray, _origin0, plane_n, out Vector3 hit);
 
         if (gizmo_data.mode == EGizmoMode.Translate)
             ApplyTranslate(hit);
@@ -560,7 +561,7 @@ public class C3_Gizmo : ImpComp3D
         int[] e = { 0, 1, 1, 3, 3, 2, 2, 0, 4, 5, 5, 7, 7, 6, 6, 4, 0, 4, 1, 5, 2, 6, 3, 7 };
         for (int i = 0; i < _sel.Count; i++)
         {
-            Imp3D.Comp3D_WorldCorners(_sel[i], corners);
+            Comp3D_WorldCorners(_sel[i], corners);
             for (int k = 0; k < e.Length; k += 2)
             {
                 Vector3 wa = corners[e[k]], wb = corners[e[k + 1]];

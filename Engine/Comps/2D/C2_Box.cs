@@ -5,9 +5,10 @@ using Raylib_cs;
 
 namespace ImperiumEngine.Comps._2D;
 
-public class C2_Box : ImpComp2D
+[ImpClass(Common = true)]
+public class C2_Box : Imp2D
 {
-    public UiStyle_Box style=UiStyle_Box.STYLE_BKG_DARK;
+    [ImpVar] public UiStyle_Box style=UiStyle_Box.STYLE_BKG_DARK;
     
     public override void OnDraw2D(double dt, WDrawFlags flags)
     {

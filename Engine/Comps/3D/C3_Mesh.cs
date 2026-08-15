@@ -5,7 +5,8 @@ using R3D_cs;
 
 namespace ImperiumEngine.Comps._3D;
 
-public class C3_Mesh : ImpComp3D
+[ImpClass(Common = true)]
+public class C3_Mesh : Imp3D
 {
     [ImpVar] public A_Mesh mesh=A_Mesh.GEO_CUBE;
     [ImpVar] public List<A_Material> materials;

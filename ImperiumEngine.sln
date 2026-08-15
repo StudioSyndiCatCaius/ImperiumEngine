@@ -1,5 +1,7 @@
-Microsoft Visual Studio Solution File, Format Version 12.00
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Engine", "Engine\Engine.csproj", "{9432A7AE-E6C4-4FB9-AC67-D0A0AC493B1C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Editor", "Editor\Editor.csproj", "{01380FD7-0DF4-41A3-B791-79D768716050}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,6 +13,10 @@ Global
 		{9432A7AE-E6C4-4FB9-AC67-D0A0AC493B1C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9432A7AE-E6C4-4FB9-AC67-D0A0AC493B1C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9432A7AE-E6C4-4FB9-AC67-D0A0AC493B1C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{01380FD7-0DF4-41A3-B791-79D768716050}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{01380FD7-0DF4-41A3-B791-79D768716050}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{01380FD7-0DF4-41A3-B791-79D768716050}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{01380FD7-0DF4-41A3-B791-79D768716050}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

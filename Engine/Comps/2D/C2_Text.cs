@@ -5,14 +5,15 @@ using Raylib_cs;
 
 namespace ImperiumEngine.Comps._2D;
 
-public class C2_Text : ImpComp2D
+[ImpClass(Common = true)]
+public class C2_Text : Imp2D
 {
-    public UiStyle_Text style=UiStyle_Text.DEFAULT;
-    public string text="";
-    public int font_size_override=0;
-    public ETextWrap wrap=ETextWrap.Word;
-    public EUIPositionAlignment text_alignment_v;
-    public EUIPositionAlignment text_alignment_h;
+    [ImpVar] public UI_Text style=UI_Text.DEFAULT;
+    [ImpVar] public string text="";
+    [ImpVar] public int font_size_override=0;
+    [ImpVar] public ETextWrap wrap=ETextWrap.Word;
+    [ImpVar] public EUIPositionAlignment text_alignment_v;
+    [ImpVar] public EUIPositionAlignment text_alignment_h;
     
     public override void OnDraw2D(double dt, WDrawFlags flags)
     {
@@ -23,39 +24,28 @@ public class C2_Text : ImpComp2D
     }
 }
 
-public class UiStyle_Text : ImpAsset
+// ####################################################################################################################
+// STYLE
+// ####################################################################################################################
+
+public class UI_Text : ImpAsset
 {
-    public static UiStyle_Text DEFAULT = new();
-    public static UiStyle_Text LIGHT = new()
+    public static UI_Text DEFAULT = new();
+    public static UI_Text LIGHT = new()
     {
         size = 13,
         color = Color.White,
     };
-    public static UiStyle_Text MUTED = new()
+    public static UI_Text MUTED = new()
     {
         size = 11,
         color = new Color(170, 170, 170, 255),
     };
-    public static UiStyle_Text STLYE_H1 = new()
-    {
-        size = 24,
-    };
-    public static UiStyle_Text STLYE_H2 = new()
-    {
-        size = 18,
-    };
-    public static UiStyle_Text STLYE_H3 = new()
-    {
-        size = 14,
-    };
-    public static UiStyle_Text STLYE_PARAGRAPH = new()
-    {
-        size = 12,
-    };
-    public static UiStyle_Text STLYE_TINY = new()
-    {
-        size = 8,
-    };
+    public static UI_Text STLYE_H1 = new() { size = 24, };
+    public static UI_Text STLYE_H2 = new() { size = 18, };
+    public static UI_Text STLYE_H3 = new() { size = 14, };
+    public static UI_Text STLYE_PARAGRAPH = new() { size = 12, };
+    public static UI_Text STLYE_TINY = new() { size = 8, };
     
     [ImpVar] public A_Font font=A_Font.FONT_ARIAL;
     [ImpVar] public int size=16;

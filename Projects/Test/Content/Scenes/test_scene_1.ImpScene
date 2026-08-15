@@ -1,0 +1,339 @@
+{
+  "_class": "ImpScene",
+  "vars": {
+    "root_type": {
+      "class_name": "ImpComp"
+    },
+    "background_color": {
+      "R": 26,
+      "G": 30,
+      "B": 36,
+      "A": 255
+    },
+    "canvas_size": {
+      "X": 1920,
+      "Y": 1080
+    },
+    "ambient_color": {
+      "R": 88,
+      "G": 98,
+      "B": 116,
+      "A": 255
+    },
+    "ambient_intensity": 0.5,
+    "sun_enabled": true,
+    "sun_color": {
+      "R": 255,
+      "G": 244,
+      "B": 228,
+      "A": 255
+    },
+    "sun_intensity": 0.5,
+    "sun_rotation": {
+      "X": -45,
+      "Y": -35,
+      "Z": 0
+    },
+    "sun_specular": 1.15,
+    "sun_cast_shadows": true,
+    "sky_texture": {
+      "path": null
+    },
+    "sky_lights_scene": true,
+    "sky_energy": 0.5,
+    "sky_blur": 0,
+    "sky_rotation": 0,
+    "fog_mode": "Disabled",
+    "fog_color": {
+      "R": 150,
+      "G": 160,
+      "B": 175,
+      "A": 255
+    },
+    "fog_start": 1,
+    "fog_end": 50,
+    "fog_density": 0.05,
+    "fog_sky_affect": 0.5,
+    "tonemap_mode": "Filmic",
+    "tonemap_exposure": 1.08,
+    "tonemap_white": 1,
+    "bloom_mode": "Mix",
+    "bloom_intensity": 0.08,
+    "bloom_levels": 0.55,
+    "bloom_threshold": 0.35,
+    "bloom_soft_threshold": 0.5,
+    "bloom_filter_radius": 1,
+    "ssao_enabled": true,
+    "ssao_radius": 1.85,
+    "ssao_intensity": 2.45,
+    "ssao_power": 1.85,
+    "ssao_bias": 0.022,
+    "ssao_samples": 8,
+    "source_file": null,
+    "source_index": 0,
+    "root": {
+      "_class": "ImpComp",
+      "name": "Untitled*",
+      "vars": {
+        "is_visible": true
+      },
+      "children": [
+        {
+          "_class": "C3_Mesh",
+          "name": "Ground",
+          "vars": {
+            "mesh": {
+              "path": "builtin:A_Mesh.GEO_PLANE"
+            },
+            "materials": null,
+            "cast_shadows": true,
+            "transform": {
+              "position": {
+                "X": 0,
+                "Y": 0.0002478361,
+                "Z": 0
+              },
+              "rotation": {
+                "X": 0,
+                "Y": 0,
+                "Z": 0
+              },
+              "scale": {
+                "X": 40,
+                "Y": 1,
+                "Z": 40
+              }
+            },
+            "physics_enabled": true,
+            "is_visible": true
+          },
+          "children": [
+            {
+              "_class": "Imp3D",
+              "name": "boxes_3",
+              "vars": {
+                "transform": {
+                  "position": {
+                    "X": 0.13363801,
+                    "Y": 0.0200001,
+                    "Z": -0.018773532
+                  },
+                  "rotation": {
+                    "X": 0,
+                    "Y": 0,
+                    "Z": 0
+                  },
+                  "scale": {
+                    "X": 0.025,
+                    "Y": 1,
+                    "Z": 0.025
+                  }
+                },
+                "physics_enabled": false,
+                "is_visible": true
+              },
+              "children": [],
+              "instance": {
+                "path": "{game}/Scenes/boxes_3.ImpScene"
+              }
+            },
+            {
+              "_class": "Imp3D",
+              "name": "boxes_1",
+              "vars": {
+                "transform": {
+                  "position": {
+                    "X": -0.033942223,
+                    "Y": 0.0200001,
+                    "Z": 0.15756118
+                  },
+                  "rotation": {
+                    "X": 0,
+                    "Y": 0,
+                    "Z": 0
+                  },
+                  "scale": {
+                    "X": 0.025,
+                    "Y": 1,
+                    "Z": 0.025
+                  }
+                },
+                "physics_enabled": false,
+                "is_visible": true
+              },
+              "children": [],
+              "instance": {
+                "path": "{game}/Scenes/boxes_3.ImpScene"
+              }
+            },
+            {
+              "_class": "Imp3D",
+              "name": "boxes_2",
+              "vars": {
+                "transform": {
+                  "position": {
+                    "X": -0.12671018,
+                    "Y": 0.0200001,
+                    "Z": -0.17836587
+                  },
+                  "rotation": {
+                    "X": 0,
+                    "Y": 25.58765,
+                    "Z": 0
+                  },
+                  "scale": {
+                    "X": 0.025,
+                    "Y": 1,
+                    "Z": 0.025
+                  }
+                },
+                "physics_enabled": false,
+                "is_visible": true
+              },
+              "children": [],
+              "instance": {
+                "path": "{game}/Scenes/boxes_3.ImpScene"
+              }
+            }
+          ]
+        },
+        {
+          "_class": "C3_Mesh",
+          "name": "Cube",
+          "vars": {
+            "mesh": {
+              "path": "builtin:A_Mesh.GEO_CUBE"
+            },
+            "materials": null,
+            "cast_shadows": true,
+            "transform": {
+              "position": {
+                "X": 0,
+                "Y": 0.5,
+                "Z": 0
+              },
+              "rotation": {
+                "X": 0,
+                "Y": 0,
+                "Z": 0
+              },
+              "scale": {
+                "X": 1,
+                "Y": 1,
+                "Z": 1
+              }
+            },
+            "physics_enabled": true,
+            "is_visible": true
+          },
+          "children": []
+        },
+        {
+          "_class": "C2_Box",
+          "name": "Panel",
+          "vars": {
+            "style": {
+              "path": "builtin:UiStyle_Box.STYLE_BKG_DARK"
+            },
+            "transform": {
+              "position": {
+                "X": 262,
+                "Y": 184
+              },
+              "rotation": 0,
+              "scale": {
+                "X": 1,
+                "Y": 1
+              }
+            },
+            "position": {
+              "X": 0,
+              "Y": 0
+            },
+            "stretch_ratio": 1,
+            "layout": {
+              "orient_H": "Start",
+              "orient_V": "Start",
+              "size": {
+                "X": 320,
+                "Y": 140
+              },
+              "size_min": {
+                "X": 0,
+                "Y": 0
+              },
+              "size_max": {
+                "X": 0,
+                "Y": 0
+              }
+            },
+            "clip_children": false,
+            "pivot": {
+              "X": 0.5,
+              "Y": 0.5
+            },
+            "normalize_pivot": true,
+            "cursor_filter": "Pass",
+            "is_visible": true
+          },
+          "children": []
+        },
+        {
+          "_class": "C2_Text",
+          "name": "Title",
+          "vars": {
+            "style": {
+              "path": "builtin:UI_Text.DEFAULT"
+            },
+            "text": "text here",
+            "font_size_override": 45,
+            "wrap": "Word",
+            "text_alignment_v": "Center",
+            "text_alignment_h": "Center",
+            "transform": {
+              "position": {
+                "X": 264,
+                "Y": 184
+              },
+              "rotation": 0,
+              "scale": {
+                "X": 1,
+                "Y": 1
+              }
+            },
+            "position": {
+              "X": 0,
+              "Y": 0
+            },
+            "stretch_ratio": 1,
+            "layout": {
+              "orient_H": "Start",
+              "orient_V": "Start",
+              "size": {
+                "X": 320,
+                "Y": 36
+              },
+              "size_min": {
+                "X": 0,
+                "Y": 0
+              },
+              "size_max": {
+                "X": 0,
+                "Y": 0
+              }
+            },
+            "clip_children": false,
+            "pivot": {
+              "X": 0.5,
+              "Y": 0.5
+            },
+            "normalize_pivot": true,
+            "cursor_filter": "Pass",
+            "is_visible": true
+          },
+          "children": []
+        }
+      ]
+    }
+  }
+}

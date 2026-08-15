@@ -6,12 +6,12 @@ using Raylib_cs;
 
 namespace ImperiumEngine.Comps._2D;
 
-public class C2_CheckBox : ImpComp2D
+public class C2_CheckBox : Imp2D
 {
     [ImpVar] public bool is_checked = false;
     [ImpVar] public string text = "";
     [ImpVar] public UiStyle_CheckBox style = UiStyle_CheckBox.DEFAULT;
-    [ImpVar] public UiStyle_Text text_style = UiStyle_Text.LIGHT;
+    [ImpVar] public UI_Text Text = UI_Text.LIGHT;
     [ImpVar] public float box_size = 16;
     [ImpVar] public bool is_disabled = false;
 
@@ -24,8 +24,8 @@ public class C2_CheckBox : ImpComp2D
     {
         cursor_filter = ECursorFilter.Hit;
         option_button = null;
-        size = new Vector2(24, 24);
-        size_min = new Vector2(16, 16);
+        layout.size = new Vector2(24, 24);
+        layout.size_min = new Vector2(16, 16);
     }
 
     public override void OnDraw2D(double dt, WDrawFlags flags)
@@ -62,17 +62,17 @@ public class C2_CheckBox : ImpComp2D
                 Raylib.DrawRectangleV(new Vector2(bx + 3, by + 3), new Vector2(s - 6, s - 6), tint);
         }
 
-        if (!string.IsNullOrEmpty(text) && text_style != null)
+        if (!string.IsNullOrEmpty(text) && Text != null)
         {
-            float font_size = text_style.size > 0 ? text_style.size : 13;
-            Font font = text_style.font != null ? text_style.font.font : Raylib.GetFontDefault();
+            float font_size = Text.size > 0 ? Text.size : 13;
+            Font font = Text.font != null ? Text.font.font : Raylib.GetFontDefault();
             Vector2 m = Raylib.MeasureTextEx(font, text, font_size, 1f);
             Vector2 text_pos = new Vector2(bx + s + 6, dim.position.Y + (dim.size.Y - m.Y) * 0.5f);
-            Color prev = text_style.color;
-            if (is_disabled) text_style.color = new Color(prev.R, prev.G, prev.B, (byte)120);
-            text_style.Draw(text, text_pos, new Vector2(m.X + 1, m.Y + 1), 0, ETextWrap.None,
+            Color prev = Text.color;
+            if (is_disabled) Text.color = new Color(prev.R, prev.G, prev.B, (byte)120);
+            Text.Draw(text, text_pos, new Vector2(m.X + 1, m.Y + 1), 0, ETextWrap.None,
                 EUIPositionAlignment.Start, EUIPositionAlignment.Start);
-            text_style.color = prev;
+            Text.color = prev;
         }
 
         is_pressed = false;
@@ -91,18 +91,19 @@ public class C2_CheckBox : ImpComp2D
         }
     }
 
-    public override void Cursor_OnEnter(ImpPlayer player)
+    public override void _Notify_AsCursorTarget(ImpPlayer player, ENotifyGeneric notify, double dt)
     {
-        base.Cursor_OnEnter(player);
-        is_hovered = true;
-        as_option_hover?.Invoke(this);
-    }
-
-    public override void Cursor_OnExit(ImpPlayer player)
-    {
-        base.Cursor_OnExit(player);
-        is_hovered = false;
-        as_option_unhover?.Invoke(this);
+        base._Notify_AsCursorTarget(player, notify, dt);
+        if (notify == ENotifyGeneric.Begin)
+        {
+            is_hovered = true;
+            as_option_hover?.Invoke(this);
+        }
+        else if (notify == ENotifyGeneric.End)
+        {
+            is_hovered = false;
+            as_option_unhover?.Invoke(this);
+        }
     }
 }
 

@@ -22,7 +22,7 @@ public class ImpFile : I_File
     
     public static string ContentDir_Engine()
     {
-        return Path.Combine(Directory.GetCurrentDirectory(), "Content");
+        return Path.Combine(AppContext.BaseDirectory, "_Content");
     }
     
     public static string ContentDir_Game()
@@ -81,6 +81,24 @@ public class ImpFile : I_File
             string moved = exact ? to : to + key[from.Length..];
             file.filepath = moved;
             _loaded[moved] = file;
+        }
+    }
+
+    /// <summary>Drops cached source files at this path and anything underneath it after a delete.</summary>
+    public static void Cache_Drop(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return;
+        string from;
+        try { from = Path.GetFullPath(path); }
+        catch { return; }
+
+        List<string> keys = new(_loaded.Keys);
+        foreach (string key in keys)
+        {
+            bool exact = key.Equals(from, StringComparison.OrdinalIgnoreCase);
+            bool under = key.StartsWith(from + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+            if (!exact && !under) continue;
+            _loaded.Remove(key);
         }
     }
 

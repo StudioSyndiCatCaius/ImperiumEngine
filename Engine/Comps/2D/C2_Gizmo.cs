@@ -5,7 +5,7 @@ using Raylib_cs;
 
 namespace ImperiumEngine.Comps._2D;
 
-public class C2_Gizmo : ImpComp2D
+public class C2_Gizmo : Imp2D
 {
     public TGizmoData gizmo_data;
     public bool is_dragging;
@@ -19,13 +19,13 @@ public class C2_Gizmo : ImpComp2D
     float _grab_angle;
     float _axis_len;
 
-    readonly List<ImpComp2D> _sel = new();
+    readonly List<Imp2D> _sel = new();
     readonly List<TTransform2> _start = new();
     readonly List<Vector2> _pivot_start = new();
 
     // Local transform and raw pivot as the drag began. _start is world space and _pivot_start is
     // resolved to pixels, so undo keeps its own snapshot of the fields it has to put back.
-    readonly List<ImpComp2D> _undo_sel = new();
+    readonly List<Imp2D> _undo_sel = new();
     readonly List<TTransform2> _undo_start = new();
     readonly List<Vector2> _undo_pivot = new();
 
@@ -119,15 +119,15 @@ public class C2_Gizmo : ImpComp2D
         DrawSelection(cam, vp);
     }
 
-    public static ImpComp2D Pick(ImpComp root, TCamera2D cam, TDimensions2 vp, Vector2 screen)
+    public static Imp2D Pick(ImpComp root, TCamera2D cam, TDimensions2 vp, Vector2 screen)
     {
-        ImpComp2D best = null;
+        Imp2D best = null;
         float best_area = float.MaxValue;
         Vector2 world = ImpGizmo.ScreenToWorld(screen, cam, vp);
         void Walk(ImpComp n)
         {
             if (n == null || !n.is_visible) return;
-            if (n is ImpComp2D c2 && n is not C2_Gizmo && !c2.IsGroupPivot)
+            if (n is Imp2D c2 && n is not C2_Gizmo && !c2.IsGroupPivot)
             {
                 if (HitComp(c2, world))
                 {
@@ -153,7 +153,7 @@ public class C2_Gizmo : ImpComp2D
         void Walk(ImpComp n)
         {
             if (n == null || !n.is_visible) return;
-            if (n is ImpComp2D c2 && n is not C2_Gizmo && !c2.IsGroupPivot)
+            if (n is Imp2D c2 && n is not C2_Gizmo && !c2.IsGroupPivot)
             {
                 CompCorners(c2, corners);
                 Vector2 lo = new(float.MaxValue);
@@ -171,18 +171,18 @@ public class C2_Gizmo : ImpComp2D
         Walk(root);
     }
 
-    public static Vector2 PivotLocal(ImpComp2D c)
+    public static Vector2 PivotLocal(Imp2D c)
     {
         return c == null ? Vector2.Zero : c.Pivot_Local();
     }
 
     // The transform position IS the pivot point.
-    public static Vector2 PivotWorld(ImpComp2D c)
+    public static Vector2 PivotWorld(Imp2D c)
     {
         return c == null ? Vector2.Zero : c.Position_Get(true);
     }
 
-    public static void CompCorners(ImpComp2D c, Vector2[] corners)
+    public static void CompCorners(Imp2D c, Vector2[] corners)
     {
         Vector2 pos = c.Position_Get(true);
         float rot = c.Rotation_Get(true);
@@ -202,7 +202,7 @@ public class C2_Gizmo : ImpComp2D
         }
     }
 
-    static bool HitComp(ImpComp2D c, Vector2 world)
+    static bool HitComp(Imp2D c, Vector2 world)
     {
         Vector2[] corners = new Vector2[4];
         CompCorners(c, corners);
@@ -215,7 +215,7 @@ public class C2_Gizmo : ImpComp2D
         if (gizmo_data == null) return;
         for (int i = 0; i < gizmo_data.selected_comps.Count; i++)
         {
-            if (gizmo_data.selected_comps[i] is not ImpComp2D c || c is C2_Gizmo) continue;
+            if (gizmo_data.selected_comps[i] is not Imp2D c || c is C2_Gizmo) continue;
             bool skip = false;
             for (ImpComp p = c.parent; p != null; p = p.parent)
             {
@@ -232,7 +232,7 @@ public class C2_Gizmo : ImpComp2D
         return _sel.Count > 0 ? p / _sel.Count : Vector2.Zero;
     }
 
-    void Axes(ImpComp2D first, out Vector2 ax, out Vector2 ay)
+    void Axes(Imp2D first, out Vector2 ax, out Vector2 ay)
     {
         ax = Vector2.UnitX;
         ay = Vector2.UnitY;
@@ -323,7 +323,7 @@ public class C2_Gizmo : ImpComp2D
         // cached rects from the hit test are now stale. The Position/Rotation/Scale
         // setters invalidate for themselves, but ApplyPivot writes `pivot` directly.
         // Without this the gizmo and selection outline trail the mouse by a frame.
-        ImpComp2D.Layout_Invalidate();
+        Imp2D.Layout_Invalidate();
     }
 
     // Slides the pivot through the comp while the box stays put on screen.
@@ -332,7 +332,7 @@ public class C2_Gizmo : ImpComp2D
         Vector2 delta = world - _grab;
         for (int i = 0; i < _sel.Count; i++)
         {
-            ImpComp2D c = _sel[i];
+            Imp2D c = _sel[i];
             TTransform2 st = _start[i];
             ImpGizmo.Rotate2(delta, -(float)st.rotation, out Vector2 local_delta);
             Vector2 sc = st.scale;

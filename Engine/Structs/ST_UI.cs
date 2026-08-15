@@ -5,6 +5,7 @@ using Raylib_cs;
 
 namespace ImperiumEngine.Structs;
 
+// NOTE: this will be deprecated and functionality moved into A_Texture
 public struct TImage
 {
     public A_Texture texture;
@@ -125,6 +126,45 @@ public struct TMargins
         this.top = top;
         this.bottom = bottom;
     }
+}
+
+public struct TLayout2 //bad name. think of something better later
+{
+    [ImpVar] public EUIViewportAlignment orient_H;
+    [ImpVar] public EUIViewportAlignment orient_V;
+    [ImpVar] public Vector2 size=new(100,100);
+    [ImpVar] public Vector2 size_min=Vector2.Zero;
+    [ImpVar] public Vector2 size_max=Vector2.Zero;
+
+    public TLayout2()
+    {
+        orient_H = EUIViewportAlignment.Start;
+        orient_V = EUIViewportAlignment.Start;
+    }
+    
+    // ===================================================================================================
+    // Statics
+    // ===================================================================================================
+
+    public static TLayout2 NONE = new();
+    
+    public static TLayout2 H_BAR = new() //as a small horizontal bar
+    {
+        orient_V = EUIViewportAlignment.Start,
+        orient_H = EUIViewportAlignment.Fill,
+        size = new Vector2(20, 20),
+    }; 
+    public static TLayout2 V_BAR = new() //as a small horizontal bar
+    {
+        orient_V = EUIViewportAlignment.Fill,
+        orient_H = EUIViewportAlignment.Start,
+        size = new Vector2(20, 20),
+    };
+    public static TLayout2 FULL = new()
+    {
+        orient_V = EUIViewportAlignment.Fill,
+        orient_H = EUIViewportAlignment.Fill,
+    };
 }
 
 public struct TDimensions2

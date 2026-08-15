@@ -20,4 +20,9 @@
       <Folder Include="Comps\1D\States\" />
     </ItemGroup>
 
+    <!-- engine content ships beside the exe; flows to referencing projects too -->
+    <ItemGroup>
+      <None Update="Content\**\*.*" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+
 </Project>

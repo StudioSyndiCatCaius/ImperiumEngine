@@ -210,13 +210,27 @@ public class File_JSON : ImpFile
 
         string engine = ImpFile.ContentDir_Engine();
         if (Path_IsUnder(real, engine))
-            return "{engine}/" + Path.GetRelativePath(engine, real).Replace('\\', '/');
+        {
+            return Path_TokenRoot("{engine}", engine, real);
+        }
 
         string game = ImpFile.ContentDir_Game();
         if (Path_IsUnder(real, game))
-            return "{game}/" + Path.GetRelativePath(game, real).Replace('\\', '/');
+        {
+            return Path_TokenRoot("{game}", game, real);
+        }
 
         return path.Replace('\\', '/');
+    }
+
+    static string Path_TokenRoot(string token, string root, string real)
+    {
+        string rel = Path.GetRelativePath(root, real).Replace('\\', '/');
+        if (string.IsNullOrEmpty(rel) || rel == ".")
+        {
+            return token;
+        }
+        return token + "/" + rel;
     }
 
     static string Path_WriteAsset(string asset_path)

@@ -18,5 +18,5 @@ app.Run(null, () =>
 
     _root.Child_Add(new C3_Mesh());
     _root.Child_Add(new C2_Box());
-    //_root.Child_Add(new C2_SceneView());
+    //_root.Child_Add(new C2_Viewport3D());
 });

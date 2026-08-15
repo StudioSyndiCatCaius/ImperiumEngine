@@ -1,5 +1,6 @@
 ﻿using System.Numerics;
 using ImperiumEngine.Assets;
+using ImperiumEngine.Comps;
 using ImperiumEngine.Comps._2D;
 using ImperiumEngine.Structs;
 using R3D_cs;
@@ -307,68 +308,147 @@ public class ImpScene : ImpAsset
             BindPackedTree(owner, n.children[i]);
     }
 
-    C2_SceneView _drop_view;
+    Imp2D _drop_view;
     ImpComp _drop_ghost;
 
-    public override void SceneDrop_Enter(C2_SceneView view, ImpPlayer player)
+    public override void SceneDrop_Enter(Imp2D view, ImpPlayer player)
     {
         SceneDrop_Exit(view, player);
-        if (view?.scene == null) return;
+        ImpScene dest_scene = SceneOf(view);
+        if (dest_scene == null)
+        {
+            return;
+        }
         _drop_view = view;
         _drop_ghost = Instantiate();
-        if (_drop_ghost == null) return;
-        view.drop_preview = _drop_ghost;
-        _drop_ghost.scene = view.scene;
+        if (_drop_ghost == null)
+        {
+            return;
+        }
+        Overlay_Set(view, _drop_ghost);
+        _drop_ghost.scene = dest_scene;
         SceneDrop_Update(view, 0, player);
     }
 
-    public override void SceneDrop_Exit(C2_SceneView view, ImpPlayer player)
+    public override void SceneDrop_Exit(Imp2D view, ImpPlayer player)
     {
-        if (view != null && view.drop_preview == _drop_ghost) view.drop_preview = null;
+        if (Overlay_Get(_drop_view) == _drop_ghost)
+        {
+            Overlay_Set(_drop_view, null);
+        }
         _drop_ghost?.Destroy();
         _drop_ghost = null;
         _drop_view = null;
     }
 
-    public override void SceneDrop_Update(C2_SceneView view, float dt, ImpPlayer player)
+    public override void SceneDrop_Update(Imp2D view, float dt, ImpPlayer player)
     {
-        if (_drop_ghost == null || view == null) return;
-        if (_drop_ghost is ImpComp3D g3)
+        if (_drop_ghost == null || view == null || player == null)
         {
-            if (view.Drop_World3(player, out Vector3 pos, out _))
-                g3.Position_Set(pos, true);
+            return;
         }
-        else if (_drop_ghost is ImpComp2D g2)
-            g2.Position_Set(view.Drop_World2(player), true);
+        if (_drop_ghost is Imp3D g3 && view is C2_Viewport3D v3)
+        {
+            if (v3.Trace_World(player.cursor.position, out Vector3 pos, out _))
+            {
+                g3.Position_Set(pos, true);
+            }
+        }
+        else if (_drop_ghost is Imp2D g2 && view is C2_Viewport2D v2)
+        {
+            g2.Position_Set(v2.Trace_World(player.cursor.position), true);
+        }
     }
 
-    public override void SceneDrop_DropOnComp(ImpComp comp, ImpPlayer player)
+    public override ImpComp SceneDrop_DropOnComp(ImpComp comp, ImpPlayer player)
     {
-        if (_drop_ghost == null) return;
+        if (_drop_ghost == null)
+        {
+            return null;
+        }
         ImpComp dest = comp;
-        ImpScene dest_scene = _drop_view?.scene ?? dest?.scene;
+        ImpScene dest_scene = SceneOf(_drop_view) ?? dest?.scene;
         if (dest != null && (dest.IsPackedForeign || dest.IsInstanceRoot))
+        {
             dest = dest.IsInstanceRoot ? dest.parent : dest.packed_from?.parent;
+        }
         if (dest == null || dest == _drop_ghost || _drop_ghost.IsAncestorOf(dest))
+        {
             dest = dest_scene?.root;
+        }
         if (dest == null)
         {
             SceneDrop_Exit(_drop_view, player);
-            return;
+            return null;
         }
 
-        TTransform3? w3 = _drop_ghost is ImpComp3D c3 ? c3.Transform_Get(true) : null;
-        TTransform2? w2 = _drop_ghost is ImpComp2D c2 ? c2.Transform_Get(true) : null;
-        if (_drop_view != null && _drop_view.drop_preview == _drop_ghost)
-            _drop_view.drop_preview = null;
+        TTransform3? w3 = null;
+        TTransform2? w2 = null;
+        if (_drop_ghost is Imp3D c3)
+        {
+            w3 = c3.Transform_Get(true);
+        }
+        if (_drop_ghost is Imp2D c2)
+        {
+            w2 = c2.Transform_Get(true);
+        }
+        if (Overlay_Get(_drop_view) == _drop_ghost)
+        {
+            Overlay_Set(_drop_view, null);
+        }
 
         dest.Child_Add(_drop_ghost);
-        if (w3.HasValue && _drop_ghost is ImpComp3D a3) a3.Transform_Set(w3.Value, true);
-        if (w2.HasValue && _drop_ghost is ImpComp2D a2) a2.Transform_Set(w2.Value, true);
+        if (w3.HasValue && _drop_ghost is Imp3D a3)
+        {
+            a3.Transform_Set(w3.Value, true);
+        }
+        if (w2.HasValue && _drop_ghost is Imp2D a2)
+        {
+            a2.Transform_Set(w2.Value, true);
+        }
 
         ImpUndo.Comp_Moved(_drop_ghost, default, "Drop " + GetName());
-        _drop_view?.gizmo_data?.Selection_Set(new[] { _drop_ghost });
+        ImpComp spawned = _drop_ghost;
         _drop_ghost = null;
         _drop_view = null;
+        return spawned;
+    }
+
+    static ImpScene SceneOf(Imp2D view)
+    {
+        if (view is C2_Viewport3D v3)
+        {
+            return v3.view_scene;
+        }
+        if (view is C2_Viewport2D v2)
+        {
+            return v2.view_scene;
+        }
+        return null;
+    }
+
+    static ImpComp Overlay_Get(Imp2D view)
+    {
+        if (view is C2_Viewport3D v3)
+        {
+            return v3.overlay;
+        }
+        if (view is C2_Viewport2D v2)
+        {
+            return v2.overlay;
+        }
+        return null;
+    }
+
+    static void Overlay_Set(Imp2D view, ImpComp overlay)
+    {
+        if (view is C2_Viewport3D v3)
+        {
+            v3.overlay = overlay;
+        }
+        else if (view is C2_Viewport2D v2)
+        {
+            v2.overlay = overlay;
+        }
     }
 }

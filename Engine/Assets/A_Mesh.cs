@@ -24,57 +24,76 @@ public class A_Mesh : ImpAsset
         filepath = BuiltinPrefix + "A_Mesh.GEO_PLANE",
     };
 
-    C2_SceneView _drop_view;
+    C2_Viewport3D _drop_view;
     C3_Mesh _drop_ghost;
 
-    public override void SceneDrop_Enter(C2_SceneView view, ImpPlayer player)
+    public override void SceneDrop_Enter(Imp2D view, ImpPlayer player)
     {
         SceneDrop_Exit(view, player);
-        if (view?.scene == null) return;
-        _drop_view = view;
+        if (view is not C2_Viewport3D v3 || v3.view_scene == null)
+        {
+            return;
+        }
+        _drop_view = v3;
         _drop_ghost = new C3_Mesh { name = GetName(), mesh = this };
-        view.drop_preview = _drop_ghost;
-        _drop_ghost.scene = view.scene;
+        v3.overlay = _drop_ghost;
+        _drop_ghost.scene = v3.view_scene;
         SceneDrop_Update(view, 0, player);
     }
 
-    public override void SceneDrop_Exit(C2_SceneView view, ImpPlayer player)
+    public override void SceneDrop_Exit(Imp2D view, ImpPlayer player)
     {
-        if (view != null && view.drop_preview == _drop_ghost) view.drop_preview = null;
+        if (_drop_view != null && _drop_view.overlay == _drop_ghost)
+        {
+            _drop_view.overlay = null;
+        }
         _drop_ghost?.Destroy();
         _drop_ghost = null;
         _drop_view = null;
     }
 
-    public override void SceneDrop_Update(C2_SceneView view, float dt, ImpPlayer player)
+    public override void SceneDrop_Update(Imp2D view, float dt, ImpPlayer player)
     {
-        if (_drop_ghost == null || view == null) return;
-        if (view.Drop_World3(player, out Vector3 pos, out _))
+        if (_drop_ghost == null || _drop_view == null || player == null)
+        {
+            return;
+        }
+        if (_drop_view.Trace_World(player.cursor.position, out Vector3 pos, out _))
+        {
             _drop_ghost.Position_Set(pos, true);
+        }
     }
 
-    public override void SceneDrop_DropOnComp(ImpComp comp, ImpPlayer player)
+    public override ImpComp SceneDrop_DropOnComp(ImpComp comp, ImpPlayer player)
     {
-        if (_drop_ghost == null) return;
+        if (_drop_ghost == null)
+        {
+            return null;
+        }
         ImpComp dest = comp;
-        ImpScene dest_scene = _drop_view?.scene ?? dest?.scene;
+        ImpScene dest_scene = _drop_view?.view_scene ?? dest?.scene;
         if (dest == null || dest == _drop_ghost || _drop_ghost.IsAncestorOf(dest))
+        {
             dest = dest_scene?.root;
+        }
         if (dest == null)
         {
             SceneDrop_Exit(_drop_view, player);
-            return;
+            return null;
         }
 
         TTransform3 world = _drop_ghost.Transform_Get(true);
-        if (_drop_view != null && _drop_view.drop_preview == _drop_ghost)
-            _drop_view.drop_preview = null;
+        if (_drop_view != null && _drop_view.overlay == _drop_ghost)
+        {
+            _drop_view.overlay = null;
+        }
 
         dest.Child_Add(_drop_ghost);
         _drop_ghost.Transform_Set(world, true);
         ImpUndo.Comp_Moved(_drop_ghost, default, "Drop " + GetName());
-        _drop_view?.gizmo_data?.Selection_Set(new[] { (ImpComp)_drop_ghost });
+        C3_Mesh spawned = _drop_ghost;
         _drop_ghost = null;
         _drop_view = null;
+        return spawned;
     }
 }

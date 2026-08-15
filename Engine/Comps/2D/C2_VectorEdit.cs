@@ -5,7 +5,7 @@ using Raylib_cs;
 
 namespace ImperiumEngine.Comps._2D;
 
-public class C2_VectorEdit : ImpComp2D
+public class C2_VectorEdit : Imp2D
 {
     public readonly C2_Slider[] fields;
     public string[] tags = { "X", "Y", "Z", "W" };
@@ -41,8 +41,11 @@ public class C2_VectorEdit : ImpComp2D
                 value_text_decimals = integers ? 0 : 3,
                 drag_sensitivity = integers ? 0.2f : 0.05f,
                 accent_color = axis_colors[Math.Min(i, axis_colors.Length - 1)],
-                view_alighnment_H = EUIViewportAlignment.Start,
-                view_alighnment_V = EUIViewportAlignment.Fill,
+                layout = new TLayout2
+                {
+                    orient_H = EUIViewportAlignment.Start,
+                    orient_V = EUIViewportAlignment.Fill,
+                },
             };
             field.on_changed = _ => on_changed?.Invoke(this);
             fields[i] = field;
@@ -82,10 +85,10 @@ public class C2_VectorEdit : ImpComp2D
             float x = i * (col + Gap);
             _tags[i] = new Rectangle(dim.position.X + x, dim.position.Y, _tag_w, dim.size.Y);
             fields[i].transform.position = new Vector2(x + _tag_w, 0);
-            fields[i].size = new Vector2(MathF.Max(0, col - _tag_w), dim.size.Y);
-            fields[i].size_min = new Vector2(0, 18);
-            fields[i].view_alighnment_H = EUIViewportAlignment.Start;
-            fields[i].view_alighnment_V = EUIViewportAlignment.Fill;
+            fields[i].layout.size = new Vector2(MathF.Max(0, col - _tag_w), dim.size.Y);
+            fields[i].layout.size_min = new Vector2(0, 18);
+            fields[i].layout.orient_H = EUIViewportAlignment.Start;
+            fields[i].layout.orient_V = EUIViewportAlignment.Fill;
         }
     }
 
@@ -94,12 +97,12 @@ public class C2_VectorEdit : ImpComp2D
         base.OnDraw2D(dt, flags);
         for (int i = 0; i < fields.Length && i < tags.Length; i++)
         {
-            Color prev = UiStyle_Text.MUTED.color;
-            UiStyle_Text.MUTED.color = axis_colors[Math.Min(i, axis_colors.Length - 1)];
-            UiStyle_Text.MUTED.Draw(tags[i], new Vector2(_tags[i].X, _tags[i].Y),
+            Color prev = UI_Text.MUTED.color;
+            UI_Text.MUTED.color = axis_colors[Math.Min(i, axis_colors.Length - 1)];
+            UI_Text.MUTED.Draw(tags[i], new Vector2(_tags[i].X, _tags[i].Y),
                 new Vector2(_tags[i].Width, _tags[i].Height),
                 0, ETextWrap.None, EUIPositionAlignment.Center, EUIPositionAlignment.Center);
-            UiStyle_Text.MUTED.color = prev;
+            UI_Text.MUTED.color = prev;
         }
     }
 }

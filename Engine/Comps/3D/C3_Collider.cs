@@ -7,7 +7,7 @@ public enum ECollisionShape : byte
     Cube, Sphere, Cylinder, Capsule, Cone,
 }
 
-public class C3_Collider : ImpComp3D
+public class C3_Collider : Imp3D
 {
     [ImpVar]public ECollisionShape shape;
     [ImpVar] public Vector3 extents;

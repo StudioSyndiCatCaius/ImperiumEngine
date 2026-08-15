@@ -45,15 +45,21 @@ public class C1_PopupMenu : ImpComp
         C2_PopupPanel panel = new(this)
         {
             style = new UiStyle_Box { tint = new Raylib_cs.Color(36, 36, 36, 255) },
-            view_alighnment_H = EUIViewportAlignment.Start,
-            view_alighnment_V = EUIViewportAlignment.Start,
+            layout = new TLayout2
+            {
+                orient_H = EUIViewportAlignment.Start,
+                orient_V = EUIViewportAlignment.Start,
+            },
         };
         list = new C2_List
         {
-            alignment = EUIAlignment.Vertical,
-            view_alighnment_H = EUIViewportAlignment.Fill,
-            view_alighnment_V = EUIViewportAlignment.Fill,
+            orentation = EUIOrentation.V,
             spacing = 0,
+            layout = new TLayout2
+                {
+                    orient_H = EUIViewportAlignment.Fill,
+                    orient_V = EUIViewportAlignment.Fill,
+                },
         };
         panel.Child_Add(list);
 
@@ -63,9 +69,12 @@ public class C1_PopupMenu : ImpComp
             TPopupMenuOption opt = options[i];
             if (opt.is_separator)
             {
-                ImpComp2D sep = new()
+                Imp2D sep = new()
                 {
-                    size = new Vector2(menu_width, 6),
+                    layout = new TLayout2
+                    {
+                        size = new Vector2(menu_width, 6),
+                    },
                     cursor_filter = ECursorFilter.Ignore,
                 };
                 list.Child_Add(sep);
@@ -77,13 +86,16 @@ public class C1_PopupMenu : ImpComp
             C2_Button btn = new()
             {
                 text = opt.text ?? "",
-                size = new Vector2(menu_width, row_height),
-                size_min = new Vector2(menu_width, row_height),
+                layout = new TLayout2
+                {
+                    size = new Vector2(menu_width, row_height),
+                    size_min = new Vector2(menu_width, row_height),
+                },
                 is_disabled = opt.is_disabled,
                 content_align_h = EUIPositionAlignment.Start,
                 content_pad = 8,
-                text_style = UiStyle_Text.LIGHT,
-                style = new UiStyle_Button
+                text_style = UI_Text.LIGHT,
+                style = new UI_Button
                 {
                     style_unhovered = new UiStyle_Box { tint = new Raylib_cs.Color(36, 36, 36, 255) },
                     style_hovered = new UiStyle_Box { tint = new Raylib_cs.Color(0, 96, 166, 255) },
@@ -95,8 +107,8 @@ public class C1_PopupMenu : ImpComp
             total_h += row_height;
         }
 
-        panel.size = new Vector2(menu_width, total_h);
-        panel.size_min = panel.size;
+        panel.layout.size = new Vector2(menu_width, total_h);
+        panel.layout.size_min = panel.layout.size;
         panel.transform.position = screen_pos;
         host.Child_Add(panel);
         _open = panel;
@@ -147,7 +159,7 @@ public class C2_PopupPanel : C2_Box
         if (!ImpPlayer.Key_IsPressed(EInputKey.Mouse_Left) && !ImpPlayer.Key_IsPressed(EInputKey.Mouse_Right))
             return;
         if (ImpPlayer.players.Count == 0) return;
-        ImpComp target = ImpPlayer.players[0].cursor_target;
+        ImpComp target = ImpPlayer.players[0].target_cursor;
         if (C2_MenuBar.IsUnder(this, target)) return;
         _menu.is_visible = false;
         C1_PopupMenu.CloseOpen();

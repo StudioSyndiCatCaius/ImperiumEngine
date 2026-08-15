@@ -5,7 +5,7 @@ using Raylib_cs;
 
 namespace ImperiumEngine.Comps._2D;
 
-public class C2_ColorPicker : ImpComp2D
+public class C2_ColorPicker : Imp2D
 {
     const float PanelW = 224f;
     const float SvH = 128f;
@@ -86,8 +86,12 @@ public class C2_ColorPicker : ImpComp2D
             _open ? new Color(0, 120, 215, 255) : new Color(80, 80, 80, 255));
     }
 
-    public override void Cursor_OnEnter(ImpPlayer player) { base.Cursor_OnEnter(player); _hover = true; }
-    public override void Cursor_OnExit(ImpPlayer player) { base.Cursor_OnExit(player); _hover = false; }
+    public override void _Notify_AsCursorTarget(ImpPlayer player, ENotifyGeneric notify, double dt)
+    {
+        base._Notify_AsCursorTarget(player, notify, dt);
+        if (notify == ENotifyGeneric.Begin) _hover = true;
+        else if (notify == ENotifyGeneric.End) _hover = false;
+    }
 
     public override void Cursor_OnEvent(ImpPlayer player, ECursorEvent evnt)
     {
@@ -112,12 +116,15 @@ public class C2_ColorPicker : ImpComp2D
         TDimensions2 dim = Dimensions_Get();
         _panel = new C2_ColorPickerPanel(this)
         {
-            view_alighnment_H = EUIViewportAlignment.Start,
-            view_alighnment_V = EUIViewportAlignment.Start,
+            layout = new TLayout2
+                {
+                    orient_H = EUIViewportAlignment.Start,
+                    orient_V = EUIViewportAlignment.Start,
+                },
         };
         float h = Pad + SvH + Pad + BarH + Pad + (show_alpha ? BarH + Pad : 0) + 22 + Pad;
-        _panel.size = new Vector2(MathF.Max(PanelW, dim.size.X), h);
-        _panel.size_min = _panel.size;
+        _panel.layout.size = new Vector2(MathF.Max(PanelW, dim.size.X), h);
+        _panel.layout.size_min = _panel.layout.size;
         _panel.transform.position = new Vector2(dim.position.X, dim.position.Y + dim.size.Y);
         host.Child_Add(_panel);
     }
@@ -151,7 +158,7 @@ class C2_ColorPickerPanel : C2_Box
             if (Raylib.CheckCollisionPointRec(m, sv)) _area = 0;
             else if (Raylib.CheckCollisionPointRec(m, hue)) _area = 1;
             else if (_owner.show_alpha && Raylib.CheckCollisionPointRec(m, alpha)) _area = 2;
-            else if (!p.Cursor_IsInDimensions(dim) && p.cursor_target != _owner)
+            else if (!p.Cursor_IsInDimensions(dim) && p.target_cursor != _owner)
             {
                 _owner.Close();
                 return;
@@ -206,7 +213,7 @@ class C2_ColorPickerPanel : C2_Box
 
         Raylib.DrawRectangleRec(preview, _owner.color);
         Raylib.DrawRectangleLinesEx(preview, 1, new Color(80, 80, 80, 255));
-        UiStyle_Text.LIGHT.Draw($"#{_owner.color.R:X2}{_owner.color.G:X2}{_owner.color.B:X2}{_owner.color.A:X2}",
+        UI_Text.LIGHT.Draw($"#{_owner.color.R:X2}{_owner.color.G:X2}{_owner.color.B:X2}{_owner.color.A:X2}",
             new Vector2(preview.X + preview.Height * 1.6f + 6, preview.Y),
             new Vector2(MathF.Max(0, preview.Width - preview.Height * 1.6f - 8), preview.Height),
             0, ETextWrap.None, EUIPositionAlignment.Center, EUIPositionAlignment.Start);

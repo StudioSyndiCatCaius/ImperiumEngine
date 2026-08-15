@@ -1,6 +1,7 @@
 using System.Numerics;
 using ImperiumEngine.Enums;
 
+using ImperiumEngine.Structs;
 namespace ImperiumEngine.Comps._2D;
 
 public class C2_SearchBar : C2_Box
@@ -14,20 +15,24 @@ public class C2_SearchBar : C2_Box
     public C2_SearchBar()
     {
         style = UiStyle_Box.STYLE_BKG_DARK;
-        cursor_filter = ECursorFilter.Pass;
-        view_alighnment_H = EUIViewportAlignment.Fill;
+        cursor_filter = ECursorFilter.Hit;
+        option_button = null;
+        layout.orient_H = EUIViewportAlignment.Fill;
 
         text_edit = new C2_TextEdit
         {
             text_placeholder = placeholder,
-            view_alighnment_H = EUIViewportAlignment.Fill,
-            view_alighnment_V = EUIViewportAlignment.Fill,
-            style = new UiStyle_TextEdit
+            style = new UI_TextEdit
             {
                 style_background = new UiStyle_Box { tint = new Raylib_cs.Color(28, 28, 28, 255) },
-                text_style = UiStyle_Text.LIGHT,
-                placeholder_style = UiStyle_Text.MUTED,
+                text_style = UI_Text.LIGHT,
+                placeholder_style = UI_Text.MUTED,
             },
+            layout = new TLayout2
+                {
+                    orient_H = EUIViewportAlignment.Fill,
+                    orient_V = EUIViewportAlignment.Fill,
+                },
         };
         text_edit.on_text_changed = q => on_search?.Invoke(q ?? "");
         text_edit.on_text_cleared = _ => on_search?.Invoke("");
@@ -47,5 +52,12 @@ public class C2_SearchBar : C2_Box
         if (text_edit == null) return;
         text_edit.text = value ?? "";
         on_search?.Invoke(text_edit.text);
+    }
+
+    public override void Cursor_OnEvent(ImpPlayer player, ECursorEvent evnt)
+    {
+        base.Cursor_OnEvent(player, evnt);
+        if (evnt != ECursorEvent.Select_A || text_edit == null) return;
+        text_edit.Cursor_OnEvent(player, evnt);
     }
 }

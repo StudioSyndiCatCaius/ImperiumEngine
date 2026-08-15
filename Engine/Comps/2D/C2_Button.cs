@@ -1,4 +1,4 @@
-﻿using System.Numerics;
+using System.Numerics;
 using ImperiumEngine.Assets;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Structs;
@@ -6,18 +6,15 @@ using Raylib_cs;
 
 namespace ImperiumEngine.Comps._2D;
 
-public enum EButtonLayout
-{
-    Icon_Text_H, Icon_Text_V, Text_Icon_H, Text_Icon_V,
-}
-
-public class C2_Button : ImpComp2D
+[ImpClass(Common = true)]
+public class C2_Button : Imp2D
 {
     public string text = "";
     public A_Texture icon = null;
-    public EButtonLayout layout = EButtonLayout.Icon_Text_H;
-    public UiStyle_Button style = UiStyle_Button.DEFAULT;
-    public UiStyle_Text text_style = UiStyle_Text.DEFAULT;
+    public A_Texture icon2 = null;
+    public EButtonLayout button_layout = EButtonLayout.Icon_Text_H;
+    public UI_Button style = UI_Button.DEFAULT;
+    public UI_Text text_style = UI_Text.DEFAULT;
 
     public float icon_size = 16;
     public int override_font_size = 0;
@@ -95,7 +92,7 @@ public class C2_Button : ImpComp2D
         }
 
         float g = has_icon && has_text ? gap : 0;
-        bool vertical = layout is EButtonLayout.Icon_Text_V or EButtonLayout.Text_Icon_V;
+        bool vertical = button_layout is EButtonLayout.Icon_Text_V or EButtonLayout.Text_Icon_V;
         float block_w = vertical ? MathF.Max(iw, tw) : iw + g + tw;
         float block_h = vertical ? ih + g + th : MathF.Max(ih, th);
         float bx = content_align_h switch
@@ -112,7 +109,7 @@ public class C2_Button : ImpComp2D
         };
 
         Vector2 icon_pos, text_pos;
-        switch (layout)
+        switch (button_layout)
         {
             case EButtonLayout.Text_Icon_H:
                 text_pos = new Vector2(bx, by + (block_h - th) * 0.5f);
@@ -141,6 +138,44 @@ public class C2_Button : ImpComp2D
                 Vector2.Zero, 0f, is_disabled ? new Color(255, 255, 255, 120) : Color.White);
         }
 
+        if (icon2 != null)
+        {
+            float s2 = icon_size > 0 ? icon_size : 16;
+            Texture2D tex2 = icon2.texture;
+            float src_w = tex2.Width > 0 ? tex2.Width : s2;
+            float src_h = tex2.Height > 0 ? tex2.Height : s2;
+            float iw2;
+            float ih2;
+            if (src_w >= src_h)
+            {
+                iw2 = s2;
+                ih2 = s2 * (src_h / src_w);
+            }
+            else
+            {
+                ih2 = s2;
+                iw2 = s2 * (src_w / src_h);
+            }
+            float gap2 = gap;
+            if (!has_icon)
+            {
+                gap2 = 0;
+            }
+            Vector2 icon2_pos = new Vector2(
+                icon_pos.X + iw + gap2,
+                by + (block_h - ih2) * 0.5f);
+            text_pos = new Vector2(text_pos.X + iw2 + gap, text_pos.Y);
+            Color tint2 = Color.White;
+            if (is_disabled)
+            {
+                tint2 = new Color(255, 255, 255, 120);
+            }
+            Raylib.DrawTexturePro(tex2,
+                new Rectangle(0, 0, tex2.Width, tex2.Height),
+                new Rectangle(icon2_pos.X, icon2_pos.Y, iw2, ih2),
+                Vector2.Zero, 0f, tint2);
+        }
+
         if (has_text && text_style != null)
         {
             Color prev = text_style.color;
@@ -163,26 +198,36 @@ public class C2_Button : ImpComp2D
         }
     }
 
-    public override void Cursor_OnEnter(ImpPlayer player)
+    public override void _Notify_AsCursorTarget(ImpPlayer player, ENotifyGeneric notify, double dt)
     {
-        base.Cursor_OnEnter(player);
-        is_hovered = true;
-        as_option_hover?.Invoke(this);
-    }
-
-    public override void Cursor_OnExit(ImpPlayer player)
-    {
-        base.Cursor_OnExit(player);
-        is_hovered = false;
-        as_option_unhover?.Invoke(this);
+        base._Notify_AsCursorTarget(player, notify, dt);
+        if (notify == ENotifyGeneric.Begin)
+        {
+            is_hovered = true;
+            as_option_hover?.Invoke(this);
+        }
+        else if (notify == ENotifyGeneric.End)
+        {
+            is_hovered = false;
+            as_option_unhover?.Invoke(this);
+        }
     }
 }
 
-public class UiStyle_Button : ImpAsset
-{
-    public static UiStyle_Button DEFAULT = new();
 
+public enum EButtonLayout
+{
+    Icon_Text_H, Icon_Text_V, Text_Icon_H, Text_Icon_V,
+}
+
+
+public class UI_Button : ImpAsset
+{
     [ImpVar] public UiStyle_Box style_unhovered = UiStyle_Box.STYLE_BTN_IDLE;
     [ImpVar] public UiStyle_Box style_hovered = UiStyle_Box.STYLE_BTN_HOVER;
     [ImpVar] public UiStyle_Box style_pressed = UiStyle_Box.STYLE_BTN_PRESS;
+
+    public static UI_Button DEFAULT = new();
 }
+
+

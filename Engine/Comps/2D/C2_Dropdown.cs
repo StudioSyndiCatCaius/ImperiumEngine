@@ -12,7 +12,7 @@ public struct TDropdownOption
     public TDropdownOption(string name) { this.name = name; }
 }
 
-public class C2_Dropdown : ImpComp2D
+public class C2_Dropdown : Imp2D
 {
     [ImpVar] public int current_option = -1;
     [ImpVar] public List<TDropdownOption> options = new();
@@ -21,7 +21,7 @@ public class C2_Dropdown : ImpComp2D
     public UiStyle_Box style_idle = UiStyle_Box.STYLE_BKG_MID;
     public UiStyle_Box style_hover = UiStyle_Box.STYLE_BTN_HOVER;
     public UiStyle_Box style_open = UiStyle_Box.STYLE_BTN_PRESS;
-    public UiStyle_Text style_text = UiStyle_Text.LIGHT;
+    public UI_Text Text = UI_Text.LIGHT;
 
     public Action<C2_Dropdown> on_dropdown_open;
     public Action<C2_Dropdown> on_dropdown_close;
@@ -64,29 +64,24 @@ public class C2_Dropdown : ImpComp2D
         bg?.Draw(dim);
 
         float pad = 6;
-        style_text?.Draw(Label(), dim.position + new Vector2(pad, 0),
+        Text?.Draw(Label(), dim.position + new Vector2(pad, 0),
             new Vector2(MathF.Max(0, dim.size.X - pad * 3 - 8), dim.size.Y),
             0, ETextWrap.None, EUIPositionAlignment.Center, EUIPositionAlignment.Start);
 
         float cx = dim.position.X + dim.size.X - 10;
         float cy = dim.position.Y + dim.size.Y * 0.5f;
-        Color ac = style_text?.color ?? Color.White;
+        Color ac = Text?.color ?? Color.White;
         Raylib.DrawTriangle(
             new Vector2(cx - 4, cy - 2),
             new Vector2(cx + 4, cy - 2),
             new Vector2(cx, cy + 3), ac);
     }
 
-    public override void Cursor_OnEnter(ImpPlayer player)
+    public override void _Notify_AsCursorTarget(ImpPlayer player, ENotifyGeneric notify, double dt)
     {
-        base.Cursor_OnEnter(player);
-        _hover = true;
-    }
-
-    public override void Cursor_OnExit(ImpPlayer player)
-    {
-        base.Cursor_OnExit(player);
-        _hover = false;
+        base._Notify_AsCursorTarget(player, notify, dt);
+        if (notify == ENotifyGeneric.Begin) _hover = true;
+        else if (notify == ENotifyGeneric.End) _hover = false;
     }
 
     public override void Cursor_OnEvent(ImpPlayer player, ECursorEvent evnt)

@@ -2,7 +2,8 @@
 
 namespace ImperiumEngine.Comps._3D;
 
-public class C3_Transit : ImpComp3D
+[ImpClass(Common = true)]
+public class C3_Transit : Imp3D
 {
     [ImpVar]  public TRef<ImpScene> linked_scene;
 }

@@ -39,7 +39,7 @@ public static class ImpMath
         return new Vector3(v.X, v.Y, 0);
     }
 
-    // X=pitch, Y=yaw, Z=roll (degrees) — same convention as ImpComp3D.
+    // X=pitch, Y=yaw, Z=roll (degrees) — same convention as Imp3D.
     public static Quaternion EulerToQuat(Vector3 euler_deg)
     {
         float deg2rad = MathF.PI / 180f;

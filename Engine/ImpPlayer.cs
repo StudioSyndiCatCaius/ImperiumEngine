@@ -1,4 +1,6 @@
 ﻿using System.Numerics;
+using ImperiumEngine.Comps;
+using ImperiumEngine.Comps._1D;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Structs;
 using Raylib_cs;
@@ -38,7 +40,7 @@ public class ImpPlayer
     public bool cursor_can_hover_3d = true;
     public float cursor_3d_trace_distance = 100f; // distance to trace cursor to check if hit/over and 3D ImpComps
     public ECollisionChannel cursor_3d_collision_channel = ECollisionChannel.Cursor;
-    public ImpComp2D? ui_focus = null;
+    public Imp2D? target_focus = null; // ui focus target. changed when new ui element is clicked
     
     public static List<ImpPlayer> players=[ new ()]; // min player 1
     
@@ -141,25 +143,58 @@ public class ImpPlayer
 
     public static bool Key_IsDown(EInputKey key, byte player = 0)
     {
-        if(players.Count<=player) return false;
+        if (!Key_Allowed(player)) return false;
         return players[player].key_states.ContainsKey(key) && players[player].key_states[key] == EInputState.Down;
     }
     public static bool Key_IsHeld(EInputKey key, byte player = 0)
     {
-        if (players.Count <= player) return false;
+        if (!Key_Allowed(player)) return false;
         if (!players[player].key_states.TryGetValue(key, out EInputState s)) return false;
         return s is EInputState.Pressed or EInputState.Down;
     }
     public static bool Key_IsPressed(EInputKey key, byte player = 0)
     {
-        if(players.Count<=player) return false;
+        if (!Key_Allowed(player)) return false;
         return players[player].key_states.ContainsKey(key) && players[player].key_states[key] == EInputState.Pressed;
     }
 
     public static bool Key_IsReleased(EInputKey key, byte player = 0)
     {
-        if(players.Count<=player) return false;
+        if (!Key_Allowed(player)) return false;
         return players[player].key_states.ContainsKey(key) && players[player].key_states[key] == EInputState.Released;
+    }
+
+    // True when c still lives under the editor / app scene. Detached dialog
+    // widgets and Destroyed comps fail this and must not keep hog / focus.
+    public static bool Target_IsLive(ImpComp c)
+    {
+        if (c == null)
+        {
+            return false;
+        }
+        ImpComp root = ImpScene.current?.root;
+        if (root == null)
+        {
+            return c.parent != null;
+        }
+        if (c == root)
+        {
+            return true;
+        }
+        return root.IsAncestorOf(c);
+    }
+
+    // Dialog / input_hog swallows Key_Is* for every comp outside that subtree.
+    // Queries from outside Update (cursor phase, etc.) stay raw so hit-testing still works.
+    public static bool Key_Allowed(byte player = 0)
+    {
+        if (players.Count <= player) return false;
+        if (ImpComp.Updating == null) return true;
+        ImpComp gate = C1_Dialog.Host ?? players[player].input_hog;
+        if (gate == null) return true;
+        for (ImpComp n = ImpComp.Updating; n != null; n = n.parent)
+            if (n == gate) return true;
+        return false;
     }
     
     
@@ -175,15 +210,18 @@ public class ImpPlayer
 
     public int id;
     public TCursorData cursor;
-    public ImpComp? cursor_target = null;
-    public ImpComp? grabbed_target = null;
     //a press only becomes a real drag once the cursor moves past grab_threshold, so a plain click never drops.
     public bool grab_is_active = false;
     public const float grab_threshold = 5f;
-    public ImpComp? input_hog = null; //when valid, hogs all inputs, preventing input actions on any other comp until =null
-
-    private ImpComp? last_cursor_target = null;
     private Vector2 grab_origin;
+    
+    private ImpComp? last_cursor_target = null;
+    private Imp2D? last_focus_target = null;
+    
+    public ImpComp? target_cursor = null;
+    public ImpComp? target_grabbed = null;
+    public ImpComp? input_hog = null; //when valid, hogs all inputs, preventing input actions on any other comp until =null
+    
     
     public Dictionary<EInputKey, EInputState> key_states=new ();
     public Dictionary<EInputKey, float> key_axis=new (); // scalar magnitude per key (1 for digital, delta for axes)
@@ -240,6 +278,19 @@ public class ImpPlayer
     // ─────────────────────────────────────────────────────────────
     public void Update_Input(double dt)
     {
+        // Dialogs reuse their panel by Detaching it before the overlay is Destroyed.
+        // If hog / focus was a widget inside that panel, it is no longer under
+        // ImpScene.current and would swallow Key_Is* / camera forever.
+        if (input_hog != null && !Target_IsLive(input_hog))
+        {
+            input_hog = null;
+        }
+        if (target_focus != null && !Target_IsLive(target_focus))
+        {
+            target_focus = null;
+        }
+
+        // sync Mouse with Player 1 Cursor  ----------------------------------------------------
         if (id == 0)
         {
             cursor.position = Raylib.GetMousePosition();
@@ -252,6 +303,7 @@ public class ImpPlayer
         }
         Update_Input_Multi(id);
 
+        //Process Input Actions ----------------------------------------------------
         foreach (var ia in InputActions_GetAll())
         {
             List<Vector3> axis_list = new();
@@ -295,9 +347,17 @@ public class ImpPlayer
             action_axis[ia.Key] = ImpMath.V3_Average(axis_list);
         }
 
+        //Process Input Hog ----------------------------------------------------
         if (input_hog != null)
         {
             input_hog.Update_Input(dt,this);
+        }
+        //Process Input Targets ----------------------------------------------------
+        else
+        {
+            if (target_cursor != null) { target_cursor._Notify_AsCursorTarget( this,ENotifyGeneric.Update,dt); }
+            if (target_focus != null) { target_focus._Notify_AsFocusTarget( this,ENotifyGeneric.Update,dt); }
+            if (target_grabbed != null) { target_grabbed._Notify_AsGrabbedTarget( this,ENotifyGeneric.Update,dt); }
         }
     }
 
@@ -305,15 +365,15 @@ public class ImpPlayer
     {
         if (id != 0) return;
 
-        cursor_target = null;
+        target_cursor = null;
         
         if (cursor_can_hover_2d)
         {
-            ImpComp2D? hit2d = Imp2D.Trace_Point(cursor.position, ImpScene.current.root);
-            if (hit2d != null) cursor_target = hit2d;
+            Imp2D? hit2d = Imp2D.Trace_Point(cursor.position, ImpScene.current.root);
+            if (hit2d != null) target_cursor = hit2d;
         }
 
-        if (cursor_target == null && cursor_can_hover_3d
+        if (target_cursor == null && cursor_can_hover_3d
             && Cursor_Get3DPosition(out Vector3 _cursor_3d_pos, out Vector3 _cursor_3d_normal))
         {
             TTraceResult3D result3D = Imp3D.Trace_Line(
@@ -321,50 +381,64 @@ public class ImpPlayer
                 _cursor_3d_pos + _cursor_3d_normal * cursor_3d_trace_distance,
                 cursor_3d_collision_channel);
             if (result3D.hit && result3D.hit_comp != null)
-                cursor_target = result3D.hit_comp;
+                target_cursor = result3D.hit_comp;
         }
 
         if (input_hog == null
             && (Key_IsPressed(EInputKey.Mouse_Left)
                 || Key_IsPressed(EInputKey.Mouse_Right)
                 || Key_IsPressed(EInputKey.Mouse_Middle)))
-            ui_focus = cursor_target as ImpComp2D;
-
-        void _GrabTargetEntry(ImpComp target, bool _state)
         {
-            if (grab_is_active && grabbed_target != null && target != null)
+            target_focus = target_cursor as Imp2D;
+        }
+
+        if (last_focus_target != target_focus)
+        {
+            if (last_focus_target != null)
             {
-                grabbed_target.CursorGrab_HoveredOnTarget(this, target, _state);
-                target.CursorGrab_HoveredAsTarget(this, grabbed_target, _state);
+                last_focus_target._Notify_AsFocusTarget(this, ENotifyGeneric.End, dt);
+            }
+            last_focus_target = target_focus;
+            if (target_focus != null)
+            {
+                target_focus._Notify_AsFocusTarget(this, ENotifyGeneric.Begin, dt);
             }
         }
 
-        if (last_cursor_target != cursor_target)
+        void _GrabTargetEntry(ImpComp target, bool _state)
+        {
+            if (grab_is_active && target_grabbed != null && target != null)
+            {
+                target_grabbed._Notify_OnGrabDrop(this, _state ? ENotifyGrabTarget.Hover_AsTarget_Start : ENotifyGrabTarget.Hover_AsTarget_End, target, dt);
+                target._Notify_OnGrabDrop(this, _state ? ENotifyGrabTarget.Hover_AsInstigator_Start : ENotifyGrabTarget.Hover_AsInstigator_End, target_grabbed, dt);
+            }
+        }
+
+        if (last_cursor_target != target_cursor)
         {
             // Exit cursor over ------------
             if (last_cursor_target != null)
             {
-                last_cursor_target.Cursor_OnExit(this);
+                last_cursor_target._Notify_AsCursorTarget(this,ENotifyGeneric.End,dt);
                 _GrabTargetEntry(last_cursor_target, false);
             };
-            last_cursor_target = cursor_target;
+            last_cursor_target = target_cursor;
             // enter cursor over -------------------
-            if (cursor_target != null)
+            if (target_cursor != null)
             {
-                cursor_target.Cursor_OnEnter(this);
-                _GrabTargetEntry(cursor_target, true);
+                target_cursor._Notify_AsCursorTarget(this,ENotifyGeneric.Begin,dt);
+                _GrabTargetEntry(target_cursor, true);
             }
         }
-        if (cursor_target != null) cursor_target.Cursor_OnHover(this, dt);
 
         foreach (var ia in action_states)
         {
-            if (ia.Value != EInputState.Pressed || cursor_target == null) continue;
+            if (ia.Value != EInputState.Pressed || target_cursor == null) continue;
             string name = ia.Key.ToString();
             if (name.StartsWith("Cursor_")) name = name[7..];
             if (Enum.TryParse<ECursorEvent>(name, true, out ECursorEvent evnt))
             {
-                cursor_target.Cursor_OnEvent(this, evnt);
+                target_cursor.Cursor_OnEvent(this, evnt);
             }
         }
         
@@ -374,12 +448,12 @@ public class ImpPlayer
 
         switch (grab_state)
         {
-            //arm grab (CursorGrab_Begin waits for the drag threshold)
+            //arm grab (_Notify_AsGrabbedTarget Begin waits for the drag threshold)
             case EInputState.Pressed:
 
-                if (cursor_target != null && cursor_target.CursorGrab_IsEnabled(this) && grabbed_target == null)
+                if (target_cursor != null && target_cursor.CursorGrab_IsEnabled(this) && target_grabbed == null)
                 {
-                    grabbed_target = cursor_target;
+                    target_grabbed = target_cursor;
                     grab_is_active = false;
                     grab_origin = cursor.position;
                 }
@@ -389,29 +463,28 @@ public class ImpPlayer
             //attempt drop
             case EInputState.Released:
 
-                if (grabbed_target != null && grab_is_active)
+                if (target_grabbed != null && grab_is_active)
                 {
-                    grabbed_target.CursorGrab_Drop(this,cursor_target);
-                    if (cursor_target != null)
-                    {
-                        cursor_target.CursorGrab_DroppedOn(this,grabbed_target);
-                    }
+                    target_grabbed._Notify_OnGrabDrop(this, ENotifyGrabTarget.Drop_AsTarget, target_cursor, dt);
+                    if (target_cursor != null)
+                        target_cursor._Notify_OnGrabDrop(this, ENotifyGrabTarget.Drop_AsInstigator, target_grabbed, dt);
+                    target_grabbed._Notify_AsGrabbedTarget(this, ENotifyGeneric.End, dt);
                 }
-                grabbed_target = null;
+                target_grabbed = null;
                 grab_is_active = false;
 
                 break;
 
             //update grab
             case EInputState.Down:
-                if (grabbed_target == null) break;
+                if (target_grabbed == null) break;
                 if (!grab_is_active)
                 {
                     if (Vector2.Distance(cursor.position, grab_origin) < grab_threshold) break;
                     grab_is_active = true;
-                    grabbed_target.CursorGrab_Begin(this);
+                    
+                    target_grabbed._Notify_AsGrabbedTarget(this,ENotifyGeneric.Begin,dt);
                 }
-                grabbed_target.CursorGrab_Update(this,dt);
                 break;
         }
         

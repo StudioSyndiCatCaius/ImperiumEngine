@@ -5,13 +5,13 @@ using Raylib_cs;
 
 namespace ImperiumEngine.Comps._2D;
 
-public class C2_TextEdit : ImpComp2D
+public class C2_TextEdit : Imp2D
 {
     [ImpVar] public string text = "";
     [ImpVar] public string text_placeholder = "";
     [ImpVar] public bool is_focused;
     [ImpVar] public bool is_password;
-    [ImpVar] public UiStyle_TextEdit style = new();
+    [ImpVar] public UI_TextEdit style = new();
 
     public Action<string> on_text_changed;
     public Action<string> on_text_cleared;
@@ -34,7 +34,7 @@ public class C2_TextEdit : ImpComp2D
         if (is_focused && ImpPlayer.players.Count > 0)
         {
             ImpPlayer p = ImpPlayer.players[0];
-            if (p.cursor_target != this && ImpPlayer.Key_IsPressed(EInputKey.Mouse_Left))
+            if (ImpPlayer.Key_IsPressed(EInputKey.Mouse_Left) && !ClickIsOurs(p.target_cursor))
             {
                 is_focused = false;
                 if (p.input_hog == this) p.input_hog = null;
@@ -95,14 +95,14 @@ public class C2_TextEdit : ImpComp2D
         TDimensions2 dim = Dimensions_Get();
         if (dim.size.X <= 0 || dim.size.Y <= 0) return;
 
-        style ??= new UiStyle_TextEdit();
+        style ??= new UI_TextEdit();
         style.style_background?.Draw(dim);
 
         string shown = text ?? "";
         if (is_password && shown.Length > 0) shown = new string('•', shown.Length);
 
         bool empty = string.IsNullOrEmpty(shown);
-        UiStyle_Text ts = empty ? style.placeholder_style : style.text_style;
+        UI_Text ts = empty ? style.placeholder_style : style.text_style;
         string draw = empty ? (text_placeholder ?? "") : shown;
         Vector2 pad = new(6, 0);
         Vector2 pos = dim.position + pad;
@@ -130,11 +130,18 @@ public class C2_TextEdit : ImpComp2D
         cursor = (text ?? "").Length;
         player.input_hog = this;
     }
+
+    bool ClickIsOurs(ImpComp target)
+    {
+        for (ImpComp n = this; n != null; n = n.parent)
+            if (n == target) return true;
+        return false;
+    }
 }
 
-public class UiStyle_TextEdit : ImpAsset
+public class UI_TextEdit : ImpAsset
 {
     [ImpVar] public UiStyle_Box style_background = UiStyle_Box.STYLE_BKG_MID;
-    [ImpVar] public UiStyle_Text text_style = UiStyle_Text.LIGHT;
-    [ImpVar] public UiStyle_Text placeholder_style = UiStyle_Text.MUTED;
+    [ImpVar] public UI_Text text_style = UI_Text.LIGHT;
+    [ImpVar] public UI_Text placeholder_style = UI_Text.MUTED;
 }

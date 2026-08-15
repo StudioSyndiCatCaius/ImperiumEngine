@@ -6,7 +6,7 @@ using Raylib_cs;
 
 namespace ImperiumEngine.Comps._2D;
 
-public class C2_Slider : ImpComp2D
+public class C2_Slider : Imp2D
 {
     public float value;
     public float min;
@@ -20,7 +20,7 @@ public class C2_Slider : ImpComp2D
     public float drag_sensitivity = 0.05f;
     public Color accent_color = Color.Blank;
 
-    public UiStyle_Slider style = UiStyle_Slider.DEFAULT;
+    public UI_Slider style = default;
     public Action<C2_Slider> on_changed;
 
     bool _hover;
@@ -65,8 +65,8 @@ public class C2_Slider : ImpComp2D
         {
             if (_edit != null)
             {
-                _edit.view_alighnment_H = EUIViewportAlignment.Fill;
-                _edit.view_alighnment_V = EUIViewportAlignment.Fill;
+                _edit.layout.orient_H = EUIViewportAlignment.Fill;
+                _edit.layout.orient_V = EUIViewportAlignment.Fill;
             }
             return;
         }
@@ -160,7 +160,7 @@ public class C2_Slider : ImpComp2D
         TDimensions2 dim = Dimensions_Get();
         if (dim.size.X <= 0 || dim.size.Y <= 0) return;
 
-        style ??= UiStyle_Slider.DEFAULT;
+        style ??= UI_Slider.DEFAULT;
         style.style_background?.Draw(dim);
 
         if (!is_spinner && HasRange)
@@ -179,38 +179,58 @@ public class C2_Slider : ImpComp2D
         if (accent_color.A > 0)
             Raylib.DrawRectangleV(dim.position, new Vector2(2, dim.size.Y), accent_color);
 
-        if (show_value_text && style.text_style != null)
+        if (show_value_text && style.Text != null)
         {
-            style.text_style.Draw(Text_Value(), dim.position, dim.size, 0, ETextWrap.None,
+            style.Text.Draw(Text_Value(), dim.position, dim.size, 0, ETextWrap.None,
                 EUIPositionAlignment.Center, EUIPositionAlignment.Center);
         }
     }
 
-    public override void Cursor_OnEnter(ImpPlayer player)
+    public override void _Notify_AsCursorTarget(ImpPlayer player, ENotifyGeneric notify, double dt)
     {
-        base.Cursor_OnEnter(player);
-        _hover = true;
-    }
-
-    public override void Cursor_OnExit(ImpPlayer player)
-    {
-        base.Cursor_OnExit(player);
-        if (!_drag) _hover = false;
+        base._Notify_AsCursorTarget(player, notify, dt);
+        if (notify == ENotifyGeneric.Begin) _hover = true;
+        else if (notify == ENotifyGeneric.End && !_drag) _hover = false;
     }
 }
+// ####################################################################################################################
+// STYLE
+// ####################################################################################################################
 
-public class UiStyle_Slider : ImpAsset
+public struct TSliderConfig
 {
-    public static UiStyle_Slider DEFAULT = new()
-    {
-        style_background = UiStyle_Box.STYLE_BKG_MID,
-        style_fill = UiStyle_Box.STYLE_BTN_HOVER,
-        text_style = UiStyle_Text.LIGHT,
-    };
+    public float min;
+    public float max;
+    public float step;
+    public bool is_vertical;
+    public bool is_spinner;
+    public bool show_value_text;
+    public int value_text_decimals;
+}
 
+public class UI_Slider : ImpAsset
+{
+    // =====================================================================================================
+    // Class
+    // =====================================================================================================
     [ImpVar] public TImage slider_image;
     [ImpVar] public UiStyle_Box style_background = UiStyle_Box.STYLE_BKG_MID;
     [ImpVar] public UiStyle_Box style_fill = UiStyle_Box.STYLE_BTN_HOVER;
     [ImpVar] public UiStyle_Box style_slider_pressed = UiStyle_Box.STYLE_BTN_PRESS;
-    [ImpVar] public UiStyle_Text text_style = UiStyle_Text.LIGHT;
+    [ImpVar] public UI_Text Text = UI_Text.LIGHT;
+    
+    // =====================================================================================================
+    // Statics
+    // =====================================================================================================
+
+    public static void Draw(string label, out float value, TSliderConfig slider, UI_Slider style=default)
+    {
+        value = 0;
+    }
+    
+    // ----------------------------------------------
+    // Styles
+    // ----------------------------------------------
+    public static UI_Slider DEFAULT = new();
+
 }
