@@ -1,4 +1,4 @@
-﻿using ImperiumEngine.Comps._1D.Dialog;
+﻿using ImperiumEngine.Dialogs;
 
 namespace Editor.Dialog;
 

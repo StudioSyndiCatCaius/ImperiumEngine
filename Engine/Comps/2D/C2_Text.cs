@@ -15,7 +15,7 @@ public class C2_Text : Imp2D
     [ImpVar] public EUIPositionAlignment text_alignment_v;
     [ImpVar] public EUIPositionAlignment text_alignment_h;
     
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
         if (style == null) return;

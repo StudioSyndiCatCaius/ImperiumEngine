@@ -1,0 +1,575 @@
+{
+  "_class": "ImpScene",
+  "vars": {
+    "root_type": {
+      "class_name": "ImpComp"
+    },
+    "script_override": null,
+    "script_builtin": {
+      "_class": "A_Script",
+      "vars": {
+        "parent_type": {
+          "class_name": "ImpComp"
+        },
+        "nodes": [
+          {
+            "id": "3570eb4d-7161-47e6-8654-2fff8022c3bf",
+            "kind": "VoidOverride",
+            "node_class": "",
+            "member": "OnBegin",
+            "target_type": "ImpScene",
+            "is_set": false,
+            "position": {
+              "X": 100,
+              "Y": 100
+            },
+            "pin_values": []
+          },
+          {
+            "id": "8ca9f875-df9b-4d99-b0aa-3a0f7f206fde",
+            "kind": "Func",
+            "node_class": "",
+            "member": "Print",
+            "target_type": "ImpScene",
+            "is_set": false,
+            "position": {
+              "X": 460,
+              "Y": 100
+            },
+            "pin_values": [
+              {
+                "name": "text",
+                "type_name": "String",
+                "value": "Hello friend"
+              }
+            ]
+          },
+          {
+            "id": "8d90c7b7-3222-4df2-8ba5-d7fc7fa01542",
+            "kind": "Async",
+            "node_class": "SN_Delay",
+            "member": "",
+            "target_type": "ImpScene",
+            "is_set": false,
+            "position": {
+              "X": 480,
+              "Y": 280
+            },
+            "pin_values": [
+              {
+                "name": "time",
+                "type_name": "Single",
+                "value": "1"
+              }
+            ]
+          },
+          {
+            "id": "44e3566e-8071-47ef-bd6a-520865769a3c",
+            "kind": "Branch",
+            "node_class": "SN_If",
+            "member": "",
+            "target_type": "ImpScene",
+            "is_set": false,
+            "position": {
+              "X": 840,
+              "Y": 160
+            },
+            "pin_values": [
+              {
+                "name": "condition",
+                "type_name": "Boolean",
+                "value": "false"
+              }
+            ]
+          },
+          {
+            "id": "47e3a430-4a81-4995-8980-06f21d45483f",
+            "kind": "Func",
+            "node_class": "SN_Func",
+            "member": "Print",
+            "target_type": "ImpScene",
+            "is_set": false,
+            "position": {
+              "X": 1240,
+              "Y": 60
+            },
+            "pin_values": [
+              {
+                "name": "text",
+                "type_name": "String",
+                "value": "tree"
+              }
+            ]
+          },
+          {
+            "id": "d12cab2a-aba9-43a0-b4f0-04b2874bf192",
+            "kind": "Func",
+            "node_class": "SN_Func",
+            "member": "Print",
+            "target_type": "ImpScene",
+            "is_set": false,
+            "position": {
+              "X": 1240,
+              "Y": 220
+            },
+            "pin_values": [
+              {
+                "name": "text",
+                "type_name": "String",
+                "value": "fols"
+              }
+            ]
+          },
+          {
+            "id": "4ee76677-55cf-4214-9753-b3dd10d23e2b",
+            "kind": "Var",
+            "node_class": "SN_VarGet",
+            "member": "name",
+            "target_type": "ImpComp",
+            "is_set": false,
+            "position": {
+              "X": 180,
+              "Y": 220
+            },
+            "pin_values": []
+          },
+          {
+            "id": "663d75ee-71ff-473d-a8b8-030cde83ceee",
+            "kind": "VoidOverride",
+            "node_class": "SN_Event",
+            "member": "Input_Pressed",
+            "target_type": "ImpComp",
+            "is_set": false,
+            "position": {
+              "X": 102.44532,
+              "Y": 508.80408
+            },
+            "pin_values": []
+          },
+          {
+            "id": "ca73f55a-ad02-4d4a-81e3-d0b928c3133a",
+            "kind": "Func",
+            "node_class": "SN_Func",
+            "member": "Print",
+            "target_type": "ImpComp",
+            "is_set": false,
+            "position": {
+              "X": 460,
+              "Y": 540
+            },
+            "pin_values": [
+              {
+                "name": "text",
+                "type_name": "String",
+                "value": "dada"
+              }
+            ]
+          },
+          {
+            "id": "c7bcedac-03d8-44a6-be84-141e19e35ac3",
+            "kind": "Func",
+            "node_class": "SN_Func",
+            "member": "Input_SetOwnerActive",
+            "target_type": "ImpComp",
+            "is_set": false,
+            "position": {
+              "X": 400,
+              "Y": -160
+            },
+            "pin_values": [
+              {
+                "name": "is_active",
+                "type_name": "Boolean",
+                "value": "true"
+              }
+            ]
+          }
+        ],
+        "connections": [
+          {
+            "from_node": "44e3566e-8071-47ef-bd6a-520865769a3c",
+            "from_pin": 0,
+            "to_node": "47e3a430-4a81-4995-8980-06f21d45483f",
+            "to_pin": 0
+          },
+          {
+            "from_node": "44e3566e-8071-47ef-bd6a-520865769a3c",
+            "from_pin": 1,
+            "to_node": "d12cab2a-aba9-43a0-b4f0-04b2874bf192",
+            "to_pin": 0
+          },
+          {
+            "from_node": "8ca9f875-df9b-4d99-b0aa-3a0f7f206fde",
+            "from_pin": 0,
+            "to_node": "8d90c7b7-3222-4df2-8ba5-d7fc7fa01542",
+            "to_pin": 0
+          },
+          {
+            "from_node": "8d90c7b7-3222-4df2-8ba5-d7fc7fa01542",
+            "from_pin": 0,
+            "to_node": "44e3566e-8071-47ef-bd6a-520865769a3c",
+            "to_pin": 0
+          },
+          {
+            "from_node": "4ee76677-55cf-4214-9753-b3dd10d23e2b",
+            "from_pin": 0,
+            "to_node": "8ca9f875-df9b-4d99-b0aa-3a0f7f206fde",
+            "to_pin": 2
+          },
+          {
+            "from_node": "663d75ee-71ff-473d-a8b8-030cde83ceee",
+            "from_pin": 0,
+            "to_node": "ca73f55a-ad02-4d4a-81e3-d0b928c3133a",
+            "to_pin": 0
+          },
+          {
+            "from_node": "3570eb4d-7161-47e6-8654-2fff8022c3bf",
+            "from_pin": 0,
+            "to_node": "c7bcedac-03d8-44a6-be84-141e19e35ac3",
+            "to_pin": 0
+          },
+          {
+            "from_node": "c7bcedac-03d8-44a6-be84-141e19e35ac3",
+            "from_pin": 0,
+            "to_node": "8ca9f875-df9b-4d99-b0aa-3a0f7f206fde",
+            "to_pin": 0
+          }
+        ],
+        "vars": [],
+        "source_file": null,
+        "source_index": 0
+      }
+    },
+    "background_color": {
+      "R": 26,
+      "G": 30,
+      "B": 36,
+      "A": 255
+    },
+    "canvas_size": {
+      "X": 1920,
+      "Y": 1080
+    },
+    "ambient_color": {
+      "R": 88,
+      "G": 98,
+      "B": 116,
+      "A": 255
+    },
+    "ambient_intensity": 0.5,
+    "sun_enabled": true,
+    "sun_color": {
+      "R": 255,
+      "G": 244,
+      "B": 228,
+      "A": 255
+    },
+    "sun_intensity": 0.5,
+    "sun_rotation": {
+      "X": -45,
+      "Y": -35,
+      "Z": 0
+    },
+    "sun_specular": 1.15,
+    "sun_cast_shadows": true,
+    "sky_texture": {
+      "path": null
+    },
+    "sky_lights_scene": true,
+    "sky_energy": 0.5,
+    "sky_blur": 0,
+    "sky_rotation": 0,
+    "fog_mode": "Disabled",
+    "fog_color": {
+      "R": 150,
+      "G": 160,
+      "B": 175,
+      "A": 255
+    },
+    "fog_start": 1,
+    "fog_end": 50,
+    "fog_density": 0.05,
+    "fog_sky_affect": 0.5,
+    "tonemap_mode": "Filmic",
+    "tonemap_exposure": 1.08,
+    "tonemap_white": 1,
+    "bloom_mode": "Mix",
+    "bloom_intensity": 0.08,
+    "bloom_levels": 0.55,
+    "bloom_threshold": 0.35,
+    "bloom_soft_threshold": 0.5,
+    "bloom_filter_radius": 1,
+    "ssao_enabled": true,
+    "ssao_radius": 1.85,
+    "ssao_intensity": 2.45,
+    "ssao_power": 1.85,
+    "ssao_bias": 0.022,
+    "ssao_samples": 8,
+    "source_file": null,
+    "source_index": 0,
+    "root": {
+      "_class": "ImpComp",
+      "name": "Untitled*",
+      "vars": {
+        "is_visible": true,
+        "is_locked": false,
+        "children_editable": true,
+        "popup_config": null,
+        "tooltip_class": {
+          "class_name": null
+        },
+        "script_override": null,
+        "script_builtin": {
+          "_class": "A_Script",
+          "vars": {
+            "parent_type": {
+              "class_name": "ImpComp"
+            },
+            "nodes": [],
+            "connections": [],
+            "vars": [],
+            "source_file": null,
+            "source_index": 0
+          }
+        }
+      },
+      "children": [
+        {
+          "_class": "C3_Mesh",
+          "name": "Ground",
+          "vars": {
+            "mesh": {
+              "path": "builtin:A_Mesh.GEO_PLANE"
+            },
+            "materials": null,
+            "cast_shadows": true,
+            "transform": {
+              "position": {
+                "X": 0,
+                "Y": 0.0002478361,
+                "Z": 0
+              },
+              "rotation": {
+                "X": 0,
+                "Y": 0,
+                "Z": 0
+              },
+              "scale": {
+                "X": 40,
+                "Y": 1,
+                "Z": 40
+              }
+            },
+            "physics_enabled": true,
+            "is_visible": true,
+            "is_locked": false,
+            "children_editable": true,
+            "popup_config": null,
+            "script_override": null,
+            "script_builtin": {
+              "_class": "A_Script",
+              "vars": {
+                "parent_type": {
+                  "class_name": "C3_Mesh"
+                },
+                "nodes": [],
+                "connections": [],
+                "vars": [],
+                "source_file": null,
+                "source_index": 0
+              }
+            }
+          },
+          "children": []
+        },
+        {
+          "_class": "C3_Mesh",
+          "name": "Cube",
+          "vars": {
+            "mesh": {
+              "path": "builtin:A_Mesh.GEO_CUBE"
+            },
+            "materials": null,
+            "cast_shadows": true,
+            "transform": {
+              "position": {
+                "X": 0,
+                "Y": 0.5,
+                "Z": 0
+              },
+              "rotation": {
+                "X": 0,
+                "Y": 0,
+                "Z": 0
+              },
+              "scale": {
+                "X": 1,
+                "Y": 1,
+                "Z": 1
+              }
+            },
+            "physics_enabled": true,
+            "is_visible": true,
+            "is_locked": false,
+            "children_editable": true,
+            "popup_config": null,
+            "script_override": null,
+            "script_builtin": {
+              "_class": "A_Script",
+              "vars": {
+                "parent_type": {
+                  "class_name": "C3_Mesh"
+                },
+                "nodes": [],
+                "connections": [],
+                "vars": [],
+                "source_file": null,
+                "source_index": 0
+              }
+            }
+          },
+          "children": []
+        },
+        {
+          "_class": "C2_Box",
+          "name": "Panel",
+          "vars": {
+            "style": {
+              "path": "builtin:UiStyle_Box.STYLE_BKG_DARK"
+            },
+            "transform": {
+              "position": {
+                "X": 262,
+                "Y": 184
+              },
+              "rotation": 0,
+              "scale": {
+                "X": 1,
+                "Y": 1
+              }
+            },
+            "position": {
+              "X": 0,
+              "Y": 0
+            },
+            "stretch_ratio": 1,
+            "layout": {
+              "orient_H": "Start",
+              "orient_V": "Start",
+              "size": {
+                "X": 320,
+                "Y": 140
+              },
+              "size_min": {
+                "X": 0,
+                "Y": 0
+              },
+              "size_max": {
+                "X": 0,
+                "Y": 0
+              }
+            },
+            "clip_children": false,
+            "pivot": {
+              "X": 0.5,
+              "Y": 0.5
+            },
+            "normalize_pivot": true,
+            "cursor_filter": "Pass",
+            "is_visible": true,
+            "is_locked": false,
+            "children_editable": true,
+            "popup_config": null,
+            "script_override": null,
+            "script_builtin": {
+              "_class": "A_Script",
+              "vars": {
+                "parent_type": {
+                  "class_name": "C2_Box"
+                },
+                "nodes": [],
+                "connections": [],
+                "vars": [],
+                "source_file": null,
+                "source_index": 0
+              }
+            }
+          },
+          "children": []
+        },
+        {
+          "_class": "C2_Text",
+          "name": "Title",
+          "vars": {
+            "style": {
+              "path": "builtin:UI_Text.DEFAULT"
+            },
+            "text": "text here",
+            "font_size_override": 45,
+            "wrap": "Word",
+            "text_alignment_v": "Center",
+            "text_alignment_h": "Center",
+            "transform": {
+              "position": {
+                "X": 264,
+                "Y": 184
+              },
+              "rotation": 0,
+              "scale": {
+                "X": 1,
+                "Y": 1
+              }
+            },
+            "position": {
+              "X": 0,
+              "Y": 0
+            },
+            "stretch_ratio": 1,
+            "layout": {
+              "orient_H": "Start",
+              "orient_V": "Start",
+              "size": {
+                "X": 320,
+                "Y": 36
+              },
+              "size_min": {
+                "X": 0,
+                "Y": 0
+              },
+              "size_max": {
+                "X": 0,
+                "Y": 0
+              }
+            },
+            "clip_children": false,
+            "pivot": {
+              "X": 0.5,
+              "Y": 0.5
+            },
+            "normalize_pivot": true,
+            "cursor_filter": "Pass",
+            "is_visible": true,
+            "is_locked": false,
+            "children_editable": true,
+            "popup_config": null,
+            "script_override": null,
+            "script_builtin": {
+              "_class": "A_Script",
+              "vars": {
+                "parent_type": {
+                  "class_name": "C2_Text"
+                },
+                "nodes": [],
+                "connections": [],
+                "vars": [],
+                "source_file": null,
+                "source_index": 0
+              }
+            }
+          },
+          "children": []
+        }
+      ]
+    }
+  }
+}

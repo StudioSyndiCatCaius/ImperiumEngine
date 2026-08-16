@@ -216,7 +216,7 @@ public class EdCommonCompTile : Imp2D
         }
     }
 
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
         TDimensions2 dim = Dimensions_Get();

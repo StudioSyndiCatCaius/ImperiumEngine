@@ -158,7 +158,7 @@ public class C2_Expandable : Imp2D
         }
     }
 
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
         if (!is_expanded || style?.style_content_box == null) return;

@@ -230,13 +230,16 @@ public class PNL_FileBrowser : EdPanel
         {
             Vector2 p = add.Dimensions_Get().position;
             p.Y += add.Dimensions_Get().size.Y;
-            C1_PopupMenu.Open(p, new List<TPopupMenuOption>
+            ImpPlayer.Popup_Run(this, new A_PopupConfig
             {
-                new() { text = "New Folder", on_press = NewFolder },
-                new() { text = "New Scene", on_press = NewScene },
-                new() { is_separator = true },
-                new() { text = "Import Sources as Assets", on_press = ImportSources },
-            });
+                options = new List<TPopupMenuOption>
+                {
+                    new() { text = "New Folder", on_press = NewFolder },
+                    new() { text = "New Scene", on_press = NewScene },
+                    new() { is_separator = true },
+                    new() { text = "Import Sources as Assets", on_press = ImportSources },
+                },
+            }, null, p);
         };
         _toolbar.Child_Add(add);
         _toolbar.Child_Add(ToolBtn("Import", 70, ImportSources));
@@ -439,7 +442,7 @@ public class PNL_FileBrowser : EdPanel
             if (p.Cursor_IsInDimensions(file_list.Dimensions_Get())
                 && p.target_cursor is not EdFileThumbnail)
             {
-                C1_PopupMenu.Open(p.cursor.position, EmptyFolderOptions());
+                ImpPlayer.Popup_Run(this, new A_PopupConfig { options = EmptyFolderOptions() }, null, p.cursor.position);
             }
         }
 
@@ -502,7 +505,7 @@ public class PNL_FileBrowser : EdPanel
     {
         if (item.data is not TDirectory dir || string.IsNullOrEmpty(dir.path)) return;
         Vector2 pos = ImpPlayer.players.Count > 0 ? ImpPlayer.players[0].cursor.position : Vector2.Zero;
-        C1_PopupMenu.Open(pos, FolderOptions(dir.path));
+        ImpPlayer.Popup_Run(this, new A_PopupConfig { options = FolderOptions(dir.path) }, null, pos);
     }
 
     void _DirDropExternal(object payload, TTreeItem item)
@@ -1217,7 +1220,7 @@ public class PNL_FileBrowser : EdPanel
         Vector2 pos = ImpPlayer.players.Count > 0 ? ImpPlayer.players[0].cursor.position : Vector2.Zero;
         if (thumb.is_folder)
         {
-            C1_PopupMenu.Open(pos, FolderOptions(thumb.path, thumb));
+            ImpPlayer.Popup_Run(this, new A_PopupConfig { options = FolderOptions(thumb.path, thumb) }, null, pos);
             return;
         }
 
@@ -1233,7 +1236,7 @@ public class PNL_FileBrowser : EdPanel
         opts.Add(new() { text = "Duplicate", on_press = () => Path_Duplicate(thumb.path) });
         opts.Add(new() { text = "Show in Explorer", on_press = () => ShowInExplorer(thumb.path, true) });
         opts.Add(new() { text = "Delete", on_press = () => Path_DeleteAsk(thumb.path) });
-        C1_PopupMenu.Open(pos, opts);
+        ImpPlayer.Popup_Run(this, new A_PopupConfig { options = opts }, null, pos);
     }
 
     List<TPopupMenuOption> FolderOptions(string path, EdFileThumbnail thumb = null)
@@ -1246,6 +1249,7 @@ public class PNL_FileBrowser : EdPanel
             new() { is_separator = true },
             new() { text = "New Folder", on_press = NewFolder },
             new() { text = "New Scene", on_press = NewScene },
+            new() { text = "New Asset", on_press = NewAsset },
             new() { is_separator = true },
             new() { text = "Rename", on_press = () => Rename_Begin(path, thumb) },
             new() { text = "Duplicate", on_press = () => Path_Duplicate(path) },
@@ -1260,6 +1264,7 @@ public class PNL_FileBrowser : EdPanel
         {
             new() { text = "New Folder", on_press = NewFolder },
             new() { text = "New Scene", on_press = NewScene },
+            new() { text = "New Asset", on_press = NewAsset },
             new() { text = "Import Sources as Assets", on_press = ImportSources },
             new() { is_separator = true },
             new() { text = "Refresh", on_press = RefreshAll },
@@ -1276,11 +1281,12 @@ public class PNL_FileBrowser : EdPanel
 
     void NewScene()
     {
-        if (string.IsNullOrEmpty(_current_dir) || !Directory.Exists(_current_dir)) return;
-        string dest = UniqueName(_current_dir, "NewScene", ".ImpScene");
-        ImpScene scene = new() { filepath = dest };
-        scene.File_Write();
-        Browsers_Notify();
+        DLG_NewScene.Run(_current_dir);
+    }
+
+    void NewAsset()
+    {
+        DLG_NewAsset.Run(_current_dir);
     }
 
     void ImportSources()
@@ -1502,6 +1508,44 @@ public class PNL_FileBrowser : EdPanel
         catch { return string.Equals(a, b, StringComparison.OrdinalIgnoreCase); }
     }
 
+    // Game Content folder for new files. Engine content is read-from, not written-to.
+    public static string Folder_ForCreate(string suggested)
+    {
+        string game = ImpFile.ContentDir_Game();
+        string folder = suggested;
+        if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))
+        {
+            folder = game;
+        }
+
+        string engine = ImpFile.ContentDir_Engine();
+        if (!string.IsNullOrEmpty(engine)
+            && !string.IsNullOrEmpty(game)
+            && IsUnder(folder, engine)
+            && !IsUnder(folder, game)
+            && !PathsEqual(folder, game))
+        {
+            folder = game;
+        }
+
+        if (string.IsNullOrEmpty(folder))
+        {
+            return "";
+        }
+        if (!Directory.Exists(folder))
+        {
+            try
+            {
+                Directory.CreateDirectory(folder);
+            }
+            catch
+            {
+                return "";
+            }
+        }
+        return folder;
+    }
+
     public static bool IsUnder(string path, string root)
     {
         if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(root)) return false;
@@ -1674,7 +1718,7 @@ public class EdRenameField : C2_Box
         else Commit();
     }
 
-    public override void OnDraw2DForeground(double dt, WDrawFlags flags)
+    public override void OnDraw2DForeground(double dt, EDrawFlags flags)
     {
         base.OnDraw2DForeground(dt, flags);
         TDimensions2 dim = Dimensions_Get();
@@ -1705,7 +1749,7 @@ public class EdDragGhost : Imp2D
         layout.size_min = layout.size;
     }
 
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
         TDimensions2 dim = Dimensions_Get();
@@ -1909,7 +1953,7 @@ public class EdFileThumbnail : Imp2D
     // Draw
     // ---------------------------------------------------------------------------------------------------------
     
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
         TDimensions2 dim = Dimensions_Get();

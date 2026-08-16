@@ -1,4 +1,5 @@
 using System.Numerics;
+using ImperiumEngine.Dialogs;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Structs;
 using Raylib_cs;
@@ -40,15 +41,33 @@ public class C2_AssetSlot : Imp2D
         c_picker = new C2_Picker
         {
             placeholder = "None",
-            options_build = () => C2_Picker.Options_Assets(asset_type),
             text_get = Label_Value,
             tint_get = () => ImpAsset.Color_ForType(Value?.GetType() ?? asset_type),
-            on_picked = opt => Value_Set(ImpAsset.Load(opt.data as string ?? "")),
             on_cleared = () => Value_Set(null),
             drop_accepts = Drop_Accepts,
             on_dropped = path =>
             {
-                if (Drop_Accepts(path)) Value_Set(ImpAsset.Load(path));
+                if (Drop_Accepts(path))
+                {
+                    Value_Set(ImpAsset.Load(path));
+                }
+            },
+            on_open = () =>
+            {
+                Dialog_AssetPicker.Run(asset_type,
+                    path =>
+                    {
+                        if (string.IsNullOrEmpty(path))
+                        {
+                            Value_Set(null);
+                        }
+                        else
+                        {
+                            Value_Set(ImpAsset.Load(path));
+                        }
+                    },
+                    current_path: Value?.filepath,
+                    title: "Select " + C2_Tree.Class_DisplayName(asset_type));
             },
         };
         Child_Add(c_picker);
@@ -165,7 +184,7 @@ public class C2_AssetSlot : Imp2D
         layout.size_min = new Vector2(layout.size_min.X, layout.size.Y);
     }
 
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         TDimensions2 dim = Dimensions_Get();
         UiStyle_Box.STYLE_BKG_MID.Draw(new TDimensions2 { position = dim.position, size = new Vector2(dim.size.X, HeadH) });

@@ -400,7 +400,7 @@ public class ImpAsset : I_File, I_Property
         return new Color((byte)90, (byte)90, (byte)90, (byte)255);
     }
 
-    public ImpAsset Clone()
+    public virtual ImpAsset Clone()
     {
         if (Activator.CreateInstance(GetType()) is not ImpAsset copy) return null;
         foreach (FieldInfo f in GetType().GetFields(BindingFlags.Public | BindingFlags.Instance))

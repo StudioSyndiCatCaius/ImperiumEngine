@@ -1,4 +1,6 @@
-﻿namespace ImperiumEngine;
+﻿using ImperiumEngine.Assets;
+
+namespace ImperiumEngine;
 
 
 [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
@@ -7,8 +9,11 @@ public sealed class ImpVarAttribute : Attribute
     // Optional: allow a custom JSON key
     public string? Name { get; }
 
-    public bool ReadOnly { get; init; }
-
+    public EImpVarInspect Inspect { get; init; }
+    public EImpVarEdit Edit { get; init; }
+    
+    public bool ReadOnly { get; init; } //DEPRC
+    public bool Hidden { get; init; }
 
     public bool Advanced { get; init; }
     
@@ -28,7 +33,7 @@ public sealed class CategoryAttribute : Attribute
 }
 
 // overrides display name in the editor
-[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property | AttributeTargets.Enum)]
+[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property | AttributeTargets.Enum | AttributeTargets.Class | AttributeTargets.Method)]
 public sealed class TitleAttribute : Attribute
 {
     
@@ -51,10 +56,10 @@ public sealed class AssetColorAttribute : Attribute
 }
 
 [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
-public sealed class ImpConfigAttribute : Attribute
+public sealed class ConfigAttribute : Attribute
 {
     public string? Name { get; }
-    public ImpConfigAttribute(string? name = null) => Name = name;
+    public ConfigAttribute(string? name = null) => Name = name;
 }
 
 

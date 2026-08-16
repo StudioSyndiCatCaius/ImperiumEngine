@@ -191,6 +191,8 @@ public static class EdState
             data.panel_width = window.GetFloat("panel_width", 300);
             data.browser_stretch = window.GetFloat("browser_stretch", 0.5f);
             data.browser_asset_stretch = window.GetFloat("browser_asset_stretch", 0.5f);
+            data.scene_tabs_stretch = window.GetFloat("scene_tabs_stretch", 1f);
+            data.asset_tabs_stretch = window.GetFloat("asset_tabs_stretch", 1f);
             data.outliner_stretch = window.GetFloat("outliner_stretch", 1f);
             data.inspector_stretch = window.GetFloat("inspector_stretch", 1.2f);
         }
@@ -259,6 +261,8 @@ public static class EdState
         window.Set("panel_width", data.panel_width);
         window.Set("browser_stretch", data.browser_stretch);
         window.Set("browser_asset_stretch", data.browser_asset_stretch);
+        window.Set("scene_tabs_stretch", data.scene_tabs_stretch);
+        window.Set("asset_tabs_stretch", data.asset_tabs_stretch);
         window.Set("outliner_stretch", data.outliner_stretch);
         window.Set("inspector_stretch", data.inspector_stretch);
 
@@ -293,6 +297,15 @@ public static class EdState
         data.browser.ToTable(doc.root.EnsureTable("file_browser"));
         data.browser_asset.ToTable(doc.root.EnsureTable("file_browser_asset"));
         return doc;
+    }
+
+    /// <summary>
+    /// C2_List fill weights stay small (0.5 / 1 / 1.2, or a 0-1 pair after a splitter drag).
+    /// Older saves wrote pixel heights (e.g. 189) into stretch_ratio — reject those.
+    /// </summary>
+    public static bool Stretch_IsWeight(float v)
+    {
+        return v > 0f && v <= 8f;
     }
 
     public static string Path_Store(string path)
@@ -391,6 +404,8 @@ public class EdStateData
     public float panel_width = 300;
     public float browser_stretch = 0.5f;
     public float browser_asset_stretch = 0.5f;
+    public float scene_tabs_stretch = 1f;
+    public float asset_tabs_stretch = 1f;
     public float outliner_stretch = 1f;
     public float inspector_stretch = 1.2f;
     public int active_scene;

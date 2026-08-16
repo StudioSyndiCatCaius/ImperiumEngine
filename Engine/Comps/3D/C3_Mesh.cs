@@ -18,7 +18,7 @@ public class C3_Mesh : Imp3D
         collision_preset=A_CollisionPreset.PRESET_MESH;
     }
     
-    public override void OnDraw3D(double dt, WDrawFlags flags)
+    public override void OnDraw3D(double dt, EDrawFlags flags)
     {
         base.OnDraw3D(dt, flags);
         if (mesh == null || mesh.mesh.VertexCount <= 0) return;

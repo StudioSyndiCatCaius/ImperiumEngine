@@ -4,7 +4,6 @@ using Editor.Panel;
 using Editor.Windows;
 using ImperiumEngine;
 using ImperiumEngine.Assets;
-using ImperiumEngine.Comps._1D.Dialog;
 using ImperiumEngine.Comps._2D;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Structs;
@@ -79,6 +78,11 @@ public class Scene_Editor : ImpComp
     public WND_ConfigComp mtab_config_comp = new();
     public WND_ConfigGame mtab_config_game = new();
     public WND_ConfigEditor mtab_config_editor = new();
+    public C2_GameView view_game = new();
+
+    public C2_Button btn_stop;
+    public C2_Button btn_play;
+    public C2_Button btn_play_start;
     
     public Scene_Editor()
     {
@@ -113,7 +117,7 @@ public class Scene_Editor : ImpComp
         // Main Buttons
         // ---------------------
 
-        void _AddMainButton(string text, A_Texture icon, Action on_press)
+        C2_Button _AddMainButton(string text, A_Texture icon, Action on_press)
         {
             C2_Button _btn = new()
             {
@@ -134,6 +138,7 @@ public class Scene_Editor : ImpComp
                 },
             };
             ui_main_buttons.Child_Add(_btn);
+            return _btn;
         }
 
         void _AddMainSeperator()
@@ -159,8 +164,10 @@ public class Scene_Editor : ImpComp
         _AddMainButton("Save As", A_Texture.ICO_SAVE, () => { MOpt_Save_As(); });
         _AddMainButton("Save All", A_Texture.ICO_SAVE, () => { MOpt_Save_All(); });
         _AddMainSeperator();
-        _AddMainButton("Play", A_Texture.ICO_PLAY, () => { MOpt_Play(); });
-        _AddMainButton("Play From Start", A_Texture.ICO_PLAY, () => { MOpt_Play_Start(); });
+        btn_stop = _AddMainButton("Stop", A_Texture.ICO_STOP, () => { MOpt_Play_Stop(); });
+        btn_play = _AddMainButton("Play", A_Texture.ICO_PLAY, () => { MOpt_Play(); });
+        btn_play_start = _AddMainButton("Play From Start", A_Texture.ICO_PLAY, () => { MOpt_Play_Start(); });
+        btn_stop.is_disabled = true;
 
         // ---------------------
         // Main Tabs
@@ -208,6 +215,28 @@ public class Scene_Editor : ImpComp
         bool ctrl = ImpPlayer.Key_IsHeld(EInputKey.Key_LeftControl) || ImpPlayer.Key_IsHeld(EInputKey.Key_RightControl);
         if (ctrl && ImpPlayer.Key_IsPressed(EInputKey.Key_Y)) MOpt_Redo();
 
+        bool pie = ImpGame.Get(ImpGame.ID_PLAY) != null;
+        if (btn_stop != null)
+        {
+            btn_stop.is_disabled = !pie;
+        }
+        if (btn_play != null)
+        {
+            btn_play.is_disabled = pie;
+        }
+        if (btn_play_start != null)
+        {
+            btn_play_start.is_disabled = pie;
+        }
+        if (!pie && ImpPlayer.Action_IsPressed("PIE_Play"))
+        {
+            MOpt_Play();
+        }
+        if (pie && ImpPlayer.Action_IsPressed("PIE_Quit"))
+        {
+            MOpt_Play_Stop();
+        }
+
         if (_edit_options == null || _edit_options.Count < 2) return;
         ImpUndo undo = ImpUndo.active;
         _Sync(0, "Undo", undo != null && undo.CanUndo, undo?.UndoLabel);
@@ -250,12 +279,22 @@ public class Scene_Editor : ImpComp
     }
 
     public void MOpt_New_Scene()
-    { 
-        Console.WriteLine("New Scene");   
+    {
+        DLG_NewScene.Run(Folder_ForCreate());
     }
+
     public void MOpt_New_Asset()
     {
-        Console.WriteLine("New Asset");  
+        DLG_NewAsset.Run(Folder_ForCreate());
+    }
+
+    string Folder_ForCreate()
+    {
+        if (ActiveWindow() is WND_Asset)
+        {
+            return mtab_asset.file_browser.CurrentDir;
+        }
+        return mtab_scene.file_browser.CurrentDir;
     }
     
     public void MOpt_Save()
@@ -349,15 +388,52 @@ public class Scene_Editor : ImpComp
     
     public void MOpt_Play()
     {
-        Console.WriteLine("Play");
+        if (ImpGame.Get(ImpGame.ID_PLAY) != null)
+        {
+            return;
+        }
+        PNL_SceneView view = mtab_scene.ActiveEdScene();
+        if (view == null || view.scene == null)
+        {
+            return;
+        }
+        ImpGame game = ImpGame.Play_Start(view.scene);
+        if (game == null)
+        {
+            return;
+        }
+        if (view.view_root != null)
+        {
+            view.view_root.Child_Add(view_game);
+        }
+        else
+        {
+            view.Child_Add(view_game);
+        }
+        view_game.layout = TLayout2.FULL;
+        view_game.is_visible = true;
+        view_game.Bind(game, view.viewport3D.camera);
+        if (view.tabs_view != null)
+        {
+            view.tabs_view.selected_tab = 0;
+        }
+        ui_main_tabs.selected_tab = 0;
     }
 
     public void MOpt_Play_Start()
     {
-        Console.WriteLine("Play from Start");
+        MOpt_Play();
     }
 
-    public override void OnDraw2DForeground(double dt, WDrawFlags flags)
+    public void MOpt_Play_Stop()
+    {
+        view_game.Unbind();
+        view_game.is_visible = false;
+        view_game.Detach();
+        ImpGame.Play_Stop();
+    }
+
+    public override void OnDraw2DForeground(double dt, EDrawFlags flags)
     {
         ImpPlayer? _player = ImpPlayer.players.Count > 0 ? ImpPlayer.players[0] : null;
         if (_player == null) return;

@@ -12,19 +12,22 @@ Scene-graph node. `Imp2D` / `Imp3D` inherit.
 | `is_visible` | ImpVar. Local only — `IsVisibleInTree()` walks ancestors. |
 | `parent` / `children` | Tree. `children` is readonly list, mutate via Child_* / Detach. |
 | `scene` | Cached owning `ImpScene`. **Not** ImpVar. Property: assign cascades to descendants. |
+| `game_owner` | Cached owning `ImpGame`. **Not** ImpVar. Same cascade as `scene`. Get(0) = editor/standalone, Get(1) = PIE. |
 | `input_owner` | `ImpPlayer` that feeds input into this subtree. |
+| `popup_config` | `A_PopupConfig`. Non-null = RMB on this comp (or a descendant without its own config) opens the global ImpPlayer popup. |
 
-**`scene` contract**
-- Set on attach: `Child_Add` / `Child_Insert` copy `parent.scene` onto the child (cascades).
+**`scene` / `game_owner` contract**
+- Set on attach: `Child_Add` / `Child_Insert` copy `parent.scene` and `parent.game_owner` onto the child (cascades).
 - Cleared on `Detach` and `Destroy`.
-- Scene root is bound by `ImpScene.root` setter (`root.scene = this`).
-- Loose / cloned comps have `scene == null` until attached under a bound root.
-- Clone skips `_scene` (and parent/children/input_owner/is_destroying). Re-attach to bind.
+- Scene root is bound by `ImpScene.root` setter (`root.scene = this`, `root.game_owner = scene.game`).
+- `ImpGame.scene` setter stamps `ImpScene.game`, which stamps the tree.
+- Loose / cloned comps have `scene` / `game_owner` == null until attached under a bound root.
+- Clone skips `_scene` and `_game_owner` (and parent/children/input_owner/is_destroying). Re-attach to bind.
 
 **Tree ops**
 - `Child_Add` / `Child_Insert` Detach first (or reorder if already a child).
 - `Reparent` keeps world transform for 2D/3D, then Child_Add/Insert.
-- `Destroy` destroys children first, then unhooks parent + clears scene.
+- `Destroy` destroys children first, then unhooks parent + clears scene and game_owner.
 - Update/Draw snapshot children via `ArrayPool` (not `ToArray`) because those passes may reparent/destroy.
 
 **Do not confuse with** `Imp2D._scene_root` — static per-frame flag for “this subtree is scene canvas content” (layout/pivot/rotation). That is **not** `ImpComp.scene`.
@@ -63,15 +66,19 @@ Icons autoload from `{engine}/Icons/type/` then `{engine}/Icons/Types/`. Tried n
 
 **UI styles** live in the matching `C2_*.cs` as `ImpAsset` subclasses (`UI_Text` in `C2_Text`, `UI_Button` + `EButtonLayout` in `C2_Button`, `UI_List` in `C2_List`, `UI_MenuBar` in `C2_MenuBar`, `UI_TextEdit` / `UI_Slider` / `UI_TabBox` same pattern). Box chrome is `UiStyle_Box` in `C2_Box`. There is no `Engine/Assets/UI` or `A_UI` anymore.
 
+`C2_TextEdit.hog_input` (default true) is whether focusing the field sets `input_hog`. Inspector fields hog; graph pin defaults set it false so the canvas still pans / zooms / clicks. Click-outside walks from `target_cursor` up (the field or a descendant), not from the field up through ancestors — otherwise clicking the graph (an ancestor) would never unfocus.
+
 ## ImpScene (`Engine/ImpScene.cs`)
 
 `ImpAsset` subclass. File ext `ImpScene`. A scene **is** a hierarchy of ImpComps under `root`.
 
 | Member | Notes |
 |---|---|
-| `current` / `global` | Static scenes. `current` is the live app/editor tree. |
+| `current` / `global` | `current` follows `ImpGame.current.scene` (Get(0) host, or Get(1) while PIE is ticking). `global` is still process-wide. |
+| `game` | Owning `ImpGame`. Stamped by `ImpGame.scene`. Cascades onto `root`. |
 | `root` | Property. Assign unbinds old tree (`scene=null`), Detach, binds new (`scene=this`). Null coalesces to a fresh ImpComp. |
 | `root_type` | ImpVar `TClass<ImpComp>` — intended root class when creating a scene, not the live instance. |
+| `script_builtin` / `script_override` | Hidden inline `A_Script` + optional on-disk override. `Script_Get()` prefers override. New scenes always have a builtin (`parent_type` = ImpScene). |
 | `is_running` | Toggles `RuntimeBegin` / `RuntimeEnd` on the root, then `root.Update`. |
 | `canvas_size` | 2D scene canvas (default 1920x1080). |
 
@@ -100,6 +107,8 @@ File menu + toolbar + hotkeys. `C2_MenuBar` fires the File entries:
 
 | Command | Hotkey | Who |
 |---|---|---|
+| New Scene | Ctrl+N | `DLG_NewScene` — pick root `ImpComp` + name |
+| New Asset | | `DLG_NewAsset` — pick `ImpAsset` class + name |
 | Save | Ctrl+S | Frontmost `EdWindow.OnTrySave` |
 | Save As | Ctrl+Shift+S | Frontmost `EdWindow.OnTrySaveAs` |
 | Save All | Ctrl+Alt+S | All open scene/asset tabs, then remaining dirty cache. Untitled → `DLG_SaveFile` in sequence |
@@ -118,7 +127,7 @@ Loaded at the end of `Scene_Editor` ctor (`EdState.Load`). Written every 2s whil
 
 | Section | What |
 |---|---|
-| `[window]` | Main tab name, inspector/outliner tab, scene + asset file-browser expanded/stretch (`file_browser_expanded`, `file_browser_asset_expanded`, `browser_stretch`, `browser_asset_stretch`), splitter sizes (`panel_width`, sidebar) |
+| `[window]` | Main tab name, inspector/outliner tab, scene + asset file-browser expanded/stretch (`file_browser_expanded`, `file_browser_asset_expanded`, `browser_stretch` + `scene_tabs_stretch`, `browser_asset_stretch` + `asset_tabs_stretch`), splitter sizes (`panel_width`, sidebar) |
 | `[tabs]` | Active scene tab index, active asset tab index |
 | `[[open_scenes]]` | Saved scenes only (`File_CanWrite`). Camera 3D/2D, edit/gizmo/snap, selected comp name-paths |
 | `[[open_assets]]` | Open asset file paths |
@@ -129,7 +138,21 @@ Untitled tabs are not persisted (no path). Missing `Editor.TOML` keeps the defau
 
 `A_Game.GetRootDir()` uses `gamepath` first and ignores `builtin:` filepath. `Builtins_All` must not stamp `GAME_TEST.filepath` — that made `ContentDir_Game()` fall back to `{cwd}/Content` (the engine content copy). Result: Game tab listed Fonts/Icons, and `{game}/Scenes/…` restore missed project scenes.
 
-`File_TOML` (`Engine/Files/File_TOML.cs`) is a small tables / array-of-tables reader-writer used by `EdState`. Not a full TOML 1.0 impl.
+`File_TOML` (`Engine/Files/File_TOML.cs`) is a small tables / array-of-tables reader-writer used by `EdState` and `ImpConfig`. Not a full TOML 1.0 impl.
+
+## ImpConfig (`Engine/ImpConfig.cs`) / `WND_ConfigGame`
+
+Game settings. A member is a config var when it is **public**, **static**, `[ImpVar]`, and `[Config]`. Each declaring class is a category; values live in `{A_Game.game.GetRootDir()}/Config/{Type.Name}.TOML` (e.g. `ImpGame.save_game_type` → `ImpGame.TOML`).
+
+`ImpApp.Run` calls `ImpConfig.LoadAll()` after `on_pre_init` (snapshots field initialisers, then overlays the files). Editor assembly types are skipped. `[Config(name)]` / `[ImpVar(name)]` override the TOML key.
+
+`WND_ConfigGame` (main tab **Config Game**): left `C2_Tree` of categories, splitter, `C2_Inspector` on the selected `Type` (`include_static`, `declared_only`, `filter_property = ImpConfig.Member_IsConfig`). Edits save that class file immediately; File → Save writes every category.
+
+Supported TOML values: bool / string / numbers / enum (name) / `Vector2-4` / `Color` (float arrays) / `TRef<T>` (tokenized path) / `TClass<T>` (class name).
+
+`ImpGame` save slots (`save_game_type`, `save_game_prefex`, `save_global_type`, `save_global_name`) are `[Category("Save")]` config vars.
+
+`C2_Seperator` writes `stretch_ratio` as a 0-1 **share** of the two neighbors (not pixel size). `EdState.Stretch_IsWeight` rejects values `> 8` so old pixel dumps (`browser_stretch = 189`) do not restore a 189:1 file-browser vs scene split. Both sides of the file-browser split are persisted (`browser_stretch` + `scene_tabs_stretch`, same for assets). Drag is disabled (and the sep ignores the cursor) when a neighbor `C2_Expandable` is collapsed.
 
 `C2_Tree.Tree_ExpandedKeys` / `Tree_SetExpandedKeys` persist folder-tree open rows. `PNL_SceneView.Camera3_Apply` / `Camera2_Apply` restore orbit distance with the 3D camera.
 
@@ -171,13 +194,153 @@ Editor outliner panel. Search bar + `C2_Tree`. Binds `scene` (or `root_comp` if 
 
 Scene viewport tab (`C2_Box`, `cursor_filter = Hit`). Owns `scene`, `undo`, `edit_mode`, `gizmo_data`, `C2_Viewport3D` + `C2_Viewport2D` (both `Pass` so clicks land on the panel), 2D/3D gizmos, camera nav, marquee/selection, asset drop, and the mode/gizmo/space/snap toolbar. `WND_Scene` still hosts the tab box, selection/inspector bind, and dup/delete hotkeys.
 
+Inner `tabs_view` pages: **Scene** (`view_root` — toolbar + 3D/2D viewports) and **Script** (`PNL_ScriptGraph`). Camera / gizmo / marquee only run on Scene. Play forces `selected_tab = 0`.
+
+## PNL_ScriptGraph (`Editor/Panel/PNL_ScriptGraph.cs`)
+
+Pulse graph editor (`EdPanel`, tab name `Script`). Binds the open `ImpScene.Script_Get()` (builtin unless `script_override` is set). Layout: override list (left) + `C2_GraphEdit` + defaults inspector (`A_Script` parent_type / vars).
+
+- Left list: `[PulseOverride]` methods on `parent_type`. Green = already in the graph. Click adds or focuses the event node.
+- RMB empty canvas: Add Override / Call Function (`[PulseCall]`) / Variables / Flow. Context is **Self** (`parent_type`). The menu is `ScriptNodes.Menu(ctx, self_ctx, script)` — the panel only turns entries into `TPopupMenuOption`s, grouped by `category` (separator on change).
+- Drop a wire on empty canvas: same menu. If the pin is an object type, context is **that type** (not Self), `self_ctx = false` (no Overrides / Flow) and the new node auto-wires.
+- `BuildWidget` no longer knows any node's shape: it calls `ScriptNodes.Create(pn, ctx, script)` and maps `GetNode_Title/Color/Chrome` + `Slots_Build` rows onto the widget through `ApplySlot`. One `Spawn(TScriptNodeMenu, …)` replaces `SpawnFunc` / `SpawnVar`.
+- Graph widget stays generic — Pulse node data is `TPulseNode` on `C2_GraphNode.user_data`. No compile / VM yet.
+
+## C2_GraphEdit / C2_GraphNode (`Engine/Comps/2D/C2_Graph.cs`)
+
+Generic Godot-like graph canvas. **No scripting types in here** — Pulse / anim / material graphs all reuse this.
+
+`C2_GraphEdit` owns `scroll_offset` + `zoom`, `connections` (`TGraphLink`: from node/slot → to node/slot), grid, snap. Children that are `C2_GraphNode` are placed each frame: `transform.position = (graph_position - scroll) * zoom`, `layout.size = graph_size * zoom`.
+
+`C2_GraphNode`: `title`, `graph_position` / `graph_size` (graph space), `title_color`, `slots` (`TGraphSlot`: left/right enable, type int, color, name). `Slot_Set(index, …)` grows the list. Same `type` required to connect. One wire per input (new connect replaces). Outputs fan out.
+
+Unconnected **value** inputs (`TGraphSlot.edit_left`) host an inspector-style widget (`C2_TextEdit` / slider / checkbox / dropdown / vector / color) as a child of the node. Layout is `transform.position` (same as other Imp2D chrome) via `SlotEdits_Layout`, called from the graph's place-nodes pass so it lines up with the pin. Clicking the widget selects the node but does not drag it. The widget hides while that input is wired. Pin text fields set `C2_TextEdit.hog_input = false` so they type without swallowing graph input; Delete / Ctrl+A stay on the field while it is focused. `TGraphSlot.value` is the live default; `on_slot_value` notifies the host. `C2_GraphEdit.IsInputConnected` / `C2_GraphNode.SlotEdits_Rebuild` / `SlotEdit_Hit`.
+
+Input (Godot-ish):
+- Pan: MMB, Space+LMB, or RMB on empty canvas
+- Zoom: wheel toward cursor
+- Drag node (selected move together). Ctrl inverts snap
+- Box select (Shift additive)
+- Drag output → input to connect. Drag a wired input to pull the wire off and rewire (`right_disconnects`)
+- RMB on a wire deletes it. Delete/Backspace: selected nodes (and their wires) or a selected wire
+- Ctrl+A select all
+
+`Connect` / `Disconnect` / `CanConnect` are the API. `on_connection` / `on_disconnection` fire after the list changes. `on_context_empty(screen)` — RMB on empty canvas (replaces RMB-pan when set). `on_connect_drop(screen, node, slot, from_out)` — released a wire on empty. `on_node_removed` before Destroy. `TGraphSlot.data_left/right` optional `Type` for host graphs. `C2_GraphNode.user_data` is host payload.
+
+Node chrome uses `{engine}/Textures/Graph/` (UE GraphEditor brushes, MIT). `C2_GraphEdit.style` is `UI_Graph`. `C2_GraphNode.chrome` = Regular (body + title spill/gloss + shadow) or Var (compact get/set). Pins/wires still drawn in code. Missing textures fall back to a tinted rect.
+
+RMB empty still pans if `on_context_empty` is null. MMB / Space+LMB always pan.
+
+## A_Script / Pulse (`Engine/Assets/A_Script.cs`, `Engine/ImpGraph.cs`)
+
+Pulse is Imperium's visual script (UE Blueprints-like). File ext `ImpScript`.
+
+`A_Script`: `parent_type` (`TClass<Object>` — `Get()` resolves by type name), `nodes` (`List<TPulseNode>`), `connections` (`List<TGraphConnection>` Guid+pin), `vars` (`List<TScriptVar>`). Hidden ImpVars stay out of the inspector.
+
+`TPulseNode.node_class` names the `SN_*` class that describes the node (empty on nodes saved before it existed — `ScriptNodes.Create` then falls back to `kind`). `TPulseNode.pin_values` (`List<TPulsePinValue>`: name / type_name / invariant text) stores unconnected input defaults. `Pin_Get` / `Pin_Set`. `Pulse.CanEditDefault` is string / bool / numbers / Vector2-4 / Color / enum (not exec, not object Target). Script graph marks those left pins `edit_left` and rebuilds widgets after `BuildWidget`.
+
+**Where scripts live**
+- `ImpScene.script_builtin` (always present) + optional on-disk `script_override`. `Script_Get()` prefers override.
+- **A scene script is authored against `ImpScene.RootType_Get()` (the `root_type` comp class), never `ImpScene`.** ImpAssets are not scriptable; the script treats the scene as a custom subclass of its root comp, so the root's ImpVars / `[PulseCall]`s / `[PulseOverride]`s are what's in scope (and `Self` / an unconnected `Target` means the root comp). `Script_Get()` re-syncs `parent_type` to `root_type` every call, which both follows a root-class change and migrates scenes saved when the builtin was parented to `ImpScene`. Editing `parent_type` on a scene builtin in the Defaults inspector will snap back — it is derived. The graph's source label shows the context: `Builtin (ImpComp)`.
+- `ImpComp` has the same pair; parent_type defaults to the comp's class. Scene Script tab edits the **scene** script, not the selected comp.
+
+**Attributes** (`Engine/Attributes.cs`)
+- `[PulseCall]` — callable from the graph (void = exec node, non-void = pure).
+- `[PulseOverride]` — overridable event (left list + RMB). On `ImpComp`: OnBegin / OnEnd / OnUpdate / Input_* / OnPopupSelect. On `ImpScene`: OnBegin / OnEnd / OnUpdate. Also `Print(string)`, `Destroy`, `IsVisibleInTree` as calls.
+
+`Pulse` static: type id/color, Overrides/Calls/Vars reflection. Exec pin id is 0.
+
+**`Pulse.Vars` is strict on `EImpVarEdit`** — `Edit = None` (the default on all 296 `[ImpVar]`s today) means *not scriptable*, so it never appears in the graph. `ReadOnly` = Get only, `ReadWrite` = Get + Set. Same rule on `TScriptVar.edit` for script-local vars. Annotate `Edit =` on a var to make it scriptable; the Variables category is empty until then. `Inspect` / `Hidden` are unchanged and still drive the inspector.
+
+## ScriptNode / SN_* (`Engine/Script/ScriptNode.cs`, `Engine/Script/Node/SN_*.cs`)
+
+The SN_* classes own what a node **is**; `TPulseNode` stays the serialized form and `A_Script` stays the file. `ScriptNode : ImpGraphNode` has `context` (type the member came off), `member`, `script`, and:
+
+- `Bind(TPulseNode, Type)` — copies id / member and fills any `[ImpVar]` field on the node from the matching `pin_values` entry, so `SN_If.condition` / `SN_Delay.time` equal their pin defaults.
+- `GetNode_Title()` / `GetNode_Color()` (both from `ImpGraphNode`) / `GetNode_Chrome()`.
+- `Slots_Build(List<TScriptSlot>)` — pin rows top to bottom. `TScriptSlot` mirrors `TGraphSlot`'s left/right layout **without** referencing the widget; an enabled pin with a null type is exec.
+
+`is_available` = the node can be added anywhere from the menu. True for flow nodes (`SN_If`, and everything under `ScriptNodeAsync` — `SN_Delay`). **False** for the reflected ones, which exist only as one instance per member: `SN_Func` per `[PulseCall]`, `SN_Event` per `[PulseOverride]`, `SN_VarGet` / `SN_VarSet` per scriptable `[ImpVar]`.
+
+`ScriptNodes` (static) scans the assembly once for concrete `ScriptNode` subclasses, keeping a prototype of each to read `is_available` / title.
+- `Create(pn, ctx, script)` → instance, by `TPulseNode.node_class`; falls back to `kind` for nodes saved before `node_class` existed (VoidOverride → `SN_Event`, Var → `SN_VarGet`/`SN_VarSet` by `is_set`, else `SN_Func`).
+- `Menu(ctx, self_ctx, script)` → `List<TScriptNodeMenu>` (category / text / node_class / kind / member / is_set / is_disabled).
+- Abstract bases (`ScriptNodeAsync`, `SN_Var`) are skipped by the scan, so they never show up as addable nodes.
+
+`SN_Var.Var_Type()` resolves the pin type: reflected `[ImpVar]`, else `A_Script.Var_TypeOf(name)` for script-local vars, else `object`.
+
+## Pulse runtime (`Engine/Script/ScriptVM.cs`)
+
+`A_Script.Compile()` turns the authored graph into a `TScriptProgram`: one `ScriptNode` per `TPulseNode` (via `ScriptNodes.Create`), the wires copied out of `connections`, and `errors`. Node pin rows are built **after** `Compile_Check`, because a check can rebind a node to another type. `compiled` / `compile_dirty` are plain fields — never serialized, so a script off disk always compiles once. `Program_Get()` compiles if dirty; `Clone()` resets both so a PIE copy compiles its own.
+
+`ScriptVM(program, self)` is one running instance. **`self` is what an unwired `Target` means** — for a scene script that is the root comp.
+
+- `Event_Run(member, args)` finds the `SN_Event` by name, stores args, and walks exec from its slot 0.
+- `Exec_Follow(node, out_slot)` walks output→input; each `ScriptNode.Exec_Run(vm)` returns the exec **output slot** to continue from, or `EXEC_STOP` / `EXEC_LATENT`. `STEP_LIMIT = 4096` stops a looping graph from hanging the editor.
+- `Input_Get(node, slot)` pulls through the wire (`Value_Get` on the source, so pure nodes run on demand, UE-style) or falls back to `TPulseNode.pin_values`.
+- Latent: `Latent_Schedule` + `Update(dt)` run `SN_Delay` off a per-VM timer list — no threads.
+- Script-local `A_Script.vars` live in the VM's `_locals`, keyed by name.
+- `Value_As` coerces pin values into parameter types (defaults round-trip through text).
+
+Node runtime lives on the SN classes: `SN_Func` reflection-invokes (`Slot_Target` / `Slot_Params` mirror `Slots_Build`), `SN_VarGet` / `SN_VarSet` read/write the member or the VM local, `SN_If` returns exec 0 (True) or 1 (False), `SN_Delay` schedules and returns `EXEC_LATENT`, `SN_Event` serves args from slot-1 onward.
+
+**Stale `target_type` rebind:** nodes authored when scene scripts were parented to `ImpScene` still say `target_type: "ImpScene"`. `Compile_Check` rebinds a call/var to the script's own `ParentType_Get()` when the saved owner is not compatible with it — **unless `Target` is wired**, which means the author meant that other type. Without this those nodes throw at invoke time.
+
+**Hooks:** `ImpScene.RBegin` compiles + creates `script_vm` (self = `root`), sets `root.script_vm = script_vm` (see `ImpComp.Script_Event` below), and fires `OnBegin`; `Update` ticks latents then fires `OnUpdate(dt)`; `REnd` fires `OnEnd`, then clears `script_vm` and `root.script_vm`/`root.input_owner`. Scripts only run while `is_running`, so the editor scene never executes. **Comp scripts (`ImpComp.script_builtin`) are not hooked** — no comp script editor, and only the scene's `RBegin`/`REnd` create a VM; a comp's own `script_builtin`/`script_override` is never compiled or run.
+
+`ImpComp.script_vm` + `Script_Event(member, args)` — the comp-side half of routing. `Update_Input` calls both the C# virtual (`Input_Pressed` etc.) and `Script_Event("Input_Pressed", new object[]{ player, action, axis })` (matching parameter order, since an `SN_Event`'s output pins are the override's args in order). Only the scene **root** comp has `script_vm` set (by `RBegin`), so only input delivered to the root reaches the scene graph — a non-root comp's Input_* events currently have nowhere to go since comp scripts aren't hooked.
+
+Editor: **Compile** button in `PNL_ScriptGraph` (left column) calls `Compile()` and reports count / errors to the label and Console. `MarkDirty()` sets `compile_dirty`.
+
+`SN_VarGet.is_validate` and `EScriptVarSize` are intent for later; only `SN_Func.is_execute` is used today.
+
+**Not yet:** custom functions (`FuncInOut`), node palette beyond RMB, comp Script tab / comp script execution, undo, pin textures, pure-node caching (a fanned-out pure node re-evaluates per consumer each frame).
+
+Takeover brief: `Agents/Handoff_ScriptGraph.md`.
+
 Right-click a comp: Duplicate / Delete / Change Type / Add Child. Right-click empty tree: Add Comp. Change Type is disabled on instance roots and packed foreign. Add Child/Comp disabled on instance roots and packed foreign. Dup/Delete disabled on packed foreign and the scene root. Change Type / Add Child / Add Comp open `DLG_ChooseComp` (`Dialog_ClassPicker` of `ImpComp`).
 
-## Dialog_ClassPicker / DLG_ChooseComp
+## ImpDialog (`Engine/ImpDialog.cs`)
 
-`C1_Dialog` is a pass-through overlay + dimmer shade on `C2_MenuBar.PopupHost()`; the panel is a later sibling so it hit-tests above the shade. While open it hogs input: `C1_Dialog.Host` / `input_hog` make `ImpPlayer.Key_Is*` return false for every comp outside that subtree (`ImpComp.Updating` is the caller). Gizmo/menu hotkeys, camera, etc. go quiet; widgets inside the dialog still type. Escape closes. `Dialog_ClassPicker` hosts `C2_Tree.Tree_Populate_FromClasses` plus a search bar (`Tree_FilterClasses`). Scene tree rows use `C2_Tree.Class_Icon`. `DLG_ChooseComp` roots at `typeof(ImpComp)` and lists every concrete descendant. Skips the Editor assembly. `[ImpClass(Hidden = true)]` on a type hides it **and** every subclass (`C2_Tree.Class_IsHidden` walks bases). Labels strip `C1_` / `C2_` / `C3_` (`Class_DisplayName`). Icons autoload `{engine}/Icons/type/{Name}.png` then `Icons/Types/`, walking bases, then `ICO_COMP*`. Abstract classes stay in the tree as grey `is_disabled` rows (grouping only — click expands, no select/confirm). Confirm via OK or double-click. Shade / Cancel closes.
+Not an ImpComp. One modal at a time, like the popup. Slot is `ImpPlayer.current_dialog` (static). `Show()` closes any open dialog + popup, parents a full-screen overlay + dimmer shade on `C2_MenuBar.PopupHost()`, and hogs **all** input until a choice closes it.
 
-Reusable dialog panels (`Dialog_ClassPicker`, `Dialog_Confirm`, `DLG_SaveFile`) Detach their box so `EnsureUi` can reuse it. **Hog_Release first, then Detach, then `base.Close()`.** Detaching first orphans the search/name text edit, so `Hog_Release` no longer sees it under the overlay and `input_hog` stays set. Scene view then treats every `Key_Is*` as hogged — no orbit, no click-deselect. `ImpPlayer.Target_IsLive` drops hog/focus that left `ImpScene.current`. `Hog_Release` is `protected` so subclasses can call it.
+| Member | Notes |
+|---|---|
+| `ImpPlayer.current_dialog` | The open instance, or null. |
+| `ImpDialog.IsOpen` / `Host` / `Contains(comp)` | Gate for `Key_Allowed` and cursor. |
+| `on_dismiss` | Shade click + Escape. Subclasses set this to their No / Cancel / OK. |
+
+`Key_Allowed` gate is `ImpDialog.Host ?? Popup_Host ?? input_hog`. Widgets under the overlay still type. Cursor hover / events / grab / focus / RMB popup stay off anything outside. `C2_TextEdit` outside the dialog unfocuses. `Popup_Run` refuses while a dialog is open. `Update_Input` closes a dialog whose overlay left the live scene.
+
+Chrome (`C2_DialogHost` / `C2_DialogShade`) is hidden. The panel is a later sibling of the shade so it hit-tests above it. `Run()` always news a fresh instance — do not Detach the panel before Close (that used to orphan the hog).
+
+**Open via each type's static `Run(...)`** — args define the instance, `Action`s are the choices:
+
+| Type | Run |
+|---|---|
+| `Dialog_Alert` | `Run(message, on_ok, text_ok?)` |
+| `Dialog_Confirm` | `Run(message, on_yes, on_no?, text_yes?, text_no?)` |
+| `Dialog_ClassPicker` | `Run(root_type, on_picked, on_cancel?, title?, current?, allow_none?)` |
+| `Dialog_AssetPicker` | `Run(asset_type, on_picked, on_cancel?, current_path?, title?, allow_none?)` |
+| `DLG_ChooseComp` | `Run(on_picked, title?)` |
+| `DLG_ConfirmDelete` | `Run(message, on_yes, on_no?)` — Confirm with Delete / Cancel |
+| `DLG_NewScene` / `DLG_NewAsset` | `Run(folder?)` |
+| `DLG_SaveFile` | `Run(asset, on_save, folder?)` |
+
+`Dialog_ClassPicker` hosts `C2_Tree.Tree_Populate_FromClasses` plus a search bar (`Tree_FilterClasses`). Scene tree rows use `C2_Tree.Class_Icon`. `DLG_ChooseComp` roots at `typeof(ImpComp)` and lists every concrete descendant. Skips the Editor assembly. `[ImpClass(Hidden = true)]` on a type hides it **and** every subclass (`C2_Tree.Class_IsHidden` walks bases). Labels strip `C1_` / `C2_` / `C3_` (`Class_DisplayName`). Icons autoload `{engine}/Icons/type/{Name}.png` then `Icons/Types/`, walking bases, then `ICO_COMP*`. Abstract classes stay in the tree as grey `is_disabled` rows (grouping only — click expands, no select/confirm). Confirm via OK or double-click. Shade / Cancel closes. Inspector `TClass<T>` rows open this with `allow_none: true` (a **None** row at the top) and pre-select the current type — do not use the old `C2_Picker` dropdown.
+
+`Dialog_AssetPicker` is the Godot-style resource picker. Search + folder tree of `ImpAsset.Files_OfType` / `Builtins_OfType` (Game / Engine / Content / Builtins), **None** at the top, selected name + tokenized path, OK / Cancel / double-click. Clicking an inspector `TRef<T>` or `C2_AssetSlot` field (`C2_Picker.on_open`) opens it. Drag-drop onto the slot and the clear **×** still work on the compact field. `on_picked` gets a tokenized path (`{game}/…` / `builtin:…`) or `""` for None.
+
+`C2_Picker.on_open` — if set, click runs that instead of the inline popup. Keep the compact field for display / drop / clear.
+
+`is_create_new` (on `DLG_NewScene` / `DLG_NewAsset`) shows a **blank** name field — no default `NewScene` / `NewAsset` so Create is refused until they type one. Invalid filename chars and an already-existing path keep the picker open (`stay_open` + `Hint_Set`). Create writes into the current file-browser folder (`PNL_FileBrowser.Folder_ForCreate` — engine Content is redirected to game Content).
+
+| Dialog | Root class | File | Root / instance |
+|---|---|---|---|
+| `DLG_NewScene` | `ImpComp` | `{name}.ImpScene` | Instantiates the picked class as `scene.root`, sets `root_type` |
+| `DLG_NewAsset` | `ImpAsset` | `{name}.{File_GetExtension()}` | Instantiates the picked asset class |
+
+`Scene_Editor.MOpt_New_Scene` / `MOpt_New_Asset` (File menu + main buttons) and the file-browser New Scene / New Asset entries all call `DLG_New*.Run(folder)`. After write: `Browsers_Notify` + `ImpAsset.Editor_OnOpenAsset`.
 
 `TTreeItem` is a struct — never mutate a parent item after inserting it; build children first, then the node.
 
@@ -188,12 +351,52 @@ Reusable dialog panels (`Dialog_ClassPicker`, `Dialog_Confirm`, `DLG_SaveFile`) 
 
 Editor chrome (windows, file browser, popups) lives **inside** `current` as UI comps, so they also get `scene == ImpScene.current`. Edited game scenes are separate `ImpScene` instances shown by `PNL_SceneView` through `C2_Viewport3D` / `C2_Viewport2D`.
 
+## ImpGame / Play-in-Editor (`Engine/ImpGame.cs`)
+
+C# statics cannot be instanced (one AppDomain, and Raylib/R3D/Jolt are process-global). Game-scoped state lives on `ImpGame` instead. **Not** `A_Game` — that asset is the project (`.ImpGame` file). `ImpGame` is the live session.
+
+| Lookup | What |
+|---|---|
+| `Get(0)` / `ID_HOST` | Editor / standalone. Created by `EnsureHost` / first `Get(0)`. `scene` is the chrome tree. |
+| `Get(1)` / `ID_PLAY` | PIE session, or null when stopped. `scene` is a `PlayCopy()` of the authored scene. |
+| `current` | Ambient game for the tick in progress. `ImpScene.current` returns `current.scene`. Prefer `this.game_owner` on a comp. |
+
+`ImpApp` calls `EnsureHost()` after post-init. `C2_GameView` binds `current` to `Get(1)` around the play `Update` / `Draw`, then restores `Get(0)`. Editor chrome therefore still lives under host; game comps that read `this.game_owner` or `ImpScene.current` during their own tick see the play session.
+
+`C2_GameView.view_game` is the session it *shows* (PIE). `ImpComp.game_owner` on that widget is still Get(0) — it lives in the editor tree.
+
+**Play** (`Scene_Editor.MOpt_Play`, also `PIE_Play` = Alt+P): `Play_Start` clones the active `PNL_SceneView` scene, parents `view_game` (`C2_GameView`) onto that SceneView as a FULL overlay (not a main tab), copies the 3D camera, stays on the Scene tab. Play again is a no-op while PIE is live.
+
+**Stop** (`MOpt_Play_Stop` / toolbar Stop / `PIE_Quit` = Alt+Escape): unbinds + detaches the overlay, then `Play_Stop`. Closing the hosting scene tab also stops PIE. Toolbar: Stop is `is_disabled` when `Get(1)` is null; Play and Play From Start are `is_disabled` during PIE.
+
+`C2_GameView` ticks `view_game.scene` under `Bind`. Parent it into `PNL_SceneView.view_root` (the viewport list) so it gets the same fill slot as the editor camera. 3D is `C2_Viewport3D` with `R3D.SetAspectMode(Expand)` so the blit fills the widget. 2D HUD (`clear_background` / `draw_canvas` false) draws in-place over that blit — not through a second RT (R3D scissor leftover was covering the bottom of the 3D image). Hosting `PNL_SceneView` hides its editor toolbar/viewports while the overlay is visible. Physics isolation is not wired yet. `ImpPlayer.players` is still process-global, but **action input is now routed per session** — see below.
+
+### Input target game
+
+`ImpPlayer.target_game` (null = host) is the session a player sends action input to. `TargetGame_Get()` resolves null to `Get(ID_HOST)` — **never `ImpGame.current`**, because the gate runs inside `C2_GameView`'s `Bind(view_game)` window where `current` *is* the PIE game; a `current` fallback makes every PIE comp match and the feature silently no-ops. `TargetGame_Set` refuses a session that is no longer registered. `ImpPlayer.TargetGame_IsHost(player)` is the editor-side test (fails open).
+
+`ImpComp.Update` delivers `Update_Input` only when `game_owner == input_owner.TargetGame_Get()`; a null `game_owner` counts as host (`Destroy()` nulls it, so "always allowed" would keep feeding a dead tree). `input_hog` stays the outer, absolute veto. This only affects comps that called `Input_SetOwnerActive` — editor widgets run off `Cursor_OnEvent` / `target_focus` and are untouched, so the editor stays usable during play.
+
+`C2_GameView` claims on `Bind` (Play starts focused, for **all** players — only player 0 has a cursor, so gamepad players could never click in), on `_Notify_AsFocusTarget(Begin)`, and on `Cursor_OnEvent(Select_A/B)`; it releases on focus `End` and on `Unbind`. The `Cursor_OnEvent` claim is not redundant: focus `Begin` only fires when `target_focus` *changes*, so a future "force back to editor" hotkey would otherwise leave you unable to click back in.
+
+Reset is three overlapping layers, because a lockout is unrecoverable: `ImpGame.Play_Stop` (authoritative, covers every stop path), `C2_GameView.Unbind`, and a stale-session backstop in `ImpPlayer.Update_Input` beside the `Target_IsLive` cleanups.
+
+Ordering: `target_focus` is assigned in the **Cursor** phase, after Update. So click-in takes effect next frame (the focusing click is swallowed rather than double-firing as a game action — correct), and click-out leaks one frame of input to the game (harmless).
+
+Editor gating: `WND_Scene.HandleEditHotkeys` early-returns unless the host holds input — Delete / Ctrl+D act on the *authored* selection and would otherwise let a game bound to Delete destroy real comps mid-play. Undo/redo and the menu bar are deliberately **not** gated. `PIE_Quit` uses `Action_IsPressed`, which ignores `Key_Allowed`, so the escape hatch always works. Do **not** fold the target test into `Key_Allowed` — it would kill panel resizing, scroll boxes, sliders and dialogs during PIE.
+
+Not covered: PIE comps are not cursor targets (`Update_Cursor` traces only the editor root, with `ImpApp.app.camera`), so game HUD buttons / 3D click targets do not respond — action input only. A PIE comp holding `input_hog` would keep input after click-out (`Update_Input` calls the hog directly).
+
+`A_Texture.ICO_STOP` = `{engine}/Icons/ico_editor_stop.png` (same mint as play).
+
+Do **not** try AssemblyLoadContext or a second process for PIE. Shared GPU assets stay on `ImpAsset` cache. Per-game later: physics, `C1_GameMode.current`, transit, play-local players.
+
 ## C2_Viewport3D / C2_Viewport2D (`Engine/Comps/2D/`)
 
 Dumb display widgets. Each takes `view_scene` and/or `root` (root wins) plus optional `overlay` (drop ghost, not in the tree). Do **not** name the viewed scene `scene` — that hides `ImpComp.scene` (the editor chrome tree). `transpose_traces` (default true) remaps mouse picks through the widget camera / rect (`Trace_Ray` / `Trace_Pick` / `Trace_World`). Standalone default `cursor_filter = Hit`. Editor sets `Pass` so `PNL_SceneView` receives clicks.
 
 - 3D: R3D into a render texture, blit. Camera is on the widget; editor writes it.
-- 2D: canvas fill + `SceneLayout_Set` / `SceneDraw_*` of 2D comps.
+- 2D: canvas fill + `SceneLayout_Set` / `SceneDraw_*` of 2D comps. `clear_background` / `draw_canvas` (default true) — Game view turns both off so 2D HUD composites over the 3D blit.
 
 No gizmos, selection, or camera-drag on the viewports.
 
@@ -203,6 +406,12 @@ No gizmos, selection, or camera-drag on the viewports.
 - `C2_Viewport3D.Trace_World` — mesh pick, else Y=0 plane. `C2_Viewport2D.Trace_World` — canvas point.
 - Any active grab (`player.grab_is_active`) blocks camera / gizmo / marquee.
 - File-browser drop target is `PNL_SceneView` (`ImpScene` or `A_Mesh`).
+
+## ImpPlayer input actions (`TInputAction` / `TInputKey`)
+
+`ImpPlayer.Update_Input` builds `action_states` / `action_axis` from `native_actions` + `input_actions`. Each binding is a main `EInputKey` → `TInputKey`.
+
+`TInputKey.prereq_keys` — every listed key must be Held (`Pressed` or `Down`) or that binding is ignored. Empty / null = no chord. `None` entries are skipped. Example: `PIE_Play` is `Key_P` with prereq `Key_LeftAlt` (Alt+P). Releasing a prereq while the main key is still down Releases the action.
 
 ## ImpPlayer notify (`ENotifyGeneric` / `ENotifyGrabTarget`)
 
@@ -219,7 +428,9 @@ Cursor / grab / focus no longer use `Cursor_OnEnter` / `CursorGrab_Begin` / etc.
 
 `target_focus` is the last clicked Imp2D (`target_cursor as Imp2D` on mouse press, unless `input_hog`). ImpPlayer fires Begin/End when it changes (`last_focus_target`). Editor `Scene_Editor.OnDraw2DForeground` prints targets top-right. `EdFileThumbnail` selection follows focus: click/grab selects, focus End deselects (`Thumbnail_Select(null)`).
 
-`ImpPlayer.Target_IsLive(comp)` — `comp` is `ImpScene.current.root` or a descendant. Update_Input clears `input_hog` / `target_focus` that fail this (detached dialog widgets).
+`ImpPlayer.Target_IsLive(comp)` — `comp` is `ImpScene.current.root` or a descendant. Update_Input clears `input_hog` / `target_focus` that fail this (detached dialog widgets), and clears `target_game` when that session is gone.
+
+`C2_GameView` uses `_Notify_AsFocusTarget` Begin/End as the click-in / click-out edge for `ImpPlayer.target_game` — see **ImpGame / Play-in-Editor → Input target game**.
 
 ## C2_Inspector (`Engine/Comps/2D/C2_Inspector.cs`)
 
@@ -227,6 +438,9 @@ Inspects `[ImpVar]` fields/properties on the selected object(s). Categories are 
 
 - Category expanders (`C2_Expandable`) show the class autoload icon (`C2_Tree.Class_Icon`) after the chevron — same `{engine}/Icons/type` then `Icons/Types` walk as the outliner. `C2_Expandable.icon` / `C2_Button.icon2`.
 - Top `C2_SearchBar` (`show_search`, default on) filters by member name, pretty name, category, or a nested field. Matching categories stay expanded. File-browser settings inspector turns search off (`show_search = false`).
+- `filter_property` (`Func<MemberInfo, bool>`) — if set, a top-level member is listed only when this returns true. Nested group / `Rows_ForObject` rebuilds pass `apply_filter: false` so a Config filter does not hide `TRef.path` etc.
+- `include_static` — also collect public static `[ImpVar]`s (`Members_GetStatic`). Off by default so instance inspectors stay instance-only.
+- Target may be a `Type` (`InspectType`): inspect that type's members instead of `System.Type`. `TPropertyBind.Member` binds statics via `GetValue(null)` / `SetValue(null, …)` and pulls revert defaults from `ImpConfig.Default_TryGet`.
 
 ## C2_TabBox (`Engine/Comps/2D/C2_TabBox.cs`)
 
@@ -247,7 +461,24 @@ Live browsers register in `_browsers`. Any disk change (`Path_Delete` / `Path_Du
 
 - `ImpUndo.Place_Set` uses Detach / Child_Add / Child_Insert — scene cache follows automatically.
 - `ImpPlayer` hit-tests `ImpScene.current.root`.
-- `C1_PopupMenu` / `C2_MenuBar.PopupHost()` parent popups under `ImpScene.current.root`.
+- `ImpPlayer.Popup_Run` / `C2_MenuBar.PopupHost()` parent the one global popup under `ImpScene.current.root`.
+
+## ImpPlayer popup (`A_PopupConfig` / `C2_PopupMenu`)
+
+There is only one popup menu. `C1_PopupMenu` is gone.
+
+`A_PopupConfig` (`Engine/Assets/A_PopupConfig.cs`): `searchable` + `options` (`List<TPopupMenuOption>`). `TPopupMenuOption` lives in `ImperiumEngine.Comps._1D` (text, separator, disabled, `on_press`, suboptions).
+
+`ImpComp.popup_config` non-null: RMB walks from `target_cursor` up and opens that config. Pick fires `opt.on_press`, then `popup_menu_callback`, then `ImpComp.OnPopupSelect`.
+
+Programmatic: `ImpPlayer.Popup_Run(target, config, on_select, screen_pos?)`. `screen_pos` null = cursor. Script graph sets `searchable = true`.
+
+While open (`popup_menu_open`):
+- `Key_Allowed` gate is `ImpDialog.Host ?? Popup_Host ?? input_hog` — keys only work under the popup. Dialog wins if both would be open (popup cannot open while a dialog is).
+- Cursor events / hover / grab / focus stay on the popup. Click off (LMB/RMB) or Escape or picking a leaf option closes it.
+- `C2_TextEdit` outside the popup unfocuses so `GetCharPressed` cannot leak into a leftover field.
+
+Visual is hidden `C2_PopupMenu` (`C2_Box` + optional `C2_SearchBar` + `C2_List`). Search filters current page (separators hidden while typing; Enter picks the first enabled row). Submenus replace the page and open to the right.
 
 ## Godot: PackedScene instances (RefRepos/godot)
 

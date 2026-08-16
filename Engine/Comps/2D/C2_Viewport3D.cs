@@ -80,7 +80,7 @@ public class C2_Viewport3D : Imp2D
         return Imp3D.Ray_Plane(Trace_Ray(screen), Vector3.Zero, Vector3.UnitY, out pos);
     }
 
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
 
@@ -113,6 +113,7 @@ public class C2_Viewport3D : Imp2D
         }
 
         view_scene?.ApplyRenderState();
+        R3D.SetAspectMode(AspectMode.Expand);
 
         Camera rcam = R3D.CameraFromRL(camera);
         rcam.NearPlane = 0.05f;
@@ -134,6 +135,8 @@ public class C2_Viewport3D : Imp2D
         }
         overlay?.Draw(dt, 0, 0);
         R3D.End();
+        Raylib.EndScissorMode();
+        Rlgl.SetBlendMode(Raylib_cs.BlendMode.Alpha);
         if (ImpProfiler.enabled)
         {
             ImpProfiler.sv_r3d += ImpProfiler.Now_Ms - t0;

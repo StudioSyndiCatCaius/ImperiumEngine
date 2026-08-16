@@ -92,7 +92,7 @@ public class C2_VectorEdit : Imp2D
         }
     }
 
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
         for (int i = 0; i < fields.Length && i < tags.Length; i++)

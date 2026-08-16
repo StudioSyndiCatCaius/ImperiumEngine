@@ -99,7 +99,7 @@ public class C2_Tree : Imp2D
         }
     }
 
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
         if (style_box != null) style_box.Draw(Dimensions_Get());
@@ -117,6 +117,20 @@ public class C2_Tree : Imp2D
     public void Tree_Add(TTreeItem item)
     {
         _roots.Add(ToNode(item, null));
+        RebuildRows();
+    }
+
+    public void Tree_AddAt(int index, TTreeItem item)
+    {
+        if (index < 0)
+        {
+            index = 0;
+        }
+        if (index > _roots.Count)
+        {
+            index = _roots.Count;
+        }
+        _roots.Insert(index, ToNode(item, null));
         RebuildRows();
     }
 
@@ -591,7 +605,7 @@ class C2_TreeRow : Imp2D
         option_button = null;
     }
 
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
         TDimensions2 dim = Dimensions_Get();

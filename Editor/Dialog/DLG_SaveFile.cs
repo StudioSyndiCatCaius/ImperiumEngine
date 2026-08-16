@@ -2,8 +2,7 @@ using System.Numerics;
 using Editor.Panel;
 using ImperiumEngine;
 using ImperiumEngine.Assets;
-using ImperiumEngine.Comps._1D;
-using ImperiumEngine.Comps._1D.Dialog;
+using ImperiumEngine.Dialogs;
 using ImperiumEngine.Comps._2D;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Structs;
@@ -11,7 +10,7 @@ using Raylib_cs;
 
 namespace Editor.Dialog;
 
-public class DLG_SaveFile : C1_Dialog
+public class DLG_SaveFile : ImpDialog
 {
     public C2_Box box = new();
     public EdFileTree directory_tree = new();
@@ -82,15 +81,8 @@ public class DLG_SaveFile : C1_Dialog
     {
         EnsureUi();
         FillFromAsset();
+        on_dismiss = Cancel;
         base.Show();
-        if (Shade != null)
-        {
-            Shade.on_click = Cancel;
-        }
-        if (Overlay is C2_DialogHost host)
-        {
-            host.on_escape = Cancel;
-        }
         Overlay?.Child_Add(box);
         txt_name.is_focused = true;
         txt_name.cursor = (txt_name.text ?? "").Length;
@@ -98,13 +90,6 @@ public class DLG_SaveFile : C1_Dialog
         {
             ImpPlayer.players[0].input_hog = txt_name;
         }
-    }
-
-    public override void Close()
-    {
-        Hog_Release();
-        box?.Detach();
-        base.Close();
     }
 
     void FillFromAsset()

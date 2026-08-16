@@ -15,6 +15,11 @@ public class ImpApp
     // Static
     // #################################################################################
     
+    //if true, the game autostarts in borderless window mode by default.
+    [Category("Window")][ImpVar][Config] public static bool start_fullscreen = false;
+    [Category("Window")][ImpVar][Config] public static Vector2 window_size = new(1280, 720);
+    
+    
     public static ImpApp app;
     
     
@@ -36,6 +41,7 @@ public class ImpApp
         app = this;
         
         on_pre_init?.Invoke();
+        ImpConfig.LoadAll();
         
         Raylib.SetConfigFlags(ConfigFlags.Msaa4xHint | ConfigFlags.HighDpiWindow);
         Raylib.InitWindow(1280, 720, "Imperium");
@@ -43,9 +49,11 @@ public class ImpApp
         Raylib.SetTargetFPS(60);
         Raylib.SetExitKey(KeyboardKey.Null);
         R3D.Init(Raylib.GetScreenWidth(), Raylib.GetScreenHeight());
+        R3D.SetAspectMode(AspectMode.Expand);
         ImpPlayer.Init();
         
         on_post_init?.Invoke();
+        ImpGame.EnsureHost();
         
         while (!Raylib.WindowShouldClose())
         {

@@ -53,12 +53,71 @@ public class TPropertyBind
         return Equals(a, b);
     }
 
+    public static bool Member_IsStatic(MemberInfo m)
+    {
+        if (m is FieldInfo f)
+        {
+            return f.IsStatic;
+        }
+        if (m is PropertyInfo p)
+        {
+            MethodInfo get = p.GetGetMethod(true);
+            if (get != null)
+            {
+                return get.IsStatic;
+            }
+            MethodInfo set = p.GetSetMethod(true);
+            if (set != null)
+            {
+                return set.IsStatic;
+            }
+        }
+        return false;
+    }
+
     public static TPropertyBind Member(object target, MemberInfo m)
     {
         if (!Accessors(m, out Type type, out var get, out var set, out bool locked, out ImpVarAttribute attr))
+        {
             return null;
-        Default_Read(get, C2_Inspector.Default_Instance(target.GetType()), out bool has_def, out object def);
-        return new TPropertyBind(m.Name, type, () => get(target), v => set(target, v), locked, attr, has_def, def);
+        }
+
+        bool is_static = Member_IsStatic(m);
+        if (target is Type && !is_static)
+        {
+            return null;
+        }
+
+        object owner = is_static ? null : target;
+        bool has_def = false;
+        object def = null;
+        if (is_static)
+        {
+            Type decl = m.DeclaringType;
+            if (decl != null && ImpConfig.Default_TryGet(decl, m.Name, out object snap))
+            {
+                has_def = true;
+                def = snap;
+            }
+            else
+            {
+                try
+                {
+                    def = get(null);
+                    has_def = true;
+                }
+                catch
+                {
+                }
+            }
+        }
+        else
+        {
+            Type owner_type = C2_Inspector.InspectType(target);
+            Default_Read(get, C2_Inspector.Default_Instance(owner_type), out has_def, out def);
+        }
+
+        return new TPropertyBind(m.Name, type, () => get(owner), v => set(owner, v), locked, attr, has_def, def);
     }
 
     public static TPropertyBind Nested(TPropertyBind parent, MemberInfo m)
@@ -126,7 +185,20 @@ public class TPropertyBind
 [ImpClass(Hidden = true)]
 public class C2_Inspector : Imp2D
 {
-    public List<object> selected_objects = new();
+    // ##############################################################################
+    // Static
+    // ##############################################################################
+    
+    static readonly Dictionary<Type, List<MemberInfo>> _member_cache = new();
+    static readonly Dictionary<Type, List<MemberInfo>> _static_member_cache = new();
+    static readonly Dictionary<Type, I_Property> _prototypes = new();
+    static readonly Dictionary<Type, object> _default_instances = new();
+    static readonly HashSet<Type> _default_building = new();
+    
+    // ##############################################################################
+    // Class
+    // ##############################################################################
+    
     [ImpVar] public bool allow_multi_select = true;
     [ImpVar] public float label_ratio = 0.4f;
     [ImpVar] public int max_depth = 4;
@@ -135,12 +207,26 @@ public class C2_Inspector : Imp2D
     [ImpVar] public bool declared_only;
     [ImpVar] public bool show_header = true;
     [ImpVar] public bool show_search = true;
+
+    // When set, a member is listed only if this returns true. Nested group rows
+    // do not use it — pass apply_filter: false from Members_Filter for those.
+    public Func<MemberInfo, bool> filter_property;
+    public bool include_static;
+    
+    
+    public List<object> selected_objects = new();
     public float label_pad = 8f;
     public float depth_indent = 8f;
 
     public Action<C2_InspectorProperty> on_property_changed;
     public Action<ImpComp, ImpComp, ETreeDrop> on_hierarchy_drop;
 
+    string _search_query = "";
+
+    UiStyle_Box style_box = UiStyle_Box.STYLE_BKG_DARK;
+    readonly HashSet<string> _collapsed = new();
+    
+    
     public C2_List list_properties = new()
     {
         orentation = EUIOrentation.V,
@@ -185,16 +271,7 @@ public class C2_Inspector : Imp2D
             size_min = new Vector2(0, 24),
         },
     };
-
-    string _search_query = "";
-
-    UiStyle_Box style_box = UiStyle_Box.STYLE_BKG_DARK;
-    readonly HashSet<string> _collapsed = new();
-    static readonly Dictionary<Type, List<MemberInfo>> _member_cache = new();
-    static readonly Dictionary<Type, I_Property> _prototypes = new();
-    static readonly Dictionary<Type, object> _default_instances = new();
-    static readonly HashSet<Type> _default_building = new();
-
+    
     public C2_Inspector()
     {
         cursor_filter = ECursorFilter.Pass;
@@ -299,10 +376,15 @@ public class C2_Inspector : Imp2D
         List<MemberInfo> members = Members_Filter(Members_Shared(targets));
         if (declared_only && targets.Count > 0)
         {
-            Type declared = targets[0].GetType();
+            Type declared = InspectType(targets[0]);
             List<MemberInfo> cut = new();
             foreach (MemberInfo m in members)
-                if (m.DeclaringType == declared) cut.Add(m);
+            {
+                if (m.DeclaringType == declared)
+                {
+                    cut.Add(m);
+                }
+            }
             members = cut;
         }
 
@@ -437,8 +519,11 @@ public class C2_Inspector : Imp2D
         List<TPropertyBind> binds = new();
         foreach (object t in targets)
         {
-            TPropertyBind b = TPropertyBind.Member(t, Member_On(t.GetType(), m) ?? m);
-            if (b != null) binds.Add(b);
+            TPropertyBind b = TPropertyBind.Member(t, Member_On(InspectType(t), m, include_static) ?? m);
+            if (b != null)
+            {
+                binds.Add(b);
+            }
         }
         if (binds.Count == 0) return null;
         C2_InspectorProperty row = new(this, binds);
@@ -458,12 +543,21 @@ public class C2_Inspector : Imp2D
         return list;
     }
 
-    public List<MemberInfo> Members_Filter(List<MemberInfo> members, bool search = true)
+    public List<MemberInfo> Members_Filter(List<MemberInfo> members, bool search = true, bool apply_filter = true)
     {
         List<MemberInfo> list = new();
         foreach (MemberInfo m in members)
         {
-            if (!show_advanced && m.GetCustomAttribute<ImpVarAttribute>()?.Advanced == true)
+            ImpVarAttribute hide = m.GetCustomAttribute<ImpVarAttribute>();
+            if (hide != null && hide.Hidden)
+            {
+                continue;
+            }
+            if (!show_advanced && hide != null && hide.Advanced == true)
+            {
+                continue;
+            }
+            if (apply_filter && filter_property != null && !filter_property(m))
             {
                 continue;
             }
@@ -542,26 +636,86 @@ public class C2_Inspector : Imp2D
 
     List<MemberInfo> Members_Shared(List<object> targets)
     {
-        List<MemberInfo> shared = Members_Get(targets[0].GetType());
-        if (targets.Count == 1) return shared;
+        Type t0 = InspectType(targets[0]);
+        List<MemberInfo> shared = new();
+        if (t0 != null)
+        {
+            foreach (MemberInfo m in Members_Get(t0))
+            {
+                shared.Add(m);
+            }
+            if (include_static)
+            {
+                foreach (MemberInfo m in Members_GetStatic(t0))
+                {
+                    shared.Add(m);
+                }
+            }
+        }
+        if (targets.Count == 1)
+        {
+            return shared;
+        }
         List<MemberInfo> result = new();
         foreach (MemberInfo m in shared)
         {
             bool on_all = true;
             for (int i = 1; i < targets.Count && on_all; i++)
-                on_all = Member_On(targets[i].GetType(), m) != null;
-            if (on_all) result.Add(m);
+            {
+                if (Member_On(InspectType(targets[i]), m, include_static) == null)
+                {
+                    on_all = false;
+                }
+            }
+            if (on_all)
+            {
+                result.Add(m);
+            }
         }
         return result;
     }
 
-    static MemberInfo Member_On(Type t, MemberInfo want)
+    static MemberInfo Member_On(Type t, MemberInfo want, bool include_static = false)
     {
+        if (t == null || want == null)
+        {
+            return null;
+        }
         foreach (MemberInfo m in Members_Get(t))
         {
-            if (m.Name == want.Name && Member_Type(m) == Member_Type(want)) return m;
+            if (m.Name == want.Name && Member_Type(m) == Member_Type(want))
+            {
+                return m;
+            }
+        }
+        if (include_static)
+        {
+            foreach (MemberInfo m in Members_GetStatic(t))
+            {
+                if (m.Name == want.Name && Member_Type(m) == Member_Type(want))
+                {
+                    return m;
+                }
+            }
         }
         return null;
+    }
+
+    /// <summary>
+    /// When the inspector target is a <see cref="Type"/>, inspect that type
+    /// (static members) rather than System.Type itself.
+    /// </summary>
+    public static Type InspectType(object o)
+    {
+        if (o is Type t)
+        {
+            return t;
+        }
+        if (o == null)
+        {
+            return null;
+        }
+        return o.GetType();
     }
 
     public static string Category_Of(MemberInfo m)
@@ -643,6 +797,45 @@ public class C2_Inspector : Imp2D
         return list;
     }
 
+    public static List<MemberInfo> Members_GetStatic(Type t)
+    {
+        if (t == null)
+        {
+            return new List<MemberInfo>();
+        }
+        if (_static_member_cache.TryGetValue(t, out List<MemberInfo> hit))
+        {
+            return hit;
+        }
+        List<MemberInfo> list = new();
+        List<Type> chain = new();
+        for (Type cur = t; cur != null && cur != typeof(object); cur = cur.BaseType)
+        {
+            chain.Add(cur);
+        }
+
+        const BindingFlags flags = BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly;
+        foreach (Type cur in chain)
+        {
+            foreach (FieldInfo f in cur.GetFields(flags))
+            {
+                if (f.GetCustomAttribute<ImpVarAttribute>() != null)
+                {
+                    list.Add(f);
+                }
+            }
+            foreach (PropertyInfo p in cur.GetProperties(flags))
+            {
+                if (p.GetCustomAttribute<ImpVarAttribute>() != null)
+                {
+                    list.Add(p);
+                }
+            }
+        }
+        _static_member_cache[t] = list;
+        return list;
+    }
+
     public static List<MemberInfo> Members_GetNested(Type t)
     {
         List<MemberInfo> tagged = Members_Get(t);
@@ -717,7 +910,7 @@ public class C2_Inspector : Imp2D
         return made;
     }
 
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
         style_box?.Draw(Dimensions_Get());
@@ -899,7 +1092,10 @@ public class C2_InspectorProperty : Imp2D
         List<Imp2D> rows = new();
         if (target == null) return rows;
         List<MemberInfo> members = C2_Inspector.Members_Get(target.GetType());
-        if (owner != null) members = owner.Members_Filter(members, false);
+        if (owner != null)
+        {
+            members = owner.Members_Filter(members, false, false);
+        }
         foreach (MemberInfo m in members)
         {
             TPropertyBind bind = TPropertyBind.Member(target, m);
@@ -928,7 +1124,10 @@ public class C2_InspectorProperty : Imp2D
     {
         c_group = MakeGroup();
         List<MemberInfo> members = C2_Inspector.Members_GetNested(t);
-        if (owner != null) members = owner.Members_Filter(members, false);
+        if (owner != null)
+        {
+            members = owner.Members_Filter(members, false, false);
+        }
         foreach (MemberInfo m in members) AddNested(m);
         Child_Add(c_group);
     }
@@ -1214,7 +1413,7 @@ public class C2_InspectorProperty : Imp2D
         return false;
     }
 
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
         if (c_group != null || pedit_full_width) return;
@@ -1253,7 +1452,7 @@ public class C2_ButtonRevert : C2_Button
         layout.size_min = layout.size;
     }
 
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
 

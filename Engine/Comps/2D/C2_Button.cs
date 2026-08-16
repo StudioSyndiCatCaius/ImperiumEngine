@@ -35,7 +35,7 @@ public class C2_Button : Imp2D
         cursor_filter = ECursorFilter.Hit;
     }
 
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
         if (style == null) return;

@@ -2,6 +2,7 @@
 using ImperiumEngine.Assets;
 using ImperiumEngine.Comps;
 using ImperiumEngine.Comps._2D;
+using ImperiumEngine.Script;
 using ImperiumEngine.Structs;
 using R3D_cs;
 using Raylib_cs;
@@ -22,7 +23,38 @@ public class ImpScene : ImpAsset
     // Static
     // #################################################################################
     
-    public static ImpScene current=new();
+    // Backing scene for boot, before ImpGame.Get(0) exists. After that, `current` is
+    // ImpGame.current.scene so a PIE tick can see a different scene than the editor.
+    static ImpScene _boot = new();
+
+    public static ImpScene current
+    {
+        get
+        {
+            ImpGame g = ImpGame.current;
+            if (g != null && g.scene != null)
+            {
+                return g.scene;
+            }
+            return _boot;
+        }
+        set
+        {
+            _boot = value ?? new ImpScene();
+            ImpGame g = ImpGame.current;
+            if (g != null)
+            {
+                g.scene = _boot;
+            }
+        }
+    }
+
+    // Scene used to seed ImpGame.Get(0). Does not follow the ambient game pointer.
+    public static ImpScene BootScene()
+    {
+        return _boot;
+    }
+
     public static ImpScene global=new();
     
     public static bool transit_active;
@@ -37,6 +69,24 @@ public class ImpScene : ImpAsset
     // Class
     // #################################################################################
     
+    ImpGame _game;
+    public ImpGame game
+    {
+        get => _game;
+        set
+        {
+            if (_game == value)
+            {
+                return;
+            }
+            _game = value;
+            if (_root != null)
+            {
+                _root.game_owner = value;
+            }
+        }
+    }
+
     ImpComp _root;
     public ImpComp root
     {
@@ -44,16 +94,51 @@ public class ImpScene : ImpAsset
         set
         {
             if (_root == value) return;
-            if (_root != null) _root.scene = null;
+            if (_root != null)
+            {
+                _root.scene = null;
+                _root.game_owner = null;
+            }
             _root = value ?? new ImpComp();
             _root.Detach();
             _root.scene = this;
+            _root.game_owner = _game;
         }
     }
 
     public ImpScene()
     {
         root = new ImpComp();
+        if (script_builtin == null)
+        {
+            script_builtin = new A_Script();
+        }
+        script_builtin.parent_type = new TClass<Object>(RootType_Get());
+    }
+
+    // Class the scene's script is authored against. ImpAssets are not scriptable — the script treats
+    // the scene as a custom subclass of its root comp, so the root's ImpVars / calls / events are in scope.
+    public Type RootType_Get()
+    {
+        Type t = root_type.Get();
+        if (t == null)
+        {
+            return typeof(ImpComp);
+        }
+        return t;
+    }
+
+    [PulseOverride] public virtual void OnBegin() { }
+    [PulseOverride] public virtual void OnEnd() { }
+    [PulseOverride] public virtual void OnUpdate(double dt) { }
+
+    [PulseCall] public void Print(string text)
+    {
+        if (text == null)
+        {
+            text = "";
+        }
+        Console.WriteLine(text);
     }
 
     Light sun_light;
@@ -63,6 +148,29 @@ public class ImpScene : ImpAsset
     string sky_loaded_path = "";
     
     [ImpVar] public TClass<ImpComp> root_type = new TClass<ImpComp>(typeof(ImpComp));
+
+    [Category("Imp")][ImpVar] public A_Script script_override;
+    [ImpVar(Hidden = true)] public A_Script script_builtin = new A_Script();
+
+    public A_Script Script_Get()
+    {
+        if (script_override != null)
+        {
+            return script_override;
+        }
+        if (script_builtin == null)
+        {
+            script_builtin = new A_Script();
+        }
+        // Follows root_type: re-basing the root class re-bases the script, and this migrates
+        // scenes saved back when the builtin was parented to ImpScene.
+        Type root_t = RootType_Get();
+        if (script_builtin.parent_type.class_name != root_t.Name)
+        {
+            script_builtin.parent_type = new TClass<Object>(root_t);
+        }
+        return script_builtin;
+    }
         
     [ImpVar] public Color background_color=new Color(26, 30, 36, 255);
     [Category("Canvas")][ImpVar] public Vector2 canvas_size=new(1920, 1080);
@@ -223,19 +331,48 @@ public class ImpScene : ImpAsset
         R3D.SetLightDirection(sun_light, Vector3.Transform(-Vector3.UnitZ, sun_q));
     }
     
+    // Running instance of the scene's Pulse script. Self is the root comp — the script is written
+    // as if the scene were a subclass of it. Only exists while the scene is running (PIE).
+    public ImpScriptVM impScriptVm;
+
     public void RBegin()
     {
-        root.RuntimeBegin();
+        root.OnBegin();
+
+        impScriptVm = null;
+        A_Script s = Script_Get();
+        if (s != null && s.nodes != null && s.nodes.Count > 0)
+        {
+            TScriptProgram p = s.Program_Get();
+            for (int i = 0; i < p.errors.Count; i++)
+            {
+                Console.WriteLine("[Pulse] " + p.errors[i]);
+            }
+            impScriptVm = new ImpScriptVM(p, root);
+            // The root comp receives input, so it needs a way back to this graph.
+            root.impScriptVm = impScriptVm;
+            impScriptVm.Event_Run("OnBegin", null);
+        }
     }
-    
+
     public void REnd()
     {
-        root.RuntimeEnd();
+        if (impScriptVm != null)
+        {
+            impScriptVm.Event_Run("OnEnd", null);
+            impScriptVm = null;
+        }
+        if (root != null)
+        {
+            root.impScriptVm = null;
+            root.input_owner = null;
+        }
+        root.OnEnd();
     }
-    
+
     public void Update(double dt)
     {
-        
+
         if (is_running!=was_running)
         {
             was_running=is_running;
@@ -243,6 +380,11 @@ public class ImpScene : ImpAsset
             else { REnd(); }
         }
         root.Update(dt,is_running);
+        if (is_running && impScriptVm != null)
+        {
+            impScriptVm.Update(dt);
+            impScriptVm.Event_Run("OnUpdate", new object[] { dt });
+        }
     }
     
     public void Draw(double dt,int draw_state)
@@ -253,6 +395,34 @@ public class ImpScene : ImpAsset
     // ------------------------------------
     // File
     // ------------------------------------
+
+    // Runtime copy for Play-in-Editor. Same vars as this asset, cloned tree, not in the
+    // asset cache, so playing cannot dirty or overwrite the authored scene.
+    public ImpScene PlayCopy()
+    {
+        ImpScene copy = Clone() as ImpScene;
+        if (copy == null)
+        {
+            copy = new ImpScene();
+        }
+        ImpComp tree = null;
+        if (root != null)
+        {
+            tree = root.Clone();
+        }
+        if (tree != null)
+        {
+            copy.root = tree;
+        }
+        copy.is_running = true;
+        copy.filepath = "";
+        copy.is_dirty = false;
+        if (script_builtin != null)
+        {
+            copy.script_builtin = script_builtin.Clone() as A_Script;
+        }
+        return copy;
+    }
 
     public override string File_GetExtension() { return "ImpScene"; }
 

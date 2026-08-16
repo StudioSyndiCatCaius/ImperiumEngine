@@ -118,7 +118,7 @@ public class C2_TabBox : Imp2D
         }
     }
 
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
         style_background?.Draw(Dimensions_Get());

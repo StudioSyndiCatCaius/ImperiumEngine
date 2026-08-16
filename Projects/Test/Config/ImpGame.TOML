@@ -1,0 +1,6 @@
+starting_scene = "{game}/Scenes/lvl_test.ImpScene"
+default_game_mode = "GM_Gameplay"
+save_game_type = ""
+save_game_prefex = "save_"
+save_global_type = ""
+save_global_name = "global"

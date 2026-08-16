@@ -10,7 +10,7 @@ public class C2_Box : Imp2D
 {
     [ImpVar] public UiStyle_Box style=UiStyle_Box.STYLE_BKG_DARK;
     
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
         if (style == null) return;

@@ -9,10 +9,12 @@ namespace ImperiumEngine;
 
 public class Imp3D : ImpComp
 {
-    // #################################################################################
+    // #######################################################################################################################
+    // #######################################################################################################################
     // Static
-    // #################################################################################
-
+    // #######################################################################################################################
+    // #######################################################################################################################
+    
     public static void Draw_Line(Vector3 start, Vector3 end, float thickness, Color color)
     {
         Raylib.DrawLine3D(start, end, color);
@@ -165,18 +167,21 @@ public class Imp3D : ImpComp
             corners[i] = w.position + Vector3.Transform(local[i] * w.scale, q);
     }
 
-
-    // #################################################################################
+    // #######################################################################################################################
+    // #######################################################################################################################
     // Class
-    // #################################################################################
+    // #######################################################################################################################
+    // #######################################################################################################################
+    
     [Category("Transform")] [ImpVar] public TTransform3 transform = new();
     [Category("Physics")] [ImpVar] public bool physics_enabled;
     public A_CollisionPreset collision_preset = A_CollisionPreset.PRESET_NONE;
 
-    // ------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------------------------
     // Transform
-    // ------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------------------------
 
+    [PulseCall]
     public void Transform_Set(TTransform3 value, bool world_space = false)
     {
         if (!world_space || parent is not Imp3D p)
@@ -184,19 +189,19 @@ public class Imp3D : ImpComp
         else
             transform = LocalFromWorld(p.Transform_Get(true), value);
     }
-
+    [PulseCall]
     public TTransform3 Transform_Get(bool world_space = false)
     {
         if (!world_space || parent is not Imp3D p)
             return transform;
         return WorldFromLocal(p.Transform_Get(true), transform);
     }
-
+    [PulseCall]
     public Vector3 Position_Get(bool world_space = false)
     {
         return Transform_Get(world_space).position;
     }
-
+    [PulseCall]
     public void Position_Set(Vector3 position, bool world_space = false)
     {
         if (!world_space || parent is not Imp3D p)
@@ -213,12 +218,12 @@ public class Imp3D : ImpComp
             parent_w.scale.Z != 0 ? 1f / parent_w.scale.Z : 0);
         transform.position = Vector3.Transform(position - parent_w.position, Quaternion.Inverse(q)) * inv_s;
     }
-
+    [PulseCall]
     public Vector3 Rotation_Get(bool world_space = false)
     {
         return Transform_Get(world_space).rotation;
     }
-
+    [PulseCall]
     public void Rotation_Set(Vector3 rotation, bool world_space = false)
     {
         if (!world_space || parent is not Imp3D p)
@@ -230,12 +235,12 @@ public class Imp3D : ImpComp
         var parent_q = EulerToQuat(p.Transform_Get(true).rotation);
         transform.rotation = QuatToEuler(Quaternion.Inverse(parent_q) * EulerToQuat(rotation));
     }
-
+    [PulseCall]
     public Vector3 Scale_Get(bool world_space = false)
     {
         return Transform_Get(world_space).scale;
     }
-
+    [PulseCall]
     public void Scale_Set(Vector3 scale, bool world_space = false)
     {
         if (!world_space || parent is not Imp3D p)
@@ -250,7 +255,7 @@ public class Imp3D : ImpComp
             ps.Y != 0 ? scale.Y / ps.Y : 0,
             ps.Z != 0 ? scale.Z / ps.Z : 0);
     }
-
+    [PulseCall]
     static TTransform3 WorldFromLocal(TTransform3 parent, TTransform3 local)
     {
         var pq = EulerToQuat(parent.rotation);
@@ -261,7 +266,7 @@ public class Imp3D : ImpComp
             scale = parent.scale * local.scale
         };
     }
-
+    [PulseCall]
     static TTransform3 LocalFromWorld(TTransform3 parent, TTransform3 world)
     {
         var pq = EulerToQuat(parent.rotation);
@@ -298,4 +303,11 @@ public class Imp3D : ImpComp
         float rad2deg = 180f / MathF.PI;
         return new Vector3(pitch * rad2deg, yaw * rad2deg, roll * rad2deg);
     }
+    
+    // ---------------------------------------------------------------------------------------------------------------
+    // Physics / Movement
+    // ---------------------------------------------------------------------------------------------------------------
+
+    [ImpVar] [Category("Physics")] public bool can_move; // runs the movement update only works when physics are enabled
+    [ImpVar] [Category("Physics")] public A_MoveMode move_mode;
 };

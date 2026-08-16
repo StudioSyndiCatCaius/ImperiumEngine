@@ -2,6 +2,7 @@ using System.Numerics;
 using System.Reflection;
 using Editor.Dialog;
 using ImperiumEngine;
+using ImperiumEngine.Assets;
 using ImperiumEngine.Comps._1D;
 using ImperiumEngine.Comps._2D;
 using ImperiumEngine.Enums;
@@ -116,13 +117,16 @@ public class PNL_SceneTree : EdPanel
         bool foreign = c.IsPackedForeign;
         bool inst = c.IsInstanceRoot;
         bool is_root = c == Root();
-        C1_PopupMenu.Open(pos, new List<TPopupMenuOption>
+        ImpPlayer.Popup_Run(this, new A_PopupConfig
         {
-            new() { text = "Duplicate", is_disabled = foreign || is_root || c.parent == null, on_press = () => Duplicate(c) },
-            new() { text = "Delete", is_disabled = foreign || is_root, on_press = () => Delete(c) },
-            new() { text = "Change Type", is_disabled = foreign || inst, on_press = () => ChooseType("Change Type", t => ChangeType(c, t)) },
-            new() { text = "Add Child", is_disabled = foreign || inst, on_press = () => ChooseType("Add Child", t => AddChild(c, t)) },
-        });
+            options = new List<TPopupMenuOption>
+            {
+                new() { text = "Duplicate", is_disabled = foreign || is_root || c.parent == null, on_press = () => Duplicate(c) },
+                new() { text = "Delete", is_disabled = foreign || is_root, on_press = () => Delete(c) },
+                new() { text = "Change Type", is_disabled = foreign || inst, on_press = () => ChooseType("Change Type", t => ChangeType(c, t)) },
+                new() { text = "Add Child", is_disabled = foreign || inst, on_press = () => ChooseType("Add Child", t => AddChild(c, t)) },
+            },
+        }, null, pos);
     }
 
     void OnEmptyRightClick()
@@ -130,21 +134,18 @@ public class PNL_SceneTree : EdPanel
         ImpComp root = Root();
         if (root == null) return;
         Vector2 pos = ImpPlayer.players.Count > 0 ? ImpPlayer.players[0].cursor.position : Vector2.Zero;
-        C1_PopupMenu.Open(pos, new List<TPopupMenuOption>
+        ImpPlayer.Popup_Run(this, new A_PopupConfig
         {
-            new() { text = "Add Comp", is_disabled = root.IsPackedForeign || root.IsInstanceRoot, on_press = () => ChooseType("Add Comp", t => AddChild(root, t)) },
-        });
+            options = new List<TPopupMenuOption>
+            {
+                new() { text = "Add Comp", is_disabled = root.IsPackedForeign || root.IsInstanceRoot, on_press = () => ChooseType("Add Comp", t => AddChild(root, t)) },
+            },
+        }, null, pos);
     }
 
     static void ChooseType(string title, Action<Type> picked)
     {
-        DLG_ChooseComp dlg = new() { title = title };
-        dlg.BuildRootType(typeof(ImpComp));
-        dlg.on_confirm = d =>
-        {
-            if (d.selected_type != null) picked(d.selected_type);
-        };
-        dlg.Show();
+        DLG_ChooseComp.Run(picked, title);
     }
 
     void Duplicate(ImpComp s)

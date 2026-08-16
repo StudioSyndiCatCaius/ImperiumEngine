@@ -172,6 +172,7 @@ public class WND_Asset : EdWindow
         {
             data.browser_asset_stretch = file_browser_wrap.stretch_ratio;
         }
+        data.asset_tabs_stretch = tab_assets.stretch_ratio;
         data.active_asset = tab_assets.selected_tab;
         data.assets.Clear();
         for (int i = 0; i < tab_assets.children.Count; i++)
@@ -197,10 +198,14 @@ public class WND_Asset : EdWindow
         if (file_browser_wrap != null)
         {
             file_browser_wrap.is_expanded = data.file_browser_asset_expanded;
-            if (data.browser_asset_stretch > 0)
+            if (EdState.Stretch_IsWeight(data.browser_asset_stretch))
             {
                 file_browser_wrap.stretch_ratio = data.browser_asset_stretch;
             }
+        }
+        if (EdState.Stretch_IsWeight(data.asset_tabs_stretch))
+        {
+            tab_assets.stretch_ratio = data.asset_tabs_stretch;
         }
         if (data.assets.Count == 0)
         {

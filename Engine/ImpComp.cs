@@ -2,17 +2,20 @@
 using System.Reflection;
 using ImperiumEngine.Assets;
 using ImperiumEngine.Comps;
+using ImperiumEngine.Comps._1D;
 using ImperiumEngine.Comps._2D;
 using ImperiumEngine.Enums;
+using ImperiumEngine.Script;
 using ImperiumEngine.Structs;
 using Raylib_cs;
 
 namespace ImperiumEngine;
 
 [Flags]
-public enum WDrawFlags
+public enum EDrawFlags
 {
-    Editor, Debug,
+    Editor, // what to draw when in editor view (Toggle in editor with "G")
+    Selected, //what to draw when selected in editor
 }
 
 public class ImpComp
@@ -57,10 +60,35 @@ public class ImpComp
     // Class
     // #################################################################################
     
-    [Category("Component")][ImpVar] public string name; //should probably be a TLabel later?
+    [Category("Component")][ImpVar(Edit = EImpVarEdit.ReadOnly)]
+    public string name; //should probably be a TLabel later?
 
     [Category("Component")][ImpVar] public bool is_visible=true;
+    [Category("Component")][ImpVar] public bool is_locked=false;
+    [Category("Component")][ImpVar] public bool children_editable=true;
+    [Category("Component")][ImpVar] public A_PopupConfig popup_config=null;
+    [Category("Component")][ImpVar] TClass<Imp2D> tooltip_class;
+    [Category("Imp")][ImpVar] public A_Script script_override=null;
 
+    [ImpVar(Hidden = true)] public A_Script script_builtin=new A_Script();
+
+    public A_Script Script_Get()
+    {
+        if (script_override != null)
+        {
+            return script_override;
+        }
+        if (script_builtin == null)
+        {
+            script_builtin = new A_Script();
+        }
+        if (string.IsNullOrEmpty(script_builtin.parent_type.class_name))
+        {
+            script_builtin.parent_type = new TClass<Object>(GetType());
+        }
+        return script_builtin;
+    }
+    
     private bool is_destroying=false;
     
     public readonly List<ImpComp> children=new();
@@ -77,8 +105,39 @@ public class ImpComp
                 children[i].scene = value;
         }
     }
+
+    ImpGame _game_owner;
+    public ImpGame game_owner
+    {
+        get => _game_owner;
+        set
+        {
+            if (_game_owner == value)
+            {
+                return;
+            }
+            _game_owner = value;
+            for (int i = 0; i < children.Count; i++)
+            {
+                children[i].game_owner = value;
+            }
+        }
+    }
     
     public ImpPlayer input_owner=null;
+
+    // Pulse script running on this comp. A scene script is bound to its root comp (ImpScene.RBegin
+    // sets this), so events that arrive at the comp — input — reach the scene graph.
+    public ImpScriptVM impScriptVm;
+
+    public void Script_Event(string member, object[] args)
+    {
+        if (impScriptVm == null)
+        {
+            return;
+        }
+        impScriptVm.Event_Run(member, args);
+    }
 
     public TRef<ImpScene> packed;
     public ImpComp packed_from;
@@ -100,6 +159,11 @@ public class ImpComp
     public ImpComp()
     {
         name = GetType().Name;
+        if (script_builtin == null)
+        {
+            script_builtin = new A_Script();
+        }
+        script_builtin.parent_type = new TClass<Object>(GetType());
     }
 
     /// <summary>
@@ -144,6 +208,7 @@ public class ImpComp
         {
             child.parent = this;
             child.scene = scene;
+            child.game_owner = game_owner;
             Imp2D.Layout_Invalidate();
             return;
         }
@@ -151,6 +216,7 @@ public class ImpComp
         children.Add(child);
         child.parent = this;
         child.scene = scene;
+        child.game_owner = game_owner;
         Imp2D.Layout_Invalidate();
     }
 
@@ -171,6 +237,7 @@ public class ImpComp
         children.Insert(index, child);
         child.parent = this;
         child.scene = scene;
+        child.game_owner = game_owner;
         Imp2D.Layout_Invalidate();
     }
 
@@ -180,6 +247,7 @@ public class ImpComp
         parent.children.Remove(this);
         parent = null;
         scene = null;
+        game_owner = null;
         Imp2D.Layout_Invalidate();
     }
 
@@ -215,7 +283,7 @@ public class ImpComp
     /// True when this comp and every ancestor is visible. Hiding a comp does not touch the
     /// is_visible of its children, so anything asking "am I on screen" has to walk up.
     /// </summary>
-    public bool IsVisibleInTree()
+    [PulseCall] public bool IsVisibleInTree()
     {
         for (ImpComp n = this; n != null; n = n.parent)
             if (!n.is_visible) return false;
@@ -236,7 +304,7 @@ public class ImpComp
             children[0].Destroy();
     }
 
-    public void Destroy()
+    [PulseCall] public void Destroy()
     {
         if (is_destroying) return;
         is_destroying = true;
@@ -248,6 +316,7 @@ public class ImpComp
             parent = null;
         }
         scene = null;
+        game_owner = null;
         is_visible = false;
         Imp2D.Layout_Invalidate();
     }
@@ -261,7 +330,7 @@ public class ImpComp
         foreach (FieldInfo f in type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
         {
             if (f.IsInitOnly || f.IsLiteral) continue;
-            if (f.Name is "parent" or "children" or "input_owner" or "is_destroying" or "_scene" or "packed_from") continue;
+            if (f.Name is "parent" or "children" or "input_owner" or "is_destroying" or "_scene" or "_game_owner" or "packed_from") continue;
             // Layout cache (Imp2D). Copying a stamp would let the clone answer with the
             // original's rect until the next epoch bump, so leave it at 0 and recompute.
             if (f.Name.StartsWith("_e_") || f.Name.StartsWith("_c_")) continue;
@@ -281,6 +350,11 @@ public class ImpComp
             if (f.Name == "option_button" && val == this)
             {
                 f.SetValue(copy, copy);
+                continue;
+            }
+            if (val is A_Script sc && string.IsNullOrEmpty(sc.filepath))
+            {
+                f.SetValue(copy, sc.Clone());
                 continue;
             }
             f.SetValue(copy, val);
@@ -312,7 +386,19 @@ public class ImpComp
             {
                 if (input_owner.input_hog == null)
                 {
-                    Update_Input(dt,input_owner);
+                    // A player drives one session at a time: PIE comps stay dead until the game
+                    // view is clicked into, and editor-owned comps stop the moment it is.
+                    // A null owner counts as host — Destroy() nulls game_owner, so treating it
+                    // as "always allowed" would keep feeding a torn-down tree.
+                    ImpGame owner = game_owner;
+                    if (owner == null)
+                    {
+                        owner = ImpGame.Get(ImpGame.ID_HOST);
+                    }
+                    if (owner == input_owner.TargetGame_Get())
+                    {
+                        Update_Input(dt,input_owner);
+                    }
                 }
             }
 
@@ -345,18 +431,29 @@ public class ImpComp
             EInputState state = keystate.Value;
             if (state == EInputState.None) continue;
             Vector3 axis = _player.InputAction_GetAxis(action);
+            // Arg order must match the [PulseOverride] signature — the event node hands its
+            // output pins out in parameter order.
             switch (state)
-            { 
-                case EInputState.Pressed: Input_Pressed(_player, action, axis); break;
-                case EInputState.Released: Input_Released(_player, action, axis); break;
-                case EInputState.Down: Input_Update(_player, action, dt, axis); break;
+            {
+                case EInputState.Pressed:
+                    Input_Pressed(_player, action, axis);
+                    Script_Event("Input_Pressed", new object[] { _player, action, axis });
+                    break;
+                case EInputState.Released:
+                    Input_Released(_player, action, axis);
+                    Script_Event("Input_Released", new object[] { _player, action, axis });
+                    break;
+                case EInputState.Down:
+                    Input_Update(_player, action, dt, axis);
+                    Script_Event("Input_Update", new object[] { _player, action, dt, axis });
+                    break;
             }
         }
         
         
     }
     
-    public void Draw(double dt, WDrawFlags flags, int state)
+    public void Draw(double dt, EDrawFlags flags, int state)
     {
         if (is_visible)
         {
@@ -414,13 +511,22 @@ public class ImpComp
     // virtuals
     // ----------------------------------------------------
     
-    public virtual void OnDraw2D(double dt, WDrawFlags flags) { }
-    public virtual void OnDraw2DForeground(double dt, WDrawFlags flags) { }
-    public virtual void OnDraw3D(double dt, WDrawFlags flags) { }
+    public virtual void OnDraw2D(double dt, EDrawFlags flags) { }
+    public virtual void OnDraw2DForeground(double dt, EDrawFlags flags) { }
+    public virtual void OnDraw3D(double dt, EDrawFlags flags) { }
     
-    public virtual void RuntimeBegin() { }
-    public virtual void RuntimeEnd() { }
-    public virtual void OnUpdate(double dt) { }
+    [PulseOverride] public virtual void OnBegin() { }
+    [PulseOverride] public virtual void OnEnd() { }
+    [PulseOverride] public virtual void OnUpdate(double dt) { }
+
+    [PulseCall] public void Print(string text)
+    {
+        if (text == null)
+        {
+            text = "";
+        }
+        Console.WriteLine(text);
+    }
     
     public virtual void OnVisibilityChange(bool _is_visible) { }
     
@@ -428,6 +534,8 @@ public class ImpComp
     // Cursor
     // ----------------------------------------------------
     public virtual void Cursor_OnEvent(ImpPlayer player, ECursorEvent evnt) {}
+
+    [PulseOverride] public virtual void OnPopupSelect(TPopupMenuOption option) { }
     
     // ----------------------------------------------------
     // Cursor Grab (Drag & Drop)
@@ -453,9 +561,29 @@ public class ImpComp
         Array.Clear(snap, 0, n);
         System.Buffers.ArrayPool<ImpComp>.Shared.Return(snap);
     }
+
+    [PulseCall]
+    public virtual void Input_SetOwnerActive(int player_id, bool is_active)
+    {
+        if (is_active)
+        {
+            input_owner=ImpPlayer.players[player_id];
+            if (input_owner != null)
+            {
+                Console.WriteLine("Assigned input to : "+input_owner);
+            }
+        }
+        else
+        {
+            input_owner = null;
+        }
+    }
     
+    [PulseOverride][Title(" Input - On Pressed")]
     public virtual void Input_Pressed(ImpPlayer player, TLabel iaction, Vector3 axis) { }
+    [PulseOverride][Title(" Input - On Released")]
     public virtual void Input_Released(ImpPlayer player, TLabel iaction, Vector3 axis) { }
+    [PulseOverride][Title(" Input - On Down")]
     public virtual void Input_Update(ImpPlayer player, TLabel iaction, double dt, Vector3 axis) { }
     
     

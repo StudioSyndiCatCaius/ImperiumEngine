@@ -153,7 +153,7 @@ public class C2_Slider : Imp2D
             : value.ToString("0." + new string('#', value_text_decimals), CultureInfo.InvariantCulture);
     }
 
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
         if (IsTyping) return;

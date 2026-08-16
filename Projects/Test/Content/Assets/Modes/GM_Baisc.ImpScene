@@ -1,0 +1,92 @@
+{
+  "_class": "ImpScene",
+  "vars": {
+    "root_type": {
+      "class_name": "C1_GameMode"
+    },
+    "background_color": {
+      "R": 26,
+      "G": 30,
+      "B": 36,
+      "A": 255
+    },
+    "canvas_size": {
+      "X": 1920,
+      "Y": 1080
+    },
+    "ambient_color": {
+      "R": 88,
+      "G": 98,
+      "B": 116,
+      "A": 255
+    },
+    "ambient_intensity": 0.22,
+    "sun_enabled": true,
+    "sun_color": {
+      "R": 255,
+      "G": 244,
+      "B": 228,
+      "A": 255
+    },
+    "sun_intensity": 1.35,
+    "sun_rotation": {
+      "X": -45,
+      "Y": -35,
+      "Z": 0
+    },
+    "sun_specular": 1.15,
+    "sun_cast_shadows": true,
+    "sky_texture": {
+      "path": null
+    },
+    "sky_lights_scene": true,
+    "sky_energy": 1.15,
+    "sky_blur": 0,
+    "sky_rotation": 0,
+    "fog_mode": "Disabled",
+    "fog_color": {
+      "R": 150,
+      "G": 160,
+      "B": 175,
+      "A": 255
+    },
+    "fog_start": 1,
+    "fog_end": 50,
+    "fog_density": 0.05,
+    "fog_sky_affect": 0.5,
+    "tonemap_mode": "Filmic",
+    "tonemap_exposure": 1.08,
+    "tonemap_white": 1,
+    "bloom_mode": "Mix",
+    "bloom_intensity": 0.08,
+    "bloom_levels": 0.55,
+    "bloom_threshold": 0.35,
+    "bloom_soft_threshold": 0.5,
+    "bloom_filter_radius": 1,
+    "ssao_enabled": true,
+    "ssao_radius": 1.85,
+    "ssao_intensity": 2.45,
+    "ssao_power": 1.85,
+    "ssao_bias": 0.022,
+    "ssao_samples": 8,
+    "source_file": null,
+    "source_index": 0,
+    "root": {
+      "_class": "C1_GameMode",
+      "name": "GM_Baisc",
+      "vars": {
+        "starting_state": {
+          "class_name": null
+        },
+        "default_state": {
+          "class_name": null
+        },
+        "is_visible": true,
+        "is_locked": false,
+        "children_editable": true,
+        "popup_config": null
+      },
+      "children": []
+    }
+  }
+}

@@ -28,7 +28,7 @@ public class C2_CheckBox : Imp2D
         layout.size_min = new Vector2(16, 16);
     }
 
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
         if (style == null) return;

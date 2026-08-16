@@ -32,7 +32,6 @@ public class C2_Seperator : Imp2D
     public override void OnUpdate(double dt)
     {
         base.OnUpdate(dt);
-        cursor_filter = ECursorFilter.Hit;
 
         if (parent is C2_List list)
             orentation = list.orentation;
@@ -52,7 +51,45 @@ public class C2_Seperator : Imp2D
             layout.orient_V = EUIViewportAlignment.Start;
         }
 
-        if (!is_draggable || ImpPlayer.players.Count == 0) return;
+        Neighbors(out Imp2D nprev, out Imp2D nnext);
+        bool can_drag = is_draggable && nprev != null && nnext != null;
+        if (can_drag && nprev is C2_Expandable ep && !ep.is_expanded)
+        {
+            can_drag = false;
+        }
+        if (can_drag && nnext is C2_Expandable en && !en.is_expanded)
+        {
+            can_drag = false;
+        }
+        if (can_drag)
+        {
+            cursor_filter = ECursorFilter.Hit;
+        }
+        else
+        {
+            cursor_filter = ECursorFilter.Ignore;
+        }
+
+        if (!can_drag)
+        {
+            if (_drag && ImpPlayer.players.Count > 0)
+            {
+                ImpPlayer hog_player = ImpPlayer.players[0];
+                if (hog_player.input_hog == this)
+                {
+                    hog_player.input_hog = null;
+                }
+            }
+            if (_drag || _hover)
+            {
+                Cursor_Clear();
+            }
+            _drag = false;
+            _hover = false;
+            return;
+        }
+
+        if (ImpPlayer.players.Count == 0) return;
         ImpPlayer player = ImpPlayer.players[0];
         bool held = ImpPlayer.Key_IsHeld(EInputKey.Mouse_Left);
         bool targeted = player.target_cursor == this;
@@ -92,7 +129,7 @@ public class C2_Seperator : Imp2D
         }
     }
 
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
         TDimensions2 dim = Dimensions_Get();
@@ -187,8 +224,19 @@ public class C2_Seperator : Imp2D
         bool next_fill = IsFill(_next, horizontal);
         SetMain(_prev, horizontal, new_p);
         SetMain(_next, horizontal, new_n);
-        if (prev_fill) _prev.stretch_ratio = MathF.Max(0.001f, new_p);
-        if (next_fill) _next.stretch_ratio = MathF.Max(0.001f, new_n);
+        // Weights, not pixels — list fill divides remaining space by stretch_ratio share.
+        // Writing pixel heights here made EdState restore a 189:1 browser vs scene split.
+        if (total > 0.001f)
+        {
+            if (prev_fill)
+            {
+                _prev.stretch_ratio = MathF.Max(0.001f, new_p / total);
+            }
+            if (next_fill)
+            {
+                _next.stretch_ratio = MathF.Max(0.001f, new_n / total);
+            }
+        }
     }
 
     static bool IsFill(Imp2D c, bool horizontal) =>

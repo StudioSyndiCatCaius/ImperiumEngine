@@ -11,6 +11,8 @@ namespace Editor.Panel;
 public class PNL_SceneView : C2_Box
 {
     public ImpScene scene;
+    
+    public PNL_ScriptGraph script_graph = new();
 
     //one history per camera tab, so undo in one camera never reaches into another
     public ImpUndo undo = new();
@@ -42,6 +44,15 @@ public class PNL_SceneView : C2_Box
         cursor_filter = ECursorFilter.Pass,
     };
 
+    public C2_TabBox tabs_view = new()
+    {
+        layout = TLayout2.FULL,
+        tab_height = 24,
+        tab_width = 72,
+    };
+
+    public C2_List view_root;
+
     C2_List toolbar = new()
     {
         orentation = EUIOrentation.H,
@@ -54,6 +65,9 @@ public class PNL_SceneView : C2_Box
         },
     };
 
+    //draw flags
+    bool view_is_debug = false;
+    
     C2_EnumOption opt_edit;
     C2_EnumOption opt_gizmo;
     C2_EnumOption opt_space;
@@ -135,8 +149,9 @@ public class PNL_SceneView : C2_Box
         };
         toolbar.Child_Add(snap_slider);
 
-        C2_List root = new()
+        view_root = new()
         {
+            name = "Scene",
             orentation = EUIOrentation.V,
             layout = new TLayout2
             {
@@ -144,10 +159,12 @@ public class PNL_SceneView : C2_Box
                 orient_V = EUIViewportAlignment.Fill,
             },
         };
-        root.Child_Add(toolbar);
-        root.Child_Add(viewport3D);
-        root.Child_Add(viewport2D);
-        Child_Add(root);
+        view_root.Child_Add(toolbar);
+        view_root.Child_Add(viewport3D);
+        view_root.Child_Add(viewport2D);
+        tabs_view.Child_Add(view_root);
+        tabs_view.Child_Add(script_graph);
+        Child_Add(tabs_view);
 
         if (ImpPlayer.players.Count > 0)
         {
@@ -188,8 +205,46 @@ public class PNL_SceneView : C2_Box
         base.OnUpdate(dt);
         viewport3D.view_scene = scene;
         viewport2D.view_scene = scene;
-        viewport3D.is_visible = edit_mode == ESceneEditorMode.Mode_3D;
-        viewport2D.is_visible = edit_mode == ESceneEditorMode.Mode_2D;
+        if (script_graph != null)
+        {
+            script_graph.Bind(scene);
+        }
+
+        bool pie_over = false;
+        if (view_root != null)
+        {
+            for (int i = 0; i < view_root.children.Count; i++)
+            {
+                if (view_root.children[i] is C2_GameView gv && gv.is_visible)
+                {
+                    pie_over = true;
+                    break;
+                }
+            }
+        }
+        if (!pie_over)
+        {
+            for (int i = 0; i < children.Count; i++)
+            {
+                if (children[i] is C2_GameView gv && gv.is_visible)
+                {
+                    pie_over = true;
+                    break;
+                }
+            }
+        }
+        if (pie_over)
+        {
+            toolbar.is_visible = false;
+            viewport3D.is_visible = false;
+            viewport2D.is_visible = false;
+        }
+        else
+        {
+            toolbar.is_visible = true;
+            viewport3D.is_visible = edit_mode == ESceneEditorMode.Mode_3D;
+            viewport2D.is_visible = edit_mode == ESceneEditorMode.Mode_2D;
+        }
         opt_edit.selected_enum = edit_mode;
         opt_gizmo.selected_enum = gizmo_mode;
         opt_space.selected_enum = gizmo_orientation;
@@ -213,6 +268,31 @@ public class PNL_SceneView : C2_Box
             {
                 snap_slider.Value_SetQuiet(gizmo_data.snap_translate);
             }
+        }
+
+        // Editor picking / gizmos / camera hotkeys are off while a game is running — the view
+        // belongs to PIE, so clicking it must not select scene comps. Same cleanup as the
+        // Script tab path, so starting play mid-drag does not leave a drag or hog behind.
+        bool play_active = ImpGame.Get(ImpGame.ID_PLAY) != null;
+        if ((tabs_view != null && tabs_view.selected_tab != 0) || play_active)
+        {
+            if (ImpPlayer.players.Count > 0)
+            {
+                ImpPlayer script_player = ImpPlayer.players[0];
+                if (drag != ECaptureDrag.None)
+                {
+                    EndDrag(script_player);
+                }
+                if (marquee)
+                {
+                    marquee = false;
+                    if (script_player.input_hog == this)
+                    {
+                        script_player.input_hog = null;
+                    }
+                }
+            }
+            return;
         }
 
         if (ImpPlayer.players.Count == 0)
@@ -548,9 +628,18 @@ public class PNL_SceneView : C2_Box
     // Draw overlays
     // ---------------------------------------------------------------------------------------------------------
 
-    public override void OnDraw2DForeground(double dt, WDrawFlags flags)
+    public override void OnDraw2DForeground(double dt, EDrawFlags flags)
     {
         base.OnDraw2DForeground(dt, flags);
+        if (tabs_view != null && tabs_view.selected_tab != 0)
+        {
+            return;
+        }
+        // No gizmo / grid overlay on top of a running game.
+        if (ImpGame.Get(ImpGame.ID_PLAY) != null)
+        {
+            return;
+        }
         TDimensions2 vp = ActiveViewDim();
         if (vp.size.X <= 0 || vp.size.Y <= 0)
         {

@@ -1,4 +1,5 @@
 using System.Numerics;
+using ImperiumEngine.Assets;
 using ImperiumEngine.Comps._1D;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Structs;
@@ -54,7 +55,7 @@ public class C2_Dropdown : Imp2D
             : placeholder_text;
     }
 
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
         TDimensions2 dim = Dimensions_Get();
@@ -84,6 +85,19 @@ public class C2_Dropdown : Imp2D
         else if (notify == ENotifyGeneric.End) _hover = false;
     }
 
+    public override void OnUpdate(double dt)
+    {
+        base.OnUpdate(dt);
+        if (_open && !ImpPlayer.popup_menu_open)
+        {
+            _open = false;
+            if (on_dropdown_close != null)
+            {
+                on_dropdown_close(this);
+            }
+        }
+    }
+
     public override void Cursor_OnEvent(ImpPlayer player, ECursorEvent evnt)
     {
         base.Cursor_OnEvent(player, evnt);
@@ -97,6 +111,10 @@ public class C2_Dropdown : Imp2D
         _open = open;
         if (!open)
         {
+            if (ImpPlayer.popup_menu_open && ImpPlayer.popup_menu_target == this)
+            {
+                ImpPlayer.Popup_Close();
+            }
             on_dropdown_close?.Invoke(this);
             return;
         }
@@ -119,6 +137,7 @@ public class C2_Dropdown : Imp2D
             });
         }
         TDimensions2 dim = Dimensions_Get();
-        C1_PopupMenu.Open(new Vector2(dim.position.X, dim.position.Y + dim.size.Y), opts);
+        ImpPlayer.Popup_Run(this, new A_PopupConfig { options = opts }, null,
+            new Vector2(dim.position.X, dim.position.Y + dim.size.Y));
     }
 }

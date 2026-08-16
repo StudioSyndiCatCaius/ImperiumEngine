@@ -10,7 +10,7 @@ public class C2_Image : Imp2D
     [ImpVar] public A_Texture texture;
     [ImpVar] public Color tint = Color.White;
 
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
         //texture.Draw(Dimensions_Get());

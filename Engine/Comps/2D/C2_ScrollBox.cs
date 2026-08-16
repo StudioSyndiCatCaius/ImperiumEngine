@@ -208,7 +208,7 @@ public class C2_ScrollBox : C2_Box
         content_length = rows > 0 ? rows * (cross + spacing) - spacing : 0;
     }
 
-    public override void OnDraw2DForeground(double dt, WDrawFlags flags)
+    public override void OnDraw2DForeground(double dt, EDrawFlags flags)
     {
         base.OnDraw2DForeground(dt, flags);
 

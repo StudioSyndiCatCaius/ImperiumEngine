@@ -11,6 +11,7 @@ public class C2_TextEdit : Imp2D
     [ImpVar] public string text_placeholder = "";
     [ImpVar] public bool is_focused;
     [ImpVar] public bool is_password;
+    [ImpVar] public bool hog_input = true;
     [ImpVar] public UI_TextEdit style = new();
 
     public Action<string> on_text_changed;
@@ -34,10 +35,20 @@ public class C2_TextEdit : Imp2D
         if (is_focused && ImpPlayer.players.Count > 0)
         {
             ImpPlayer p = ImpPlayer.players[0];
-            if (ImpPlayer.Key_IsPressed(EInputKey.Mouse_Left) && !ClickIsOurs(p.target_cursor))
+            if (ImpPlayer.popup_menu_open && !ImpPlayer.Popup_Contains(this))
             {
                 is_focused = false;
-                if (p.input_hog == this) p.input_hog = null;
+                Hog_Release(p);
+            }
+            else if (ImpDialog.IsOpen && !ImpDialog.Contains(this))
+            {
+                is_focused = false;
+                Hog_Release(p);
+            }
+            else if (ImpPlayer.Key_IsPressed(EInputKey.Mouse_Left) && !ClickIsOurs(p.target_cursor))
+            {
+                is_focused = false;
+                Hog_Release(p);
             }
         }
 
@@ -89,7 +100,7 @@ public class C2_TextEdit : Imp2D
         return Raylib.IsKeyPressedRepeat((KeyboardKey)(int)key);
     }
 
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
         TDimensions2 dim = Dimensions_Get();
@@ -128,13 +139,29 @@ public class C2_TextEdit : Imp2D
         is_focused = true;
         _blink = 0;
         cursor = (text ?? "").Length;
-        player.input_hog = this;
+        if (hog_input)
+        {
+            player.input_hog = this;
+        }
+    }
+
+    void Hog_Release(ImpPlayer player)
+    {
+        if (player != null && player.input_hog == this)
+        {
+            player.input_hog = null;
+        }
     }
 
     bool ClickIsOurs(ImpComp target)
     {
-        for (ImpComp n = this; n != null; n = n.parent)
-            if (n == target) return true;
+        for (ImpComp n = target; n != null; n = n.parent)
+        {
+            if (n == this)
+            {
+                return true;
+            }
+        }
         return false;
     }
 }

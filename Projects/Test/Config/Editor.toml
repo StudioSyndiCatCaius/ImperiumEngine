@@ -1,14 +1,16 @@
-saved_at = "2026-08-15T05:12:36.2011968Z"
+saved_at = "2026-08-16T00:20:16.1185682Z"
 
 [window]
-main_tab = "Scene"
+main_tab = "Config Game"
 inspector_tab = 0
 outliner_tab = 0
 file_browser_expanded = true
 file_browser_asset_expanded = true
-panel_width = 403
+panel_width = 327
 browser_stretch = 0.5
-browser_asset_stretch = 275
+browser_asset_stretch = 0.5
+scene_tabs_stretch = 1
+asset_tabs_stretch = 1
 outliner_stretch = 1
 inspector_stretch = 1.20000005
 
@@ -17,7 +19,7 @@ active_scene = 0
 active_asset = 0
 
 [file_browser]
-current_dir = "{game}/Scenes/cameras"
+current_dir = "{game}/Scenes"
 dir_tab = 0
 search = ""
 show_source_files = false
@@ -28,7 +30,7 @@ settings_open = true
 favorites_expanded = false
 sidebar_width = 220
 favorites = []
-expanded = ["{game}", "{game}/Scenes", "{game}/Scenes/cameras", "{engine}"]
+expanded = ["{game}", "{game}/Scenes", "{game}/Scenes/cameras", "{game}/Assets", "{game}/Assets/Modes", "{engine}"]
 
 [file_browser_asset]
 current_dir = "{game}/Assets/Textures"
@@ -45,18 +47,18 @@ favorites = []
 expanded = ["{game}", "{game}/Assets", "{game}/Assets/Textures", "{engine}"]
 
 [[open_scenes]]
-path = "{game}/Scenes/test_scene_1.ImpScene"
+path = "{game}/Scenes/lvl_test.ImpScene"
 edit_mode = "Mode_3D"
-gizmo_mode = "Rotate"
+gizmo_mode = "Translate"
 gizmo_space = "Local"
 snap_translate = 0.25
 snap_translate_2d = 8
-cam3_position = [6.42606544, 4.73921967, 12.1175308]
-cam3_target = [-4.39679337, -3.382658, -5.08176613]
+cam3_position = [6.46849251, 4.42295647, 8.56034851]
+cam3_target = [-0.0315075889, 0.422956645, 0.0603497401]
 cam3_fovy = 50
-cam2_position = [283.374695, 115.656273]
-cam2_zoom = 0.696198821
-selected = []
+cam2_position = [960, 540]
+cam2_zoom = 0.5
+selected = ["Ground"]
 
 [[open_assets]]
 path = "{game}/Assets/Textures/po_F2_1.ImpAsset"

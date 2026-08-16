@@ -1,11 +1,14 @@
-﻿using ImperiumEngine.Structs;
+﻿using ImperiumEngine.Comps._3D;
+using ImperiumEngine.Structs;
 
 namespace ImperiumEngine.Comps._1D;
 
-public class C1_GameMode : ImpComp
+public abstract class C1_GameMode : ImpComp
 {
-    public static C1_GameMode current;
     
-    [ImpVar] public TClass<C1_GameState> starting_state;
-    [ImpVar] public TClass<C1_GameState> default_state;
+    [ImpVar][Category("Player")] public TClass<Imp3D> default_pawn;
+    [ImpVar][Category("Player")] public TClass<C3_Camera> default_camera;
+    
+    [ImpVar][Category("State")] public TClass<C1_GameState> starting_state;
+    [ImpVar][Category("State")] public TClass<C1_GameState> default_state;
 }

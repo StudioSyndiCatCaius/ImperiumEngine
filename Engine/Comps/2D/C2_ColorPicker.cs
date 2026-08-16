@@ -66,7 +66,7 @@ public class C2_ColorPicker : Imp2D
         hue = _hue; sat = _sat; val = _val; alpha = _alpha;
     }
 
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
         TDimensions2 dim = Dimensions_Get();
@@ -179,7 +179,7 @@ class C2_ColorPickerPanel : C2_Box
         _owner.HSV_Apply(h, s, v, a);
     }
 
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
         TDimensions2 dim = Dimensions_Get();

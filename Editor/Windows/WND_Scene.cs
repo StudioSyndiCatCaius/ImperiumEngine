@@ -1,6 +1,7 @@
 using System.Numerics;
 using Editor.Dialog;
 using Editor.Panel;
+using Editor.Scenes;
 using ImperiumEngine;
 using Raylib_cs;
 using ImperiumEngine.Assets;
@@ -14,6 +15,7 @@ namespace Editor.Windows;
 //Scene editor
 public class WND_Scene : EdWindow
 {
+
     public C2_TabBox tab_scenes=new ()
     {
         layout = new TLayout2
@@ -267,6 +269,9 @@ public class WND_Scene : EdWindow
         if (ImpPlayer.players.Count == 0) return;
         ImpPlayer player = ImpPlayer.players[0];
         if (!is_visible) return;
+        // Delete / Ctrl+D act on the authored scene's selection. While the game holds input these
+        // are the game's keys — otherwise a game bound to Delete destroys real comps mid-play.
+        if (!ImpPlayer.TargetGame_IsHost()) return;
         if (player.target_focus is C2_TextEdit te && te.is_focused) return;
         for (ImpComp n = player.target_focus; n != null; n = n.parent)
         {
@@ -452,6 +457,10 @@ public class WND_Scene : EdWindow
 
             bool was_sel = tab_scenes.selected_tab == page;
             bool before = page < tab_scenes.selected_tab;
+            if (Scene_Editor.active != null && Scene_Editor.active.view_game != null && Scene_Editor.active.view_game.IsDescendantOf(c))
+            {
+                Scene_Editor.active.MOpt_Play_Stop();
+            }
             c.Destroy();
             if (before)
             {
@@ -480,6 +489,10 @@ public class WND_Scene : EdWindow
 
     public void Scene_CloseAll()
     {
+        if (Scene_Editor.active != null && Scene_Editor.active.view_game != null && Scene_Editor.active.view_game.parent != null)
+        {
+            Scene_Editor.active.MOpt_Play_Stop();
+        }
         for (int i = tab_scenes.children.Count - 1; i >= 0; i--)
         {
             ImpComp c = tab_scenes.children[i];
@@ -510,6 +523,7 @@ public class WND_Scene : EdWindow
         {
             data.browser_stretch = file_browser_wrap.stretch_ratio;
         }
+        data.scene_tabs_stretch = tab_scenes.stretch_ratio;
         data.outliner_stretch = tab_outliners.stretch_ratio;
         data.inspector_stretch = tab_inspectors.stretch_ratio;
         data.active_scene = 0;
@@ -575,10 +589,14 @@ public class WND_Scene : EdWindow
         if (file_browser_wrap != null)
         {
             file_browser_wrap.is_expanded = data.file_browser_expanded;
-            if (data.browser_stretch > 0)
+            if (EdState.Stretch_IsWeight(data.browser_stretch))
             {
                 file_browser_wrap.stretch_ratio = data.browser_stretch;
             }
+        }
+        if (EdState.Stretch_IsWeight(data.scene_tabs_stretch))
+        {
+            tab_scenes.stretch_ratio = data.scene_tabs_stretch;
         }
         if (data.outliner_stretch > 0)
         {
@@ -808,7 +826,7 @@ public class WND_Scene : EdWindow
         }
     }
 
-    PNL_SceneView ActiveEdScene()
+    public PNL_SceneView ActiveEdScene()
     {
         int page = 0;
         for (int i = 0; i < tab_scenes.children.Count; i++)

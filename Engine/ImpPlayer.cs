@@ -1,6 +1,8 @@
 ﻿using System.Numerics;
+using ImperiumEngine.Assets;
 using ImperiumEngine.Comps;
 using ImperiumEngine.Comps._1D;
+using ImperiumEngine.Comps._2D;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Structs;
 using Raylib_cs;
@@ -76,6 +78,9 @@ public class ImpPlayer
         ["_Crouch"] = new TInputAction() { keys = { [EInputKey.Key_C]=new () } },
         ["_Sprint"] = new TInputAction() { keys = { [EInputKey.Key_LeftShift]=new () } },
         ["_DragDrop"] = new TInputAction() { keys = { [EInputKey.Mouse_Left]=new () } },
+        
+        ["PIE_Play"] = new TInputAction() { keys = { [EInputKey.Key_P]=new (){ prereq_keys = [ EInputKey.Key_LeftAlt]} } },
+        ["PIE_Quit"] = new TInputAction() { keys = { [EInputKey.Key_Escape]=new (){ prereq_keys = [ EInputKey.Key_LeftShift]} } },
     }; //built-in input actions
 
     public static void Init()
@@ -190,19 +195,328 @@ public class ImpPlayer
     {
         if (players.Count <= player) return false;
         if (ImpComp.Updating == null) return true;
-        ImpComp gate = C1_Dialog.Host ?? players[player].input_hog;
+        ImpComp gate = ImpDialog.Host ?? Popup_Host ?? players[player].input_hog;
         if (gate == null) return true;
         for (ImpComp n = ImpComp.Updating; n != null; n = n.parent)
             if (n == gate) return true;
         return false;
     }
     
-    
     public static bool KeyType_IsKeyboard(EInputKey k) => (int)k < 1000;
     public static bool KeyType_IsMouse   (EInputKey k) => (int)k is >= 1000 and < 2000;
     public static bool KeyType_IsGamepad (EInputKey k) => (int)k is >= 2000 and < 3000;
     public static bool KeyType_IsTouch   (EInputKey k) => (int)k is >= 3000 and < 4000;
     public static bool KeyType_IsStick   (EInputKey k) => (int)k >= 4000;
+    
+    // ---------------------------------------------------------
+    // Dialog
+    // ---------------------------------------------------------
+    // One modal at a time. ImpDialog.Show / Close own this slot.
+    // Child types open via their static Run(...) — not an ImpComp.
+    public static ImpDialog current_dialog;
+    
+    // ---------------------------------------------------------
+    // Popup Menu
+    // ---------------------------------------------------------
+    public static bool popup_menu_open = false;
+    public static ImpComp popup_menu_target = null;
+    public static Action<ImpComp, TPopupMenuOption> popup_menu_callback = null;
+
+    public static ImpComp Popup_Host
+    {
+        get
+        {
+            if (popup_menu_open)
+            {
+                return _popup;
+            }
+            return null;
+        }
+    }
+
+    static C2_PopupMenu _popup;
+    static List<TPopupMenuOption> _popup_page;
+    static List<TPopupMenuOption> _popup_visible;
+    static string _popup_query = "";
+    static bool _popup_opened_frame;
+
+    public static bool Popup_Contains(ImpComp c)
+    {
+        if (_popup == null || c == null)
+        {
+            return false;
+        }
+        return C2_MenuBar.IsUnder(_popup, c);
+    }
+
+    public static void Popup_Run(ImpComp target, A_PopupConfig config, Action<ImpComp, TPopupMenuOption> on_select, Vector2? screen_pos = null)
+    {
+        Popup_Close();
+        if (config == null)
+        {
+            return;
+        }
+        if (ImpDialog.IsOpen)
+        {
+            return;
+        }
+        List<TPopupMenuOption> opts = config.options;
+        if (opts == null || opts.Count == 0)
+        {
+            return;
+        }
+        ImpComp host = C2_MenuBar.PopupHost() ?? ImpScene.current?.root;
+        if (host == null)
+        {
+            return;
+        }
+
+        Vector2 pos;
+        if (screen_pos.HasValue)
+        {
+            pos = screen_pos.Value;
+        }
+        else if (players.Count > 0)
+        {
+            pos = players[0].cursor.position;
+        }
+        else
+        {
+            pos = Vector2.Zero;
+        }
+
+        _popup_page = opts;
+        _popup_query = "";
+        _popup_visible = Popup_Visible(opts, "");
+        popup_menu_target = target;
+        popup_menu_callback = on_select;
+
+        _popup = new C2_PopupMenu();
+        _popup.Search_SetEnabled(config.searchable);
+        _popup.on_pick = Popup_Pick;
+        _popup.on_escape = Popup_Close;
+        if (_popup.search != null)
+        {
+            _popup.search.on_search = Popup_Filter;
+            if (_popup.search.text_edit != null)
+            {
+                _popup.search.text_edit.on_submit = _ => Popup_PickFirst();
+            }
+        }
+        _popup.Fill(_popup_visible);
+        _popup.Place(pos);
+        host.Child_Add(_popup);
+
+        popup_menu_open = true;
+        _popup_opened_frame = true;
+        Popup_HogTake();
+    }
+
+    public static void Popup_Close()
+    {
+        Popup_HogRelease();
+        if (_popup != null)
+        {
+            _popup.Destroy();
+            _popup = null;
+        }
+        popup_menu_open = false;
+        popup_menu_target = null;
+        popup_menu_callback = null;
+        _popup_page = null;
+        _popup_visible = null;
+        _popup_query = "";
+        _popup_opened_frame = false;
+    }
+
+    static ImpComp Popup_FindOwner(ImpComp hit)
+    {
+        for (ImpComp n = hit; n != null; n = n.parent)
+        {
+            A_PopupConfig cfg = n.popup_config;
+            if (cfg == null || cfg.options == null || cfg.options.Count == 0)
+            {
+                continue;
+            }
+            return n;
+        }
+        return null;
+    }
+
+    static List<TPopupMenuOption> Popup_Visible(List<TPopupMenuOption> src, string query)
+    {
+        List<TPopupMenuOption> list = new();
+        if (src == null)
+        {
+            return list;
+        }
+        bool filter = !string.IsNullOrWhiteSpace(query);
+        string q = "";
+        if (filter)
+        {
+            q = query.Trim();
+        }
+        for (int i = 0; i < src.Count; i++)
+        {
+            TPopupMenuOption opt = src[i];
+            if (!filter)
+            {
+                list.Add(opt);
+                continue;
+            }
+            if (opt.is_separator)
+            {
+                continue;
+            }
+            if (Popup_TextMatch(opt, q))
+            {
+                list.Add(opt);
+            }
+        }
+        return list;
+    }
+
+    static bool Popup_TextMatch(TPopupMenuOption opt, string q)
+    {
+        if (!string.IsNullOrEmpty(opt.text) && opt.text.Contains(q, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+        if (opt.suboptions == null)
+        {
+            return false;
+        }
+        for (int i = 0; i < opt.suboptions.Count; i++)
+        {
+            if (Popup_TextMatch(opt.suboptions[i], q))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static void Popup_Filter(string query)
+    {
+        if (_popup == null || _popup_page == null)
+        {
+            return;
+        }
+        _popup_query = query ?? "";
+        _popup_visible = Popup_Visible(_popup_page, _popup_query);
+        Vector2 pos = _popup.transform.position;
+        _popup.Fill(_popup_visible);
+        _popup.Place(pos);
+    }
+
+    static void Popup_Pick(int i)
+    {
+        if (_popup_visible == null || i < 0 || i >= _popup_visible.Count)
+        {
+            return;
+        }
+        TPopupMenuOption opt = _popup_visible[i];
+        if (opt.is_separator || opt.is_disabled)
+        {
+            return;
+        }
+        if (opt.suboptions != null && opt.suboptions.Count > 0)
+        {
+            _popup_page = opt.suboptions;
+            _popup_query = "";
+            if (_popup != null && _popup.search != null)
+            {
+                _popup.search.Query_Set("");
+            }
+            Vector2 pos = Vector2.Zero;
+            if (_popup != null)
+            {
+                TDimensions2 dim = _popup.Dimensions_Get();
+                pos = new Vector2(dim.position.X + dim.size.X - 4f, dim.position.Y);
+            }
+            _popup_visible = Popup_Visible(_popup_page, "");
+            if (_popup != null)
+            {
+                _popup.Fill(_popup_visible);
+                _popup.Place(pos);
+            }
+            return;
+        }
+
+        ImpComp target = popup_menu_target;
+        Action<ImpComp, TPopupMenuOption> cb = popup_menu_callback;
+        if (opt.on_press != null)
+        {
+            opt.on_press();
+        }
+        if (cb != null)
+        {
+            cb(target, opt);
+        }
+        if (target != null)
+        {
+            target.OnPopupSelect(opt);
+        }
+        Popup_Close();
+    }
+
+    static void Popup_PickFirst()
+    {
+        if (_popup_visible == null)
+        {
+            return;
+        }
+        for (int i = 0; i < _popup_visible.Count; i++)
+        {
+            TPopupMenuOption opt = _popup_visible[i];
+            if (opt.is_separator || opt.is_disabled)
+            {
+                continue;
+            }
+            Popup_Pick(i);
+            return;
+        }
+    }
+
+    static void Popup_HogTake()
+    {
+        if (_popup == null || players.Count == 0)
+        {
+            return;
+        }
+        ImpPlayer p = players[0];
+        p.input_hog = _popup;
+        if (_popup.search == null || _popup.search.text_edit == null)
+        {
+            return;
+        }
+        C2_TextEdit edit = _popup.search.text_edit;
+        edit.is_focused = true;
+        edit.cursor = 0;
+        p.input_hog = edit;
+        p.target_focus = edit;
+    }
+
+    static void Popup_HogRelease()
+    {
+        if (_popup == null)
+        {
+            return;
+        }
+        for (int i = 0; i < players.Count; i++)
+        {
+            ImpPlayer p = players[i];
+            ImpComp hog = p.input_hog;
+            if (hog == null)
+            {
+                continue;
+            }
+            if (C2_MenuBar.IsUnder(_popup, hog))
+            {
+                p.input_hog = null;
+            }
+        }
+    }
     
     // #################################################################################
     // Class
@@ -221,7 +535,44 @@ public class ImpPlayer
     public ImpComp? target_cursor = null;
     public ImpComp? target_grabbed = null;
     public ImpComp? input_hog = null; //when valid, hogs all inputs, preventing input actions on any other comp until =null
-    
+
+    // Session this player drives. null = the host game (the editor, or the main game standalone).
+    // Clicking in / out of a C2_GameView retargets it; kept settable so a hotkey can force it back
+    // to the editor when the cursor is hidden. `players` is a static initializer that runs long
+    // before ImpGame.EnsureHost, so this cannot default to the host object itself.
+    public ImpGame? target_game = null;
+
+    public ImpGame TargetGame_Get()
+    {
+        if (target_game != null)
+        {
+            return target_game;
+        }
+        return ImpGame.Get(ImpGame.ID_HOST);
+    }
+
+    public void TargetGame_Set(ImpGame game)
+    {
+        // Never hold a session that is already gone, or input has nowhere to land.
+        if (game != null && ImpGame.Get(game.id) != game)
+        {
+            target_game = null;
+            return;
+        }
+        target_game = game;
+    }
+
+    // True while the editor (host) owns input. Fails open so editor code keeps working
+    // before any player exists.
+    public static bool TargetGame_IsHost(byte player = 0)
+    {
+        if (players.Count <= player)
+        {
+            return true;
+        }
+        return players[player].TargetGame_Get() == ImpGame.Get(ImpGame.ID_HOST);
+    }
+
     
     public Dictionary<EInputKey, EInputState> key_states=new ();
     public Dictionary<EInputKey, float> key_axis=new (); // scalar magnitude per key (1 for digital, delta for axes)
@@ -250,9 +601,9 @@ public class ImpPlayer
         
     }
     
-    // ---------------------------------------
+    // ---------------------------------------------------------------------------------
     // Cursor
-    // ---------------------------------------
+    // ---------------------------------------------------------------------------------
     public bool Cursor_IsInDimensions(TDimensions2 dim)
     {
         return dim.Contains(cursor.position);
@@ -271,11 +622,11 @@ public class ImpPlayer
         normal = ray.Direction;
         return true;
     }
+        
     
-    // ─────────────────────────────────────────────────────────────
-    // Keyboard + Mouse  (only one allowed)
-    // Call Update_Input, then scene Update (layout), then Update_Cursor.
-    // ─────────────────────────────────────────────────────────────
+    // ---------------------------------------------------------------------------------
+    // INPUT
+    // ---------------------------------------------------------------------------------
     public void Update_Input(double dt)
     {
         // Dialogs reuse their panel by Detaching it before the overlay is Destroyed.
@@ -288,6 +639,24 @@ public class ImpPlayer
         if (target_focus != null && !Target_IsLive(target_focus))
         {
             target_focus = null;
+        }
+        if (popup_menu_open && (_popup == null || !Target_IsLive(_popup)))
+        {
+            Popup_Close();
+        }
+        if (current_dialog != null)
+        {
+            ImpComp dialog_host = ImpDialog.Host;
+            if (dialog_host == null || !Target_IsLive(dialog_host))
+            {
+                current_dialog.Close();
+            }
+        }
+        // Same idea for the input target: if that session was torn down by a path that skipped
+        // Play_Stop, fall back to the host instead of sending input nowhere.
+        if (target_game != null && ImpGame.Get(target_game.id) != target_game)
+        {
+            target_game = null;
         }
 
         // sync Mouse with Player 1 Cursor  ----------------------------------------------------
@@ -311,6 +680,30 @@ public class ImpPlayer
             foreach (var k in ia.Value.keys)
             {
                 if (Key_GetState(k.Key) == EInputState.None) continue;
+
+                TInputKey binding = k.Value;
+                if (binding != null && binding.prereq_keys != null)
+                {
+                    bool prereqs_held = true;
+                    for (int pi = 0; pi < binding.prereq_keys.Count; pi++)
+                    {
+                        EInputKey pk = binding.prereq_keys[pi];
+                        if (pk == EInputKey.None)
+                        {
+                            continue;
+                        }
+                        EInputState ps = Key_GetState(pk);
+                        if (ps != EInputState.Pressed && ps != EInputState.Down)
+                        {
+                            prereqs_held = false;
+                            break;
+                        }
+                    }
+                    if (!prereqs_held)
+                    {
+                        continue;
+                    }
+                }
 
                 Vector3 _axis = ia.Value.keys[k.Key].axis_scale;
                 float _deadzone = ia.Value.keys[k.Key].deadzone;
@@ -384,7 +777,28 @@ public class ImpPlayer
                 target_cursor = result3D.hit_comp;
         }
 
+        bool dialog_open = ImpDialog.IsOpen;
+        bool dialog_hit = dialog_open && ImpDialog.Contains(target_cursor);
+        bool popup_hit = popup_menu_open && Popup_Contains(target_cursor);
+        if (popup_menu_open)
+        {
+            if (_popup_opened_frame)
+            {
+                _popup_opened_frame = false;
+            }
+            else if (Key_IsPressed(EInputKey.Mouse_Left) || Key_IsPressed(EInputKey.Mouse_Right))
+            {
+                if (!popup_hit)
+                {
+                    Popup_Close();
+                    popup_hit = false;
+                }
+            }
+        }
+
         if (input_hog == null
+            && !popup_menu_open
+            && !dialog_open
             && (Key_IsPressed(EInputKey.Mouse_Left)
                 || Key_IsPressed(EInputKey.Mouse_Right)
                 || Key_IsPressed(EInputKey.Mouse_Middle)))
@@ -414,7 +828,17 @@ public class ImpPlayer
             }
         }
 
-        if (last_cursor_target != target_cursor)
+        ImpComp hover = target_cursor;
+        if (popup_menu_open && !popup_hit)
+        {
+            hover = null;
+        }
+        if (dialog_open && !dialog_hit)
+        {
+            hover = null;
+        }
+
+        if (last_cursor_target != hover)
         {
             // Exit cursor over ------------
             if (last_cursor_target != null)
@@ -422,24 +846,43 @@ public class ImpPlayer
                 last_cursor_target._Notify_AsCursorTarget(this,ENotifyGeneric.End,dt);
                 _GrabTargetEntry(last_cursor_target, false);
             };
-            last_cursor_target = target_cursor;
+            last_cursor_target = hover;
             // enter cursor over -------------------
-            if (target_cursor != null)
+            if (hover != null)
             {
-                target_cursor._Notify_AsCursorTarget(this,ENotifyGeneric.Begin,dt);
-                _GrabTargetEntry(target_cursor, true);
+                hover._Notify_AsCursorTarget(this,ENotifyGeneric.Begin,dt);
+                _GrabTargetEntry(hover, true);
+            }
+        }
+
+        bool opened_popup = false;
+        if (!popup_menu_open && !dialog_open && Key_IsPressed(EInputKey.Mouse_Right))
+        {
+            ImpComp owner = Popup_FindOwner(target_cursor);
+            if (owner != null)
+            {
+                Popup_Run(owner, owner.popup_config, null);
+                opened_popup = true;
             }
         }
 
         foreach (var ia in action_states)
         {
             if (ia.Value != EInputState.Pressed || target_cursor == null) continue;
+            if (opened_popup) continue;
+            if (popup_menu_open && !popup_hit) continue;
+            if (dialog_open && !dialog_hit) continue;
             string name = ia.Key.ToString();
             if (name.StartsWith("Cursor_")) name = name[7..];
             if (Enum.TryParse<ECursorEvent>(name, true, out ECursorEvent evnt))
             {
                 target_cursor.Cursor_OnEvent(this, evnt);
             }
+        }
+
+        if (popup_menu_open || dialog_open)
+        {
+            return;
         }
         
         //grab check ---------------

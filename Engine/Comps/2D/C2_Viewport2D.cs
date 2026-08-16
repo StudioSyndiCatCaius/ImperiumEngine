@@ -15,6 +15,9 @@ public class C2_Viewport2D : Imp2D
     public ImpComp? root;
     public ImpComp? overlay;
     public bool transpose_traces = true;
+    // Game view composites this over a 3D blit — skip the opaque canvas chrome.
+    public bool clear_background = true;
+    public bool draw_canvas = true;
 
     public TCamera2D camera = new()
     {
@@ -80,7 +83,7 @@ public class C2_Viewport2D : Imp2D
         }
     }
 
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
 
@@ -89,6 +92,25 @@ public class C2_Viewport2D : Imp2D
         int h = Math.Max(1, (int)MathF.Round(dim.size.Y));
         if (dim.size.X < 1 || dim.size.Y < 1)
         {
+            return;
+        }
+
+        // Game view already blitted 3D into this rect. Draw HUD here instead of
+        // through an RT — R3D.End can leave scissor/viewport that make the RT
+        // opaque and cover the bottom of the 3D image.
+        if (!clear_background && !draw_canvas)
+        {
+            Imp2D.Clip_Push(dim);
+            ImpComp hud = Root_Get();
+            if (hud != null)
+            {
+                Imp2D.SceneLayout_Set(hud, CanvasSize());
+                Imp2D.SceneDraw_Begin(camera, new Vector2(w, h));
+                hud.Draw(dt, EDrawFlags.Editor, 1);
+                overlay?.Draw(dt, EDrawFlags.Editor, 1);
+                Imp2D.SceneDraw_End();
+            }
+            Imp2D.Clip_Pop();
             return;
         }
 
@@ -108,30 +130,40 @@ public class C2_Viewport2D : Imp2D
         }
 
         Raylib.BeginTextureMode(target);
-        Raylib.ClearBackground(new Color(18, 20, 24, 255));
+        if (clear_background)
+        {
+            Raylib.ClearBackground(new Color(18, 20, 24, 255));
+        }
+        else
+        {
+            Raylib.ClearBackground(Color.Blank);
+        }
         Vector2 view = new(w, h);
         Vector2 canvas = CanvasSize();
-        Vector2 a = ImpGizmo.WorldToView(Vector2.Zero, camera, view);
-        Vector2 b = ImpGizmo.WorldToView(new Vector2(canvas.X, 0), camera, view);
-        Vector2 c = ImpGizmo.WorldToView(canvas, camera, view);
-        Vector2 d = ImpGizmo.WorldToView(new Vector2(0, canvas.Y), camera, view);
-        Color fill = new Color(26, 30, 36, 255);
-        if (view_scene != null)
+        if (draw_canvas)
         {
-            fill = ImpGizmo.WithAlpha(view_scene.background_color, 255);
+            Vector2 a = ImpGizmo.WorldToView(Vector2.Zero, camera, view);
+            Vector2 b = ImpGizmo.WorldToView(new Vector2(canvas.X, 0), camera, view);
+            Vector2 c = ImpGizmo.WorldToView(canvas, camera, view);
+            Vector2 d = ImpGizmo.WorldToView(new Vector2(0, canvas.Y), camera, view);
+            Color fill = new Color(26, 30, 36, 255);
+            if (view_scene != null)
+            {
+                fill = ImpGizmo.WithAlpha(view_scene.background_color, 255);
+            }
+            Raylib.DrawTriangle(a, b, c, fill);
+            Raylib.DrawTriangle(a, c, b, fill);
+            Raylib.DrawTriangle(a, c, d, fill);
+            Raylib.DrawTriangle(a, d, c, fill);
         }
-        Raylib.DrawTriangle(a, b, c, fill);
-        Raylib.DrawTriangle(a, c, b, fill);
-        Raylib.DrawTriangle(a, c, d, fill);
-        Raylib.DrawTriangle(a, d, c, fill);
 
         ImpComp src = Root_Get();
         if (src != null)
         {
             Imp2D.SceneLayout_Set(src, canvas);
             Imp2D.SceneDraw_Begin(camera, view);
-            src.Draw(dt, WDrawFlags.Editor, 1);
-            overlay?.Draw(dt, WDrawFlags.Editor, 1);
+            src.Draw(dt, EDrawFlags.Editor, 1);
+            overlay?.Draw(dt, EDrawFlags.Editor, 1);
             Imp2D.SceneDraw_End();
         }
         Raylib.EndTextureMode();

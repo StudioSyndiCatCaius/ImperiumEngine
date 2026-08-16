@@ -42,6 +42,8 @@ public class C2_Picker : Imp2D
     public Action<TPickerOption> on_picked;
     public Action on_cleared;
     public Action<string> on_dropped;
+    // When set, click opens this instead of the inline popup (dialogs).
+    public Action on_open;
     //Gates what a drag may drop here, so a texture can't land in a mesh slot.
     public Func<string, bool> drop_accepts;
 
@@ -119,7 +121,7 @@ public class C2_Picker : Imp2D
         return A_Texture.THUMB_FILE;
     }
 
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
         if (text_get != null) text = text_get() ?? "";
@@ -191,6 +193,12 @@ public class C2_Picker : Imp2D
         {
             Open_Set(false);
             on_cleared?.Invoke();
+            return;
+        }
+        if (on_open != null)
+        {
+            Open_Set(false);
+            on_open();
             return;
         }
         Open_Set(!_open);
@@ -338,7 +346,7 @@ class C2_PickerPopup : C2_Box
         if (i >= 0 && i < _shown.Count) _owner.Pick(_shown[i]);
     }
 
-    public override void OnDraw2D(double dt, WDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
         TDimensions2 dim = Dimensions_Get();
