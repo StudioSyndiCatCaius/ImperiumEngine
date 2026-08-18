@@ -3,6 +3,7 @@ using System.Reflection;
 using ImperiumEngine.Assets;
 using ImperiumEngine.Comps._1D;
 using ImperiumEngine.Interfaces;
+using R3D_cs;
 using Raylib_cs;
 
 namespace ImperiumEngine;
@@ -20,9 +21,81 @@ public class ImpFile : I_File
 
     const string FileTypeNamespace = "ImperiumEngine.Files";
     
+    static string _engine_content;
+
+    // Dev: Engine/Content next to the .csproj. Built: Content beside the exe.
     public static string ContentDir_Engine()
     {
-        return Path.Combine(AppContext.BaseDirectory, "_Content");
+        if (!string.IsNullOrEmpty(_engine_content))
+        {
+            return _engine_content;
+        }
+        string found = EngineContent_Find(AppContext.BaseDirectory);
+        if (string.IsNullOrEmpty(found))
+        {
+            found = EngineContent_Find(Directory.GetCurrentDirectory());
+        }
+        if (string.IsNullOrEmpty(found))
+        {
+            string beside = Path.Combine(AppContext.BaseDirectory, "Content");
+            if (Directory.Exists(beside))
+            {
+                found = beside;
+            }
+        }
+        if (string.IsNullOrEmpty(found))
+        {
+            found = Path.Combine(AppContext.BaseDirectory, "Content");
+        }
+        try
+        {
+            _engine_content = Path.GetFullPath(found);
+        }
+        catch
+        {
+            _engine_content = found;
+        }
+        return _engine_content;
+    }
+
+    static string EngineContent_Find(string start)
+    {
+        if (string.IsNullOrEmpty(start))
+        {
+            return null;
+        }
+        string dir;
+        try
+        {
+            dir = Path.GetFullPath(start);
+        }
+        catch
+        {
+            return null;
+        }
+        for (int i = 0; i < 8; i++)
+        {
+            string nested = Path.Combine(dir, "Engine", "Content");
+            if (Directory.Exists(nested))
+            {
+                return nested;
+            }
+            if (File.Exists(Path.Combine(dir, "Engine.csproj")))
+            {
+                string here = Path.Combine(dir, "Content");
+                if (Directory.Exists(here))
+                {
+                    return here;
+                }
+            }
+            DirectoryInfo parent = Directory.GetParent(dir);
+            if (parent == null)
+            {
+                break;
+            }
+            dir = parent.FullName;
+        }
+        return null;
     }
     
     public static string ContentDir_Game()
@@ -125,6 +198,7 @@ public class ImpFile : I_File
         // jpg/jpeg are textures — reuse File_PNG (Raylib LoadTexture handles both)
         string extKey = ext.TrimStart('.').ToUpperInvariant();
         if (extKey is "JPG" or "JPEG") extKey = "PNG";
+        if (extKey is "GLTF" or "FBX" or "OBJ") extKey = "GLB";
         string typeName = "File_" + extKey;
 
         Type? type =
@@ -166,7 +240,7 @@ public class ImpFile : I_File
     
     public List<Texture2D> src_textures = new();
     public List<Sound> src_sounds = new();
-    public List<Model> src_models = new();
+    public List<R3D_cs.Model> src_models = new();
     public List<Font> src_fonts = new();
 
     public void Reimport(bool force = false)
@@ -187,8 +261,7 @@ public class ImpFile : I_File
                 src_sounds.Add(_snd);
                 break;
             case EFileType.Model:
-                Model _mdl=Raylib.LoadModel(filepath);
-                src_models.Add(_mdl);
+                src_models.Add(R3D.LoadModel(filepath));
                 break;
             case EFileType.Animation:
                 break;

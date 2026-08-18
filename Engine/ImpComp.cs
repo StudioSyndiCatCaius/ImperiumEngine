@@ -56,6 +56,7 @@ public class ImpComp
         return null;
     }
     
+    
     // #################################################################################
     // Class
     // #################################################################################
@@ -145,6 +146,98 @@ public class ImpComp
     public bool IsInstanceRoot => packed_from == this && (packed.Get() != null || !string.IsNullOrEmpty(packed.path));
     public bool IsPackedForeign => packed_from != null && packed_from != this;
 
+    static readonly Dictionary<Type, FieldInfo[]> _owned_fields = new();
+
+    public static FieldInfo[] OwnedFields(Type type)
+    {
+        if (type == null)
+        {
+            return Array.Empty<FieldInfo>();
+        }
+        if (_owned_fields.TryGetValue(type, out FieldInfo[] hit))
+        {
+            return hit;
+        }
+        List<FieldInfo> list = new();
+        FieldInfo[] all = type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        for (int i = 0; i < all.Length; i++)
+        {
+            FieldInfo f = all[i];
+            if (f.IsInitOnly || f.IsLiteral)
+            {
+                continue;
+            }
+            if (f.Name == "parent" || f.Name == "packed_from")
+            {
+                continue;
+            }
+            if (!typeof(ImpComp).IsAssignableFrom(f.FieldType))
+            {
+                continue;
+            }
+            list.Add(f);
+        }
+        FieldInfo[] arr = list.ToArray();
+        _owned_fields[type] = arr;
+        return arr;
+    }
+
+    public FieldInfo OwnedFieldOf(ImpComp child)
+    {
+        if (child == null)
+        {
+            return null;
+        }
+        FieldInfo[] fields = OwnedFields(GetType());
+        for (int i = 0; i < fields.Length; i++)
+        {
+            if (ReferenceEquals(fields[i].GetValue(this), child))
+            {
+                return fields[i];
+            }
+        }
+        return null;
+    }
+
+    public bool IsOwned
+    {
+        get
+        {
+            if (parent == null)
+            {
+                return false;
+            }
+            return parent.OwnedFieldOf(this) != null;
+        }
+    }
+
+    public static ImpComp OutlinerHost(ImpComp c)
+    {
+        ImpComp n = c;
+        while (n != null && (n.IsOwned || n.IsPackedForeign))
+        {
+            n = n.parent;
+        }
+        return n;
+    }
+
+    public void Owned_Bind()
+    {
+        FieldInfo[] fields = OwnedFields(GetType());
+        for (int i = 0; i < fields.Length; i++)
+        {
+            if (fields[i].GetValue(this) is not ImpComp c)
+            {
+                continue;
+            }
+            if (c == this || c.parent != null)
+            {
+                continue;
+            }
+            Child_Add(c);
+        }
+    }
+
     // Bare ImpComp / Imp2D / Imp3D with kids is a group pivot, not a clickable volume.
     public bool IsGroupPivot
     {
@@ -203,7 +296,8 @@ public class ImpComp
     {
         if (child == null || child == this) return;
         if (child.IsPackedForeign) return;
-        if (IsPackedForeign || IsInstanceRoot) return;
+        if (IsPackedForeign) return;
+        if (IsInstanceRoot && OwnedFieldOf(child) == null && !children.Contains(child)) return;
         if (children.Contains(child))
         {
             child.parent = this;
@@ -244,6 +338,7 @@ public class ImpComp
     public void Detach()
     {
         if (parent == null) return;
+        if (IsOwned) return;
         parent.children.Remove(this);
         parent = null;
         scene = null;
@@ -254,8 +349,8 @@ public class ImpComp
     public void Reparent(ImpComp new_parent, int index = -1)
     {
         if (new_parent == null || new_parent == this || IsAncestorOf(new_parent)) return;
-        if (IsPackedForeign) return;
-        if (new_parent.IsPackedForeign || new_parent.IsInstanceRoot) return;
+        if (IsPackedForeign || IsOwned) return;
+        if (new_parent.IsPackedForeign || new_parent.IsInstanceRoot || new_parent.IsOwned) return;
 
         TTransform3? world3 = this is Imp3D c3 ? c3.Transform_Get(true) : null;
         TTransform2? world2 = this is Imp2D c2 ? c2.Transform_Get(true) : null;
@@ -283,7 +378,7 @@ public class ImpComp
     /// True when this comp and every ancestor is visible. Hiding a comp does not touch the
     /// is_visible of its children, so anything asking "am I on screen" has to walk up.
     /// </summary>
-    [PulseCall] public bool IsVisibleInTree()
+    [ScriptCall] public bool IsVisibleInTree()
     {
         for (ImpComp n = this; n != null; n = n.parent)
             if (!n.is_visible) return false;
@@ -304,10 +399,11 @@ public class ImpComp
             children[0].Destroy();
     }
 
-    [PulseCall] public void Destroy()
+    [ScriptCall] public void Destroy()
     {
         if (is_destroying) return;
         is_destroying = true;
+        OnDestroy();
         while (children.Count > 0)
             children[0].Destroy();
         if (parent != null)
@@ -344,8 +440,36 @@ public class ImpComp
     public ImpComp Clone(ImpScene skip_self = null)
     {
         if (Activator.CreateInstance(GetType()) is not ImpComp copy) return null;
+        Owned_Bind();
+        copy.Owned_Bind();
+        Clone_Into(copy, skip_self);
+        if (skip_self == null && (copy.packed.Get() != null || !string.IsNullOrEmpty(copy.packed.path)))
+            ImpScene.BindPackedTree(copy, copy);
+        return copy;
+    }
+
+    void Clone_Into(ImpComp copy, ImpScene skip_self)
+    {
+        if (copy == null)
+        {
+            return;
+        }
+        FieldInfo[] owned = OwnedFields(GetType());
         foreach (FieldInfo f in CloneFields(GetType()))
         {
+            bool is_owned_slot = false;
+            for (int i = 0; i < owned.Length; i++)
+            {
+                if (owned[i] == f)
+                {
+                    is_owned_slot = true;
+                    break;
+                }
+            }
+            if (is_owned_slot)
+            {
+                continue;
+            }
             object val = f.GetValue(this);
             if (f.Name == "option_button" && val == this)
             {
@@ -359,19 +483,41 @@ public class ImpComp
             }
             f.SetValue(copy, val);
         }
-        copy.parent = null;
         copy.input_owner = null;
         copy.packed_from = null;
         for (int i = 0; i < children.Count; i++)
         {
             ImpComp kid = children[i];
-            if (skip_self != null && ImpScene.IsSelfInstance(kid, skip_self)) continue;
+            if (skip_self != null && ImpScene.IsSelfInstance(kid, skip_self))
+            {
+                continue;
+            }
+            FieldInfo slot = OwnedFieldOf(kid);
+            if (slot != null)
+            {
+                ImpComp dst = slot.GetValue(copy) as ImpComp;
+                if (dst == null)
+                {
+                    dst = kid.Clone(skip_self);
+                    if (dst == null)
+                    {
+                        continue;
+                    }
+                    slot.SetValue(copy, dst);
+                    copy.Child_Add(dst);
+                }
+                else
+                {
+                    kid.Clone_Into(dst, skip_self);
+                }
+                continue;
+            }
             ImpComp ck = kid.Clone(skip_self);
-            if (ck != null) copy.Child_Add(ck);
+            if (ck != null)
+            {
+                copy.Child_Add(ck);
+            }
         }
-        if (skip_self == null && (copy.packed.Get() != null || !string.IsNullOrEmpty(copy.packed.path)))
-            ImpScene.BindPackedTree(copy, copy);
-        return copy;
     }
     
     
@@ -515,11 +661,44 @@ public class ImpComp
     public virtual void OnDraw2DForeground(double dt, EDrawFlags flags) { }
     public virtual void OnDraw3D(double dt, EDrawFlags flags) { }
     
-    [PulseOverride] public virtual void OnBegin() { }
-    [PulseOverride] public virtual void OnEnd() { }
-    [PulseOverride] public virtual void OnUpdate(double dt) { }
+    [ScriptOverride] public virtual void OnBegin()
+    {
+        Owned_Bind();
+        int n = children.Count;
+        ImpComp[] snap = ChildSnap_Rent(n);
+        for (int i = 0; i < n; i++)
+        {
+            ImpComp c = snap[i];
+            if (c.parent != this)
+            {
+                continue;
+            }
+            c.OnBegin();
+        }
+        ChildSnap_Return(snap, n);
+    }
 
-    [PulseCall] public void Print(string text)
+    [ScriptOverride] public virtual void OnEnd()
+    {
+        int n = children.Count;
+        ImpComp[] snap = ChildSnap_Rent(n);
+        for (int i = 0; i < n; i++)
+        {
+            ImpComp c = snap[i];
+            if (c.parent != this)
+            {
+                continue;
+            }
+            c.OnEnd();
+        }
+        ChildSnap_Return(snap, n);
+    }
+
+    protected virtual void OnDestroy() { }
+
+    [ScriptOverride] public virtual void OnUpdate(double dt) { }
+
+    [ScriptCall] public void Print(string text)
     {
         if (text == null)
         {
@@ -535,7 +714,7 @@ public class ImpComp
     // ----------------------------------------------------
     public virtual void Cursor_OnEvent(ImpPlayer player, ECursorEvent evnt) {}
 
-    [PulseOverride] public virtual void OnPopupSelect(TPopupMenuOption option) { }
+    [ScriptOverride] public virtual void OnPopupSelect(TPopupMenuOption option) { }
     
     // ----------------------------------------------------
     // Cursor Grab (Drag & Drop)
@@ -562,7 +741,7 @@ public class ImpComp
         System.Buffers.ArrayPool<ImpComp>.Shared.Return(snap);
     }
 
-    [PulseCall]
+    [ScriptCall]
     public virtual void Input_SetOwnerActive(int player_id, bool is_active)
     {
         if (is_active)
@@ -579,11 +758,11 @@ public class ImpComp
         }
     }
     
-    [PulseOverride][Title(" Input - On Pressed")]
+    [ScriptOverride][Title(" Input - On Pressed")]
     public virtual void Input_Pressed(ImpPlayer player, TLabel iaction, Vector3 axis) { }
-    [PulseOverride][Title(" Input - On Released")]
+    [ScriptOverride][Title(" Input - On Released")]
     public virtual void Input_Released(ImpPlayer player, TLabel iaction, Vector3 axis) { }
-    [PulseOverride][Title(" Input - On Down")]
+    [ScriptOverride][Title(" Input - On Down")]
     public virtual void Input_Update(ImpPlayer player, TLabel iaction, double dt, Vector3 axis) { }
     
     

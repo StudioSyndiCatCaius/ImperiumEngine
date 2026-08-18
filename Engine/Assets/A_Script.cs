@@ -609,8 +609,8 @@ public static class Pulse
                 {
                     continue;
                 }
-                bool is_ov = m.GetCustomAttribute<PulseOverrideAttribute>() != null;
-                bool is_call = m.GetCustomAttribute<PulseCallAttribute>() != null;
+                bool is_ov = m.GetCustomAttribute<ScriptOverrideAttribute>() != null;
+                bool is_call = m.GetCustomAttribute<ScriptCallAttribute>() != null;
                 if (ov)
                 {
                     if (!is_ov)

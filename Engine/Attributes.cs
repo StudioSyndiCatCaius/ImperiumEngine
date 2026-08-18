@@ -78,7 +78,7 @@ public sealed class ImpClassAttribute : Attribute
 // Methods
 // =======================================================================================================
 
-//in the editor, displays a button to call this function
+//in the editor, displays a button to call this function in its owning object's inspector
 [AttributeUsage(AttributeTargets.Method)]
 public class CallInEditorAttribute : Attribute
 {
@@ -86,19 +86,22 @@ public class CallInEditorAttribute : Attribute
 }
 
 // ========================================================================================================
-// PULSE Visual Scripting
+// Scripting
 // ========================================================================================================
 
-// indicates that this function is callable in the editor scripting system "Pulse"
+// Imperium supports 2 forms of scripting: Lua, and a cutsom visual scripting system called "Pulse"
+
+// indicates that this function is callable in the scripting system
 [AttributeUsage(AttributeTargets.Method)]
-public class PulseCallAttribute : Attribute
+public class ScriptCallAttribute : Attribute
 {
-    
+    // DEPCR. try to auto make any non-void with no Action/Func args as a pure-type by default. 
+    //public bool pure { get; set; } //only for non-void return functions. defaults to pure with 
 }
 
-// only for "virtual" functions. indicates that this function is overridable in the editor scripting system "Pulse";
+// only for "virtual" functions. indicates that this function is overridable in the scripting system 
 [AttributeUsage(AttributeTargets.Method)]
-public class PulseOverrideAttribute : Attribute
+public class ScriptOverrideAttribute : Attribute
 {
     
 }

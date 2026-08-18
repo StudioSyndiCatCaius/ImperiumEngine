@@ -1185,9 +1185,13 @@ public class PNL_SceneView : C2_Box
             return null;
         }
         ImpComp dest = Drop_Pick(player);
-        if (dest != null && (dest.IsPackedForeign || dest.IsInstanceRoot))
+        if (dest != null && (dest.IsPackedForeign || dest.IsOwned))
         {
-            dest = dest.IsInstanceRoot ? dest.parent : dest.packed_from?.parent;
+            dest = ImpComp.OutlinerHost(dest);
+        }
+        if (dest != null && dest.IsInstanceRoot)
+        {
+            dest = dest.parent;
         }
         if (dest == null || dest == _drop_type_ghost || _drop_type_ghost.IsAncestorOf(dest))
         {

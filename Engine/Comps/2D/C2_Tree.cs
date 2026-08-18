@@ -214,8 +214,17 @@ public class C2_Tree : Imp2D
     {
         Tree_Clear();
         if (comp == null) return;
-        Tree_Add(FromComp(comp));
+        Tree_Add(FromComp(comp, false));
         Tree_ExpandKey(KeyOf(comp), true);
+    }
+
+    public void Tree_Populate_Components(ImpComp host)
+    {
+        Tree_Clear();
+        if (host == null) return;
+        Tree_Add(FromComp(host, true));
+        Tree_ExpandKey(KeyOf(host), true);
+        Tree_ExpandAll(true);
     }
 
     Type _class_root;
@@ -411,35 +420,93 @@ public class C2_Tree : Imp2D
         return found;
     }
 
-    TTreeItem FromComp(ImpComp comp)
+    TTreeItem FromComp(ImpComp comp, bool components)
     {
-        TTreeItem[] kids = Array.Empty<TTreeItem>();
-        if (comp.children.Count > 0)
+        List<TTreeItem> kid_list = new();
+        for (int i = 0; i < comp.children.Count; i++)
         {
-            kids = new TTreeItem[comp.children.Count];
-            for (int i = 0; i < comp.children.Count; i++)
-                kids[i] = FromComp(comp.children[i]);
+            ImpComp child = comp.children[i];
+            if (child == null)
+            {
+                continue;
+            }
+            if (components)
+            {
+                if (!CompTree_Include(comp, child))
+                {
+                    continue;
+                }
+            }
+            else if (child.IsOwned || child.IsPackedForeign)
+            {
+                continue;
+            }
+            kid_list.Add(FromComp(child, components));
         }
         A_Texture icon = Class_Icon(comp.GetType());
         Color name_col = default;
         if (comp.IsInstanceRoot || comp.IsPackedForeign)
+        {
             name_col = new Color(236, 196, 82, 255);
+        }
+        else if (comp.IsOwned)
+        {
+            name_col = new Color(140, 180, 220, 255);
+        }
         if (comp.IsInstanceRoot)
+        {
             _expanded.Add(KeyOf(comp));
+        }
+        string label = CompTree_Label(comp, components);
         return new TTreeItem
         {
             sections = new[]
             {
                 new TTreeItemSection
                 {
-                    text = string.IsNullOrEmpty(comp.name) ? comp.GetType().Name : comp.name,
+                    text = label,
                     icon = icon,
                     color = name_col,
                 }
             },
-            children = kids,
+            children = kid_list.ToArray(),
             data = comp,
         };
+    }
+
+    static string CompTree_Label(ImpComp comp, bool components)
+    {
+        if (components && comp.parent != null)
+        {
+            FieldInfo slot = comp.parent.OwnedFieldOf(comp);
+            if (slot != null && slot.IsPublic)
+            {
+                return slot.Name;
+            }
+        }
+        if (string.IsNullOrEmpty(comp.name))
+        {
+            return comp.GetType().Name;
+        }
+        return comp.name;
+    }
+
+    static bool CompTree_Include(ImpComp parent, ImpComp child)
+    {
+        if (child.IsPackedForeign)
+        {
+            return true;
+        }
+        FieldInfo slot = parent.OwnedFieldOf(child);
+        if (slot != null)
+        {
+            return slot.IsPublic;
+        }
+        if (parent.IsOwned || parent.IsPackedForeign || parent.IsInstanceRoot)
+        {
+            return true;
+        }
+        return false;
     }
 
     TreeNode ToNode(TTreeItem item, TreeNode parent)
@@ -749,7 +816,7 @@ class C2_TreeRow : Imp2D
     {
         if (CursorGrab_Payload() != null) return true;
         return _tree.allow_reorder && _tree.on_item_drop != null
-            && _node.item.data is ImpComp c && !c.IsPackedForeign;
+            && _node.item.data is ImpComp c && !c.IsPackedForeign && !c.IsOwned;
     }
 
     public override object CursorGrab_Payload()

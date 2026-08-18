@@ -220,6 +220,9 @@ public class C2_Inspector : Imp2D
 
     public Action<C2_InspectorProperty> on_property_changed;
     public Action<ImpComp, ImpComp, ETreeDrop> on_hierarchy_drop;
+    public Action<ImpComp> on_component_click;
+
+    ImpComp _tree_host;
 
     string _search_query = "";
 
@@ -389,6 +392,26 @@ public class C2_Inspector : Imp2D
         }
 
         bool searching = !string.IsNullOrWhiteSpace(_search_query);
+        ImpComp focus = null;
+        if (targets.Count == 1 && targets[0] is ImpComp picked)
+        {
+            focus = picked;
+            ImpComp host = ImpComp.OutlinerHost(picked);
+            if (host == null)
+            {
+                host = picked;
+            }
+            _tree_host = host;
+            if (!searching && CompTree_HasAny(host))
+            {
+                AddComponentTree(host, focus);
+            }
+        }
+        else
+        {
+            _tree_host = null;
+        }
+
         if (members.Count == 0 && searching)
         {
             AddRow(new C2_Text
@@ -450,14 +473,66 @@ public class C2_Inspector : Imp2D
             AddRow(box);
         }
 
-        if (!searching && targets.Count == 1 && targets[0] is ImpComp host
-            && host.children.Count > 0 && !host.IsInstanceRoot && !host.IsPackedForeign)
-            AddChildrenTree(host);
     }
 
-    void AddChildrenTree(ImpComp host)
+    static bool CompTree_HasAny(ImpComp host)
     {
-        const string key = "Children";
+        if (host == null)
+        {
+            return false;
+        }
+        if (host.IsInstanceRoot)
+        {
+            return host.children.Count > 0;
+        }
+        FieldInfo[] fields = ImpComp.OwnedFields(host.GetType());
+        for (int i = 0; i < fields.Length; i++)
+        {
+            if (!fields[i].IsPublic)
+            {
+                continue;
+            }
+            if (fields[i].GetValue(host) is ImpComp slot && slot.parent == host)
+            {
+                return true;
+            }
+        }
+        for (int i = 0; i < host.children.Count; i++)
+        {
+            if (host.children[i] != null && host.children[i].IsPackedForeign)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static int CompTree_Count(ImpComp c)
+    {
+        int n = 1;
+        for (int i = 0; i < c.children.Count; i++)
+        {
+            ImpComp child = c.children[i];
+            if (child == null)
+            {
+                continue;
+            }
+            FieldInfo slot = c.OwnedFieldOf(child);
+            bool include = child.IsPackedForeign
+                || (slot != null && slot.IsPublic)
+                || ((c.IsOwned || c.IsPackedForeign || c.IsInstanceRoot) && !child.IsOwned);
+            if (!include)
+            {
+                continue;
+            }
+            n += CompTree_Count(child);
+        }
+        return n;
+    }
+
+    void AddComponentTree(ImpComp host, ImpComp focus)
+    {
+        const string key = "Components";
         C2_Expandable box = new()
         {
             name = key,
@@ -477,11 +552,11 @@ public class C2_Inspector : Imp2D
             else _collapsed.Add(key);
         };
 
-        int count = 1 + ChildCount(host);
+        int count = CompTree_Count(host);
         float h = Math.Clamp(22f * count + 8f, 48f, 240f);
         C2_Tree tree = new()
         {
-            allow_reorder = true,
+            allow_reorder = false,
             layout = new TLayout2
             {
                 orient_H = EUIViewportAlignment.Fill,
@@ -489,23 +564,26 @@ public class C2_Inspector : Imp2D
                 size_min = new Vector2(0, 48),
             },
         };
-        tree.on_item_drop = (src, dst, where) =>
+        tree.on_item_click = item =>
         {
-            if (src.data is ImpComp a && dst.data is ImpComp b)
-                on_hierarchy_drop?.Invoke(a, b, where);
+            if (item.data is not ImpComp c)
+            {
+                return;
+            }
+            selected_objects.Clear();
+            selected_objects.Add(c);
+            Rebuild();
+            on_component_click?.Invoke(c);
         };
-        tree.Tree_Populate_FromComp(host);
+        tree.Tree_Populate_Components(host);
+        if (focus != null)
+        {
+            tree.Tree_SelectData(focus);
+        }
         box.Child_Add(tree);
         box.layout.size = new Vector2(0, box.bar_height + h + 4);
         box.layout.size_min = box.layout.size;
         AddRow(box);
-    }
-
-    static int ChildCount(ImpComp c)
-    {
-        int n = c.children.Count;
-        for (int i = 0; i < c.children.Count; i++) n += ChildCount(c.children[i]);
-        return n;
     }
 
     void AddRow(Imp2D row)

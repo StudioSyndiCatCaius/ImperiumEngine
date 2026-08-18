@@ -8,21 +8,32 @@ namespace ImperiumEngine.Assets;
 
 public class A_Mesh : ImpAsset
 {
+    // ################################################################################################################
+    // Class
+    // ################################################################################################################
+    
     public Mesh mesh;
 
-    static A_Mesh? _geo_cube;
-    static A_Mesh? _geo_plane;
-
-    public static A_Mesh GEO_CUBE => _geo_cube ??= new A_Mesh
+    public override void Source_OnReload(ImpFile file)
     {
-        mesh = R3D.GenMeshCube(1f, 1f, 1f),
-        filepath = BuiltinPrefix + "A_Mesh.GEO_CUBE",
-    };
-    public static A_Mesh GEO_PLANE => _geo_plane ??= new A_Mesh
-    {
-        mesh = R3D.GenMeshPlane(1f, 1f, 1, 1),
-        filepath = BuiltinPrefix + "A_Mesh.GEO_PLANE",
-    };
+        base.Source_OnReload(file);
+        if (file.src_models.Count == 0)
+        {
+            return;
+        }
+        R3D_cs.Model mdl = file.src_models[0];
+        int count = mdl.Meshes.Length;
+        if (count <= 0)
+        {
+            return;
+        }
+        int i = source_index;
+        if (i < 0 || i >= count)
+        {
+            i = 0;
+        }
+        mesh = mdl.Meshes[i];
+    }
 
     C2_Viewport3D _drop_view;
     C3_Mesh _drop_ghost;
@@ -96,4 +107,24 @@ public class A_Mesh : ImpAsset
         _drop_view = null;
         return spawned;
     }
+
+    // ################################################################################################################
+    // Class
+    // ################################################################################################################
+    
+    static A_Mesh? _geo_cube;
+    static A_Mesh? _geo_plane;
+
+    public static A_Mesh GEO_CUBE => _geo_cube ??= new A_Mesh
+    {
+        mesh = R3D.GenMeshCube(1f, 1f, 1f),
+        filepath = BuiltinPrefix + "A_Mesh.GEO_CUBE",
+    };
+    public static A_Mesh GEO_PLANE => _geo_plane ??= new A_Mesh
+    {
+        mesh = R3D.GenMeshPlane(1f, 1f, 1, 1),
+        filepath = BuiltinPrefix + "A_Mesh.GEO_PLANE",
+    };
+    
+    public static A_Mesh SK_MANNEQUIN=Import<A_Mesh>("{engine}/Meshes/Character/Mannequin/sk_c_mannequin.glb");
 }

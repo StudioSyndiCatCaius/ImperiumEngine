@@ -150,6 +150,7 @@ public class WND_Scene : EdWindow
 
         scene_tree.on_item_drop = OnTreeDrop;
         inspector_comp.on_hierarchy_drop = OnHierarchyDrop;
+        inspector_comp.on_component_click = OnInspectorComponent;
         scene_tree.on_comp_click = comp =>
         {
             _selected_comp = comp;
@@ -297,7 +298,7 @@ public class WND_Scene : EdWindow
         if (a == null || b == null) return;
         if (a == b || a.IsAncestorOf(b)) return;
         if (_bound_scene != null && a == _bound_scene.root) return;
-        if (a.IsPackedForeign || b.IsPackedForeign) return;
+        if (a.IsPackedForeign || b.IsPackedForeign || a.IsOwned || b.IsOwned) return;
         if (where == ETreeDrop.Child && b.IsInstanceRoot) return;
 
         TCompPlace from = ImpUndo.Place_Get(a);
@@ -348,7 +349,7 @@ public class WND_Scene : EdWindow
         for (int i = 0; i < src.Count; i++)
         {
             ImpComp s = src[i];
-            if (s == null || s == pnl.scene.root || s.parent == null || s.IsPackedForeign) continue;
+            if (s == null || s == pnl.scene.root || s.parent == null || s.IsPackedForeign || s.IsOwned) continue;
             ImpComp copy = s.Clone();
             if (copy == null) continue;
             // Named before the insert below, so the scan never sees the copy itself. The source
@@ -381,7 +382,7 @@ public class WND_Scene : EdWindow
         for (int i = 0; i < src.Count; i++)
         {
             ImpComp s = src[i];
-            if (s == null || s == pnl.scene.root || s.IsPackedForeign) continue;
+            if (s == null || s == pnl.scene.root || s.IsPackedForeign || s.IsOwned) continue;
             // Detach rather than Destroy: Destroy tears the subtree apart child by child, and
             // undo needs the comp to come back with everything under it still attached.
             TCompPlace from = ImpUndo.Place_Get(s);
@@ -805,6 +806,37 @@ public class WND_Scene : EdWindow
         return new Vector2(v[0], v[1]);
     }
 
+    void OnInspectorComponent(ImpComp comp)
+    {
+        if (comp == null)
+        {
+            return;
+        }
+        _selected_comp = comp;
+        PNL_SceneView pnl = ActiveEdScene();
+        if (pnl == null)
+        {
+            return;
+        }
+        pnl.gizmo_data.on_selection_changed = null;
+        pnl.gizmo_data.Selection_Set(new[] { comp });
+        pnl.gizmo_data.on_selection_changed = OnGizmoSelection;
+        ImpComp host = ImpComp.OutlinerHost(comp);
+        if (host == null)
+        {
+            host = comp;
+        }
+        scene_tree.Select(host);
+        if (comp is Imp2D)
+        {
+            pnl.edit_mode = ESceneEditorMode.Mode_2D;
+        }
+        else if (comp is Imp3D)
+        {
+            pnl.edit_mode = ESceneEditorMode.Mode_3D;
+        }
+    }
+
     void OnGizmoSelection()
     {
         PNL_SceneView pnl = ActiveEdScene();
@@ -817,7 +849,12 @@ public class WND_Scene : EdWindow
             for (int i = 0; i < sel.Count; i++) objs.Add(sel[i]);
             inspector_comp.Objects_Add(objs, true);
             tab_inspectors.selected_tab = 0;
-            scene_tree.Select(_selected_comp);
+            ImpComp host = ImpComp.OutlinerHost(_selected_comp);
+            if (host == null)
+            {
+                host = _selected_comp;
+            }
+            scene_tree.Select(host);
         }
         else
         {

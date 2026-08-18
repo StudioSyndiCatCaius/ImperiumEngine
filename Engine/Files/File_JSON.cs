@@ -488,8 +488,25 @@ public class File_JSON : ImpFile
             {
                 ImpComp child = comp.children[i];
                 if (child.IsPackedForeign) continue;
+                if (child.IsOwned) continue;
                 children.Add(Comp_ToJson(child, visiting));
             }
+        }
+
+        var owned = new JsonObject();
+        FieldInfo[] owned_fields = ImpComp.OwnedFields(comp.GetType());
+        for (int i = 0; i < owned_fields.Length; i++)
+        {
+            FieldInfo f = owned_fields[i];
+            if (f.GetValue(comp) is not ImpComp slot)
+            {
+                continue;
+            }
+            if (slot.parent != comp)
+            {
+                continue;
+            }
+            owned[f.Name] = Comp_ToJson(slot, visiting);
         }
 
         var obj = new JsonObject
@@ -499,6 +516,10 @@ public class File_JSON : ImpFile
             ["vars"] = vars,
             ["children"] = children,
         };
+        if (owned.Count > 0)
+        {
+            obj["owned"] = owned;
+        }
         if (comp.IsInstanceRoot && !string.IsNullOrEmpty(comp.packed.path))
             obj["instance"] = new JsonObject { ["path"] = Path_WriteAsset(comp.packed.path) };
         return obj;
@@ -536,6 +557,16 @@ public class File_JSON : ImpFile
             comp = created;
         }
 
+        if (!comp.IsInstanceRoot)
+        {
+            comp.Owned_Bind();
+        }
+        Comp_ApplyJson(comp, obj, path_context, !comp.IsInstanceRoot);
+        return comp;
+    }
+
+    static void Comp_ApplyJson(ImpComp comp, JsonObject obj, string? path_context, bool apply_tree)
+    {
         if (obj["name"] is JsonValue jn && jn.TryGetValue<string>(out string? named) && named != null)
             comp.name = named;
 
@@ -553,14 +584,86 @@ public class File_JSON : ImpFile
             }
         }
 
-        if (!comp.IsInstanceRoot && obj["children"] is JsonArray arr)
+        if (!apply_tree)
+        {
+            return;
+        }
+
+        if (obj["owned"] is JsonObject owned)
+        {
+            FieldInfo[] fields = ImpComp.OwnedFields(comp.GetType());
+            for (int i = 0; i < fields.Length; i++)
+            {
+                FieldInfo f = fields[i];
+                if (!owned.ContainsKey(f.Name) || owned[f.Name] is not JsonObject slot_obj)
+                {
+                    continue;
+                }
+                if (f.GetValue(comp) is ImpComp native)
+                {
+                    Comp_ApplyJson(native, slot_obj, path_context, true);
+                    continue;
+                }
+                ImpComp? made = Comp_FromJson(slot_obj, path_context);
+                if (made == null)
+                {
+                    continue;
+                }
+                f.SetValue(comp, made);
+                comp.Child_Add(made);
+            }
+        }
+
+        if (obj["children"] is JsonArray arr)
         {
             foreach (JsonNode? child in arr)
             {
+                if (Comp_TryMergeOwned(comp, child, path_context))
+                {
+                    continue;
+                }
                 ImpComp? c = Comp_FromJson(child, path_context);
                 if (c != null) comp.Child_Add(c);
             }
         }
-        return comp;
+    }
+
+    static bool Comp_TryMergeOwned(ImpComp host, JsonNode? node, string? path_context)
+    {
+        if (host == null || node is not JsonObject obj)
+        {
+            return false;
+        }
+        string? child_name = null;
+        if (obj["name"] is JsonValue jn && jn.TryGetValue<string>(out string? named))
+        {
+            child_name = named;
+        }
+        string? cls = obj["_class"]?.GetValue<string>();
+        Type? type = ImpComp.Type_FromName(cls);
+        FieldInfo[] fields = ImpComp.OwnedFields(host.GetType());
+        for (int i = 0; i < fields.Length; i++)
+        {
+            FieldInfo f = fields[i];
+            if (f.GetValue(host) is not ImpComp native)
+            {
+                continue;
+            }
+            bool type_hit = type != null && type == native.GetType();
+            if (!type_hit)
+            {
+                continue;
+            }
+            bool name_hit = string.Equals(child_name, f.Name, StringComparison.Ordinal)
+                || string.Equals(child_name, native.name, StringComparison.Ordinal)
+                || string.Equals(child_name, native.GetType().Name, StringComparison.Ordinal);
+            if (!name_hit)
+            {
+                continue;
+            }
+            Comp_ApplyJson(native, obj, path_context, true);
+            return true;
+        }
+        return false;
     }
 }

@@ -158,3 +158,12 @@ public class A_CreatureConfig : ImpAsset
     public Dictionary<ImpAsset,int> inventory = new();
     public Dictionary<AG_Leveling,float> leveling = new();
 }
+
+
+[ImpClass(Hidden = true)]
+//an global instance of a creature by an ImpAsset as its Identity. E.G a party member in an RPG 
+public class ImpCreature : ImpComp
+{
+    public C1_Creature creature;
+    public ImpAsset identity;
+}

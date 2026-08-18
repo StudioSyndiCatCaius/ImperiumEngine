@@ -77,6 +77,7 @@ public class ImpPlayer
         ["_Jump"] = new TInputAction() { keys = { [EInputKey.Key_Space]=new () } },
         ["_Crouch"] = new TInputAction() { keys = { [EInputKey.Key_C]=new () } },
         ["_Sprint"] = new TInputAction() { keys = { [EInputKey.Key_LeftShift]=new () } },
+        ["_Pause"] = new TInputAction() { keys = { [EInputKey.Key_Escape]=new () } },
         ["_DragDrop"] = new TInputAction() { keys = { [EInputKey.Mouse_Left]=new () } },
         
         ["PIE_Play"] = new TInputAction() { keys = { [EInputKey.Key_P]=new (){ prereq_keys = [ EInputKey.Key_LeftAlt]} } },
@@ -528,7 +529,8 @@ public class ImpPlayer
     public bool grab_is_active = false;
     public const float grab_threshold = 5f;
     private Vector2 grab_origin;
-    
+
+    public Imp3D? pawn = null;
     private ImpComp? last_cursor_target = null;
     private Imp2D? last_focus_target = null;
     

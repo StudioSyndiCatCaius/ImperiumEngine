@@ -19,5 +19,9 @@
     <ItemGroup>
       <None Update="Content\**\*.*" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
+    <ItemGroup>
+      <Folder Include="Nodes\Common\" />
+      <Folder Include="Nodes\Quest\" />
+    </ItemGroup>
 
 </Project>

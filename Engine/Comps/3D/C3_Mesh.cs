@@ -1,6 +1,7 @@
 using System.Numerics;
 using ImperiumEngine.Assets;
 using ImperiumEngine.Structs;
+using JoltPhysicsSharp;
 using R3D_cs;
 
 namespace ImperiumEngine.Comps._3D;
@@ -27,5 +28,31 @@ public class C3_Mesh : Imp3D
         float d = MathF.PI / 180f;
         Quaternion rot = Quaternion.CreateFromYawPitchRoll(t.rotation.Y * d, t.rotation.X * d, t.rotation.Z * d);
         R3D.DrawMeshEx(mesh.mesh, R3D.GetDefaultMaterial(), t.position, rot, t.scale);
+    }
+
+    public override Shape Phys_MakeShape(Vector3 world_scale)
+    {
+        Vector3 s = new(
+            MathF.Abs(world_scale.X),
+            MathF.Abs(world_scale.Y),
+            MathF.Abs(world_scale.Z));
+        if (s.X < 0.01f)
+        {
+            s.X = 0.01f;
+        }
+        if (s.Y < 0.01f)
+        {
+            s.Y = 0.01f;
+        }
+        if (s.Z < 0.01f)
+        {
+            s.Z = 0.01f;
+        }
+
+        if (mesh != null && ReferenceEquals(mesh, A_Mesh.GEO_PLANE))
+        {
+            return new BoxShape(new Vector3(s.X * 0.5f, MathF.Max(0.02f, s.Y * 0.02f), s.Z * 0.5f));
+        }
+        return new BoxShape(s * 0.5f);
     }
 }

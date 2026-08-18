@@ -99,6 +99,8 @@ public class C2_GraphEdit : Imp2D
         clip_children = true;
         layout = TLayout2.FULL;
     }
+    
+    
 
     public Vector2 GraphToScreen(Vector2 graph)
     {
@@ -1639,6 +1641,14 @@ public class C2_GraphNode : Imp2D
             }
         }
     }
+
+    public void TriggerOutput(int pin, int connections = -1)
+    {
+        // if connections <0, actiavte all nodes connected to the output pin
+    }
+    
+    public virtual void OnNode_Enter(int pin, C2_GraphNode previous) {}
+    public virtual void OnNode_Exit(int pin) {}
 }
 
 public class UI_Graph : ImpAsset

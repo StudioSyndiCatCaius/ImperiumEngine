@@ -128,11 +128,11 @@ public class ImpScene : ImpAsset
         return t;
     }
 
-    [PulseOverride] public virtual void OnBegin() { }
-    [PulseOverride] public virtual void OnEnd() { }
-    [PulseOverride] public virtual void OnUpdate(double dt) { }
+    [ScriptOverride] public virtual void OnBegin() { }
+    [ScriptOverride] public virtual void OnEnd() { }
+    [ScriptOverride] public virtual void OnUpdate(double dt) { }
 
-    [PulseCall] public void Print(string text)
+    [ScriptCall] public void Print(string text)
     {
         if (text == null)
         {
@@ -368,6 +368,10 @@ public class ImpScene : ImpAsset
             root.input_owner = null;
         }
         root.OnEnd();
+        if (_game != null)
+        {
+            _game.Phys_Dispose();
+        }
     }
 
     public void Update(double dt)
@@ -380,6 +384,10 @@ public class ImpScene : ImpAsset
             else { REnd(); }
         }
         root.Update(dt,is_running);
+        if (is_running && _game != null && _game.phys != null)
+        {
+            _game.phys.Step(dt);
+        }
         if (is_running && impScriptVm != null)
         {
             impScriptVm.Update(dt);
@@ -538,9 +546,13 @@ public class ImpScene : ImpAsset
         }
         ImpComp dest = comp;
         ImpScene dest_scene = SceneOf(_drop_view) ?? dest?.scene;
-        if (dest != null && (dest.IsPackedForeign || dest.IsInstanceRoot))
+        if (dest != null && (dest.IsPackedForeign || dest.IsOwned))
         {
-            dest = dest.IsInstanceRoot ? dest.parent : dest.packed_from?.parent;
+            dest = ImpComp.OutlinerHost(dest);
+        }
+        if (dest != null && dest.IsInstanceRoot)
+        {
+            dest = dest.parent;
         }
         if (dest == null || dest == _drop_ghost || _drop_ghost.IsAncestorOf(dest))
         {

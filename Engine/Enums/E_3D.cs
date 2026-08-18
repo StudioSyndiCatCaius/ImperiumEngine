@@ -7,6 +7,8 @@ public enum ECollisionChannel
 {
     Visibility,
     Cursor,
+    World,
+    Pawn,
     
     Custom_01=11,
     Custom_02=12,

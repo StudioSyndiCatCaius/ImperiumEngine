@@ -329,8 +329,8 @@ public static class EdState
             real = ImpFile.Path_Resolve(path);
         }
 
-        // Game first so project files never get tagged as engine when the two
-        // Content folders used to collapse (cwd/Content vs _Content).
+        // Game first so project files never get tagged as engine when both
+        // trees sit under a folder named Content.
         string game = ImpFile.ContentDir_Game();
         if (PNL_FileBrowser.IsUnder(real, game))
         {

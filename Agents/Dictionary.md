@@ -2,6 +2,42 @@
 
 Living lookup so agents do not re-read source. Update this when you learn or change something.
 
+## ImpPhys (`Engine/ImpPhys.cs`)
+
+Per-`ImpGame` Jolt world. `Foundation` + `JobSystemThreadPool` are process-wide (`ImpPhys.Init` from `ImpApp.Run`, `Shutdown` on exit).
+
+| Flag combo | Jolt object | Role |
+|---|---|---|
+| `!physics_enabled` | none | Visual only |
+| `physics_enabled && !movement_enabled` | Static `Body` | World geo (`C3_Mesh` default) |
+| `physics_enabled && movement_enabled` | `CharacterVirtual` + optional inner body | Pawn (`C3_Character` default) |
+
+- `ImpGame.phys` / `Phys_Get()` / `Phys_Dispose()`. Lazy-create on first `Register`. `REnd` and `Play_Stop` dispose so PIE never shares bodies with host.
+- Layer filters (`ObjectLayerPairFilterTable` etc.) **must stay rooted on `ImpPhys`**. They were locals at first; GC disposed the native objects while Jolt still held the pointers, and `CharacterVirtual.ExtendedUpdate` crashed with `ExecutionEngineException`. `PhysicsSystem.Dispose` already deletes those natives — do not `Dispose()` the C# wrappers after that (just `GC.SuppressFinalize`).
+- Register on `Imp3D.OnBegin` if `physics_enabled`. Unregister on `OnEnd` / `OnDestroy`.
+- Tick: `ImpScene.Update` walks the tree (`Update_Physics` / `Update_Movement`) **then** `game.phys.Step(dt)` so same-frame `Phys_Move` applies.
+- Two object layers: Static (0) / Moving (1). Static↔Moving and Moving↔Moving collide.
+- `Trace_Line` uses `NarrowPhaseQuery.CastRay` when a world exists. Editor picking still uses AABB `Ray_Comp3D`.
+- `C3_Mesh` shapes: `GEO_PLANE` = thin box, everything else (including `GEO_CUBE` and imports) = `BoxShape(0.5 * scale)`. Triangle `MeshShape` from R3D meshes is not wired (R3D `Mesh` has no vertex accessor).
+- `C3_Collider`: collision volume only (not a mesh). Cube/Sphere/Cylinder/Capsule primitives, Cone = convex hull. Capsule `Phys_ShapeOffset` lifts the shape so `CharacterVirtual.Position` is at the feet. Editor draws a translucent cyan debug primitive matching `shape`/`extents` (hidden in PIE). `Shape_Local` feeds `Comp3D_LocalBounds` so the volume is pickable. Default `physics_enabled`.
+- No dynamic rigid bodies in v1.
+- `ImpComp.OnBegin` / `OnEnd` now cascade to children. `Destroy` calls `OnDestroy` before detaching.
+
+### Movement (`Imp3D`)
+
+Runtime (not ImpVar): `velocity`, `is_grounded`.
+
+- `Phys_Move(dir, scale)` — accumulate world wish (UE `AddMovementInput`).
+- `Phys_MoveByRot(dir, scale, rot_euler)` — `Transform(dir, rot)` then `Phys_Move`.
+- `Phys_Launch(axis, scale, force_h, force_v)` — impulse; force flags replace that plane.
+- `Update_Physics` — gravity / zero downward when grounded.
+- `Update_Movement` — accel/decel toward wish * `A_MoveMode.speed`, air control + friction, then `rotate_with_movement` (UE Orient Rotation to Movement): face horizontal velocity, up = `-gravity`. `velocity_rotation_rate` is deg/s per euler axis (0 locks that axis). Default yaw 360. `CharacterVirtual` drives position only — facing stays on the Imp3D.
+- `C3_Character` consumes `_Move` (WASD, camera/self yaw, X=forward Z=right remapped to local `(Z, Y, -X)`) and `_Jump` (`Phys_Launch` up, `jump_speed` on `A_MoveMode`). Claims player 0 on `OnBegin`.
+- Visual child meshes of a character must keep `physics_enabled = false` or they double-collide. `C3_Character.mesh` is a child `C3_Mesh` defaulting to `A_Mesh.SK_MANNEQUIN` (`Import` of `{engine}/Meshes/Character/Mannequin/sk_c_mannequin.glb`).
+
+`A_MoveMode` defaults: speed 5, accel/decel 20, jump 6, `rotate_with_movement` on, `velocity_rotation_rate` (0, 360, 0) deg/s. Gravity is `gravity_dir * 9.81 * gravity_scale` (curve unused). `PRESET_PAWN` / `ECollisionChannel.World` + `Pawn` added; body vs body still uses the two Jolt layers only.
+
+
 ## ImpComp (`Engine/ImpComp.cs`)
 
 Scene-graph node. `Imp2D` / `Imp3D` inherit.
@@ -11,6 +47,7 @@ Scene-graph node. `Imp2D` / `Imp3D` inherit.
 | `name` | ImpVar. Defaults to type name. |
 | `is_visible` | ImpVar. Local only — `IsVisibleInTree()` walks ancestors. |
 | `parent` / `children` | Tree. `children` is readonly list, mutate via Child_* / Detach. |
+| owned / native | Public (or private) `ImpComp` fields that are also children — `C3_Character.mesh` / `skeleton` / `creature`. `IsOwned`, `OwnedFields`, `OwnedFieldOf`, `Owned_Bind`, `OutlinerHost`. |
 | `scene` | Cached owning `ImpScene`. **Not** ImpVar. Property: assign cascades to descendants. |
 | `game_owner` | Cached owning `ImpGame`. **Not** ImpVar. Same cascade as `scene`. Get(0) = editor/standalone, Get(1) = PIE. |
 | `input_owner` | `ImpPlayer` that feeds input into this subtree. |
@@ -29,12 +66,17 @@ Scene-graph node. `Imp2D` / `Imp3D` inherit.
 - `Reparent` keeps world transform for 2D/3D, then Child_Add/Insert.
 - `Destroy` destroys children first, then unhooks parent + clears scene and game_owner.
 - Update/Draw snapshot children via `ArrayPool` (not `ToArray`) because those passes may reparent/destroy.
+- Owned children stay in the live `children` list (draw / update / physics) but **do not appear in the outliner**. `Detach` / `Reparent` refuse them. `Clone` overlays onto the copy’s ctor instances instead of adding a second set. JSON writes them under `owned` (field name) and merges back on load so editor reload does not double them. Private owned slots stay hidden in the inspector tree too.
+
+**Inspector Components tree**
+- Unreal-style: outliner picks the host (`OutlinerHost` walks past owned / packed-foreign). Inspector top `Components` tree lists the host + **public** owned slots + packed-foreign kids (and extras under those hidden nodes).
+- Click a row to inspect that comp’s ImpVars; gizmo follows; outliner stays on the host. Prefab instance children are the same path (hidden from outliner, yellow in the inspector tree). User-added siblings of the host still live in the outliner.
 
 **Do not confuse with** `Imp2D._scene_root` — static per-frame flag for “this subtree is scene canvas content” (layout/pivot/rotation). That is **not** `ImpComp.scene`.
 
-## Engine `_Content`
+## Engine `Content`
 
-Source lives at `Engine/_Content`. `Engine.csproj` copies it next to the exe (`CopyToOutputDirectory`). `{engine}` resolves to `AppContext.BaseDirectory/_Content` via `ImpFile.ContentDir_Engine()`. Game content is still `{game}` → `<game>/Content`.
+One folder: `Engine/Content` in source. `Engine.csproj` copies it next to the exe as `Content` for shipped builds. `{engine}` via `ImpFile.ContentDir_Engine()` prefers the source tree (`…/Engine/Content` if `Engine.csproj` is nearby) and falls back to `AppContext.BaseDirectory/Content`. Game content is still `{game}` → `<game>/Content`. Do not add `_Content`.
 
 ## Imp2D (`Engine/Imp2D.cs`)
 
@@ -172,7 +214,7 @@ Default impls are empty. `ImpScene` instances the hierarchy. `A_Mesh` spawns a `
 
 Reads/writes ImpVar fields only (public+private instance). Public-field fallback for non-asset objects. Does not serialize `ImpComp.scene` / `parent` as fields.
 
-Hierarchy: `Comp_ToJson` / `Comp_FromJson` — used when the asset is an `ImpScene` (`vars.root`). Children are a JSON array, not ImpVar.
+Hierarchy: `Comp_ToJson` / `Comp_FromJson` — used when the asset is an `ImpScene` (`vars.root`). User children are a JSON array. Native field comps go in `owned` and are applied onto the ctor instances (never `Child_Add`’d again).
 
 ## ImpComp.Type_FromName
 
@@ -180,7 +222,7 @@ Resolves a concrete `ImpComp` subclass by short type name (`C3_Mesh`, `ImpComp`,
 
 ## PNL_SceneTree (`Editor/Panel/PNL_SceneTree.cs`)
 
-Editor outliner panel. Search bar + `C2_Tree`. Binds `scene` (or `root_comp` if set). Refreshes on hierarchy sig. `WND_Scene` owns click/drop (inspector + gizmo + reparent). External payload drop (`on_item_drop_external`) of a `Type` adds that comp as a child (`AddComp` / `AddChild`).
+Editor outliner panel. Search bar + `C2_Tree`. Binds `scene` (or `root_comp` if set). Refreshes on hierarchy sig. Skips `IsOwned` and `IsPackedForeign` (those live in the inspector Components tree). `WND_Scene` owns click/drop (inspector + gizmo + reparent). External payload drop (`on_item_drop_external`) of a `Type` adds that comp as a child (`AddComp` / `AddChild`).
 
 ## PNL_CommonComps (`Editor/Panel/PNL_CommonComps.cs`)
 
@@ -369,7 +411,7 @@ C# statics cannot be instanced (one AppDomain, and Raylib/R3D/Jolt are process-g
 
 **Stop** (`MOpt_Play_Stop` / toolbar Stop / `PIE_Quit` = Alt+Escape): unbinds + detaches the overlay, then `Play_Stop`. Closing the hosting scene tab also stops PIE. Toolbar: Stop is `is_disabled` when `Get(1)` is null; Play and Play From Start are `is_disabled` during PIE.
 
-`C2_GameView` ticks `view_game.scene` under `Bind`. Parent it into `PNL_SceneView.view_root` (the viewport list) so it gets the same fill slot as the editor camera. 3D is `C2_Viewport3D` with `R3D.SetAspectMode(Expand)` so the blit fills the widget. 2D HUD (`clear_background` / `draw_canvas` false) draws in-place over that blit — not through a second RT (R3D scissor leftover was covering the bottom of the 3D image). Hosting `PNL_SceneView` hides its editor toolbar/viewports while the overlay is visible. Physics isolation is not wired yet. `ImpPlayer.players` is still process-global, but **action input is now routed per session** — see below.
+`C2_GameView` ticks `view_game.scene` under `Bind`. Parent it into `PNL_SceneView.view_root` (the viewport list) so it gets the same fill slot as the editor camera. 3D is `C2_Viewport3D` with `R3D.SetAspectMode(Expand)` so the blit fills the widget. 2D HUD (`clear_background` / `draw_canvas` false) draws in-place over that blit — not through a second RT (R3D scissor leftover was covering the bottom of the 3D image). Hosting `PNL_SceneView` hides its editor toolbar/viewports while the overlay is visible. Physics is per-`ImpGame` (`ImpGame.phys`). `ImpPlayer.players` is still process-global, but **action input is now routed per session** — see below.
 
 ### Input target game
 
@@ -389,7 +431,7 @@ Not covered: PIE comps are not cursor targets (`Update_Cursor` traces only the e
 
 `A_Texture.ICO_STOP` = `{engine}/Icons/ico_editor_stop.png` (same mint as play).
 
-Do **not** try AssemblyLoadContext or a second process for PIE. Shared GPU assets stay on `ImpAsset` cache. Per-game later: physics, `C1_GameMode.current`, transit, play-local players.
+Do **not** try AssemblyLoadContext or a second process for PIE. Shared GPU assets stay on `ImpAsset` cache. Physics is already per-game (`ImpGame.phys`). Per-game later: `C1_GameMode.current`, transit, play-local players.
 
 ## C2_Viewport3D / C2_Viewport2D (`Engine/Comps/2D/`)
 
@@ -441,6 +483,7 @@ Inspects `[ImpVar]` fields/properties on the selected object(s). Categories are 
 - `filter_property` (`Func<MemberInfo, bool>`) — if set, a top-level member is listed only when this returns true. Nested group / `Rows_ForObject` rebuilds pass `apply_filter: false` so a Config filter does not hide `TRef.path` etc.
 - `include_static` — also collect public static `[ImpVar]`s (`Members_GetStatic`). Off by default so instance inspectors stay instance-only.
 - Target may be a `Type` (`InspectType`): inspect that type's members instead of `System.Type`. `TPropertyBind.Member` binds statics via `GetValue(null)` / `SetValue(null, …)` and pulls revert defaults from `ImpConfig.Default_TryGet`.
+- Comp inspector: top **Components** tree (`Tree_Populate_Components`) for public owned slots + packed-foreign kids. `on_component_click` retargets vars / gizmo. Host is `ImpComp.OutlinerHost`. No reorder.
 
 ## C2_TabBox (`Engine/Comps/2D/C2_TabBox.cs`)
 
@@ -594,6 +637,7 @@ A `C2_Button` prefab would be `"_class": "C2_Button"` plus that button’s ImpVa
 
 - Write `instance` when `IsInstanceRoot`.
 - Do **not** emit `IsPackedForeign` children.
+- Do **not** emit `IsOwned` children in `children`. Write them as `owned.{fieldName}` and apply onto the ctor instance on load. Legacy files that stuffed natives into `children` merge by type + name (`mesh` / `C3_Mesh`).
 - v1: write the instance root’s ImpVars as today. v2: diff against `packed.root`.
 - `_class` kept so a missing packed file can still spawn a placeholder of the right family.
 
@@ -609,10 +653,10 @@ Packaged children (`IsPackedForeign`) are selected and edited like any other com
 
 - No delete, duplicate, reparent, or reorder.
 - No parenting into an instance root or a foreign node (`Child_Add` / `Child_Insert` / `Reparent` refuse).
-- Outliner grab and inspector Children tree are off for instance roots / foreign.
+- Outliner grab is off for instance roots / foreign / owned. Inspector **Components** tree (not a reorderable Children list) is how you reach them.
 - Instance root itself is host-owned: move, delete, duplicate the whole capsule. Duplicate is `Clone()` of that capsule (keeps overrides). `Instantiate()` (drop/load) skips children that are instances of the same scene so a self-drop cannot explode the template.
 
-Outliner lists live children (instance roots auto-expand). Instance root **and** packaged kids use a yellow-ish name tint (`236, 196, 82`). Click selects that node — inspect it like any other comp. No child sub-inspectors on the parent.
+Outliner hides owned natives and packed-foreign kids. Instance roots stay as a single outliner row. Inspector Components tree: owned names use the **field** name (`mesh`) with a blue tint (`140, 180, 220`); instance / packed use yellow (`236, 196, 82`). Click inspects that node.
 
 Host JSON still skips foreign children (root overrides only). Child var edits are live; persistence is later.
 

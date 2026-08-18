@@ -28,6 +28,27 @@ public class ImpGame
     public static ImpGame current;
 
     public C1_GameMode game_mode;
+    public ImpPhys phys;
+
+    public ImpPhys Phys_Get()
+    {
+        if (phys == null)
+        {
+            phys = new ImpPhys();
+            phys.Create();
+        }
+        return phys;
+    }
+
+    public void Phys_Dispose()
+    {
+        if (phys == null)
+        {
+            return;
+        }
+        phys.Dispose();
+        phys = null;
+    }
 
     public static ImpGame Get(int id = 0)
     {
@@ -111,6 +132,7 @@ public class ImpGame
             {
                 s.root.Destroy();
             }
+            dying.Phys_Dispose();
             Bind(prev ?? Get(ID_HOST));
         }
         _games[ID_PLAY] = null;
@@ -140,6 +162,8 @@ public class ImpGame
     // ------------------------------------------
     // Scene
     // ------------------------------------------
+    public ImpScene scene_previous; // when transit between scenes this is the previous root scene
+    
     ImpScene _scene;
     public ImpScene scene
     {
@@ -182,4 +206,13 @@ public class ImpGame
     {
         
     }
+    
+    // ------------------------------------------
+    // Creature
+    // ------------------------------------------
+    
+    
+    // ------------------------------------------
+    // Squad
+    // ------------------------------------------
 }

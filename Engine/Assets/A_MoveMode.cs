@@ -10,8 +10,9 @@ public class A_MoveMode : ImpAsset
     // #################################################################################
     
     [ImpVar][Category("Speed")] public float speed=5.0f;
-    [ImpVar][Category("Speed")] public float acceleration=1.0f;
-    [ImpVar][Category("Speed")] public float deceleration=1.0f;
+    [ImpVar][Category("Speed")] public float acceleration=20.0f;
+    [ImpVar][Category("Speed")] public float deceleration=20.0f;
+    [ImpVar][Category("Speed")] public float jump_speed=6.0f;
     
     [ImpVar][Category("Air")] public float air_control=1.0f;
     [ImpVar][Category("Air")] public float air_friction=0.1f;
@@ -21,8 +22,8 @@ public class A_MoveMode : ImpAsset
     [ImpVar][Category("Gravity")] public A_Curve1 gravity_accel_curve;
     [ImpVar][Category("Gravity")] public float gravity_scale=1.0f;
     
-    [ImpVar][Category("Rotation")] public bool rotate_with_movement;
-    [ImpVar][Category("Rotation")] public Vector3 velocity_rotation_rate=new(0, 5.0f, 5.0f);
+    [ImpVar][Category("Rotation")] public bool rotate_with_movement=true;
+    [ImpVar][Category("Rotation")] public Vector3 velocity_rotation_rate=new(0, 360.0f, 0);
     [ImpVar][Category("Rotation")] public bool forward_adjust_rotation;
     
     // #################################################################################

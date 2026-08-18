@@ -50,6 +50,7 @@ public class ImpApp
         Raylib.SetExitKey(KeyboardKey.Null);
         R3D.Init(Raylib.GetScreenWidth(), Raylib.GetScreenHeight());
         R3D.SetAspectMode(AspectMode.Expand);
+        ImpPhys.Init();
         ImpPlayer.Init();
         
         on_post_init?.Invoke();
@@ -102,6 +103,7 @@ public class ImpApp
 
         on_shutdown?.Invoke();
 
+        ImpPhys.Shutdown();
         R3D.Close();
         Raylib.ShowCursor();
         Raylib.CloseWindow();

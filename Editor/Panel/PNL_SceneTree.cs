@@ -116,15 +116,16 @@ public class PNL_SceneTree : EdPanel
         Vector2 pos = ImpPlayer.players.Count > 0 ? ImpPlayer.players[0].cursor.position : Vector2.Zero;
         bool foreign = c.IsPackedForeign;
         bool inst = c.IsInstanceRoot;
+        bool owned = c.IsOwned;
         bool is_root = c == Root();
         ImpPlayer.Popup_Run(this, new A_PopupConfig
         {
             options = new List<TPopupMenuOption>
             {
-                new() { text = "Duplicate", is_disabled = foreign || is_root || c.parent == null, on_press = () => Duplicate(c) },
-                new() { text = "Delete", is_disabled = foreign || is_root, on_press = () => Delete(c) },
-                new() { text = "Change Type", is_disabled = foreign || inst, on_press = () => ChooseType("Change Type", t => ChangeType(c, t)) },
-                new() { text = "Add Child", is_disabled = foreign || inst, on_press = () => ChooseType("Add Child", t => AddChild(c, t)) },
+                new() { text = "Duplicate", is_disabled = foreign || owned || is_root || c.parent == null, on_press = () => Duplicate(c) },
+                new() { text = "Delete", is_disabled = foreign || owned || is_root, on_press = () => Delete(c) },
+                new() { text = "Change Type", is_disabled = foreign || inst || owned, on_press = () => ChooseType("Change Type", t => ChangeType(c, t)) },
+                new() { text = "Add Child", is_disabled = foreign || inst || owned, on_press = () => ChooseType("Add Child", t => AddChild(c, t)) },
             },
         }, null, pos);
     }
@@ -150,7 +151,7 @@ public class PNL_SceneTree : EdPanel
 
     void Duplicate(ImpComp s)
     {
-        if (s == null || s.parent == null || s == Root() || s.IsPackedForeign) return;
+        if (s == null || s.parent == null || s == Root() || s.IsPackedForeign || s.IsOwned) return;
         ImpComp copy = s.Clone();
         if (copy == null) return;
         copy.name = ImpComp.Name_Unique(s.parent, string.IsNullOrEmpty(s.name) ? copy.GetType().Name : s.name);
@@ -164,7 +165,7 @@ public class PNL_SceneTree : EdPanel
 
     void Delete(ImpComp s)
     {
-        if (s == null || s == Root() || s.IsPackedForeign) return;
+        if (s == null || s == Root() || s.IsPackedForeign || s.IsOwned) return;
         ImpComp parent = s.parent;
         TCompPlace from = ImpUndo.Place_Get(s);
         s.Detach();
@@ -192,7 +193,7 @@ public class PNL_SceneTree : EdPanel
     void AddChild(ImpComp parent, Type type)
     {
         if (parent == null || type == null) return;
-        if (parent.IsPackedForeign || parent.IsInstanceRoot) return;
+        if (parent.IsPackedForeign || parent.IsInstanceRoot || parent.IsOwned) return;
         if (!typeof(ImpComp).IsAssignableFrom(type) || type.IsAbstract) return;
         if (Activator.CreateInstance(type) is not ImpComp n) return;
         n.name = ImpComp.Name_Unique(parent, type.Name);
@@ -205,7 +206,7 @@ public class PNL_SceneTree : EdPanel
     void ChangeType(ImpComp src, Type type)
     {
         if (src == null || type == null || type == src.GetType()) return;
-        if (src.IsInstanceRoot || src.IsPackedForeign) return;
+        if (src.IsInstanceRoot || src.IsPackedForeign || src.IsOwned) return;
         if (!typeof(ImpComp).IsAssignableFrom(type) || type.IsAbstract) return;
         if (Activator.CreateInstance(type) is not ImpComp dst) return;
 
@@ -254,6 +255,7 @@ public class PNL_SceneTree : EdPanel
             if (f.IsInitOnly || f.IsLiteral) continue;
             if (f.Name is "parent" or "children" or "input_owner" or "is_destroying" or "_scene"
                 or "packed" or "packed_from" or "option_button") continue;
+            if (typeof(ImpComp).IsAssignableFrom(f.FieldType)) continue;
             if (f.Name.StartsWith("_e_") || f.Name.StartsWith("_c_")) continue;
             if (!map.TryGetValue(f.Name, out FieldInfo df) || df.FieldType != f.FieldType) continue;
             df.SetValue(dst, f.GetValue(src));
