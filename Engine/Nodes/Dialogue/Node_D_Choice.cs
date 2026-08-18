@@ -11,12 +11,5 @@ public class Node_D_Choice : ImpFlowNode
 
 public class Node_D_ChoiceHUB : ImpFlowNode
 {
-    public override void OnNode_Enter(int pin, C2_GraphNode previous)
-    {
-        base.OnNode_Enter(pin, previous);
-        sys_Choice.Run(0, (i) =>
-        {
-            TriggerOutput(pin);
-        });
-    }
+    
 }

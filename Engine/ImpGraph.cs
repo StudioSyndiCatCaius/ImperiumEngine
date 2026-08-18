@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using ImperiumEngine.Comps._1D;
 using Raylib_cs;
 
 namespace ImperiumEngine;
@@ -26,6 +27,8 @@ public struct TFlowNodePin
 
 public class ImpFlowNode
 {
+    public A_Flow _owner;
+    public bool universal_node; 
     public Guid guid;
 
     public List<TFlowNodePin> inputs = new() { new() };
@@ -35,13 +38,15 @@ public class ImpFlowNode
 
     public void TriggerOutput(int pin, int connections = -1)
     {
-        on_exit.Invoke(this,pin,connections);
+        //if connection > -1, only trigger the out connected node of that index. if -1, trigger all out connections.
     }
     
     public virtual void OnNode_Define() { }
-    public virtual void OnNode_Enter(byte pin,ValueType val)  { }
-    public virtual void OnNode_Exit(byte pin, ValueType val) { }
+    public virtual void OnNode_Enter(byte pin,ImpFlowNode from)  { }
+    public virtual void OnNode_Exit(byte pin) { }
     public virtual void OnNode_Update(float dt) { }
+    
+    public virtual bool Node_CanUseInFlow(A_Flow flow) { return true; }
     
     public virtual Color GetNode_Color() { return Color.White; }
     public virtual String GetNode_Title() { return this.GetType().Name; }
