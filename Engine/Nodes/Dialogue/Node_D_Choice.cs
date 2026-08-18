@@ -4,12 +4,12 @@ using ImperiumEngine.Comps._2D;
 
 namespace ImperiumEngine.Nodes.Dialogue;
 
-public class Node_D_Choice : C2_FlowNode
+public class Node_D_Choice : ImpFlowNode
 {
     [ImpVar] public TText text;
 }
 
-public class Node_D_ChoiceHUB : C2_FlowNode
+public class Node_D_ChoiceHUB : ImpFlowNode
 {
     public override void OnNode_Enter(int pin, C2_GraphNode previous)
     {

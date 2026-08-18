@@ -196,7 +196,7 @@ public class PNL_ScriptGraph : EdPanel
         }
         if (_script.connections == null)
         {
-            _script.connections = new List<TGraphConnection>();
+            _script.connections = new List<TFlowConnection>();
         }
         for (int i = 0; i < _script.nodes.Count; i++)
         {
@@ -213,7 +213,7 @@ public class PNL_ScriptGraph : EdPanel
         }
         for (int i = 0; i < _script.connections.Count; i++)
         {
-            TGraphConnection c = _script.connections[i];
+            TFlowConnection c = _script.connections[i];
             C2_GraphNode from = WidgetOf(c.from_node);
             C2_GraphNode to = WidgetOf(c.to_node);
             if (from != null && to != null)
@@ -606,7 +606,7 @@ public class PNL_ScriptGraph : EdPanel
             {
                 continue;
             }
-            _script.connections.Add(new TGraphConnection
+            _script.connections.Add(new TFlowConnection
             {
                 from_node = a.id,
                 from_pin = (byte)l.from_slot,

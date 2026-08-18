@@ -1,4 +1,5 @@
-﻿using ImperiumEngine.Interfaces;
+﻿using ImperiumEngine.Comps._1D;
+using ImperiumEngine.Interfaces;
 
 namespace ImperiumEngine.Assets.Flow;
 

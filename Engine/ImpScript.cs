@@ -14,7 +14,7 @@ public class TScriptProgram
 {
     public A_Script script;
     public List<ScriptNode> nodes = new();
-    public List<TGraphConnection> links = new();
+    public List<TFlowConnection> links = new();
     public List<string> errors = new();
 
     public ScriptNode Node_Find(Guid id)
@@ -50,7 +50,7 @@ public class TScriptProgram
     {
         for (int i = 0; i < links.Count; i++)
         {
-            TGraphConnection c = links[i];
+            TFlowConnection c = links[i];
             if (c.to_node == to_node && c.to_pin == to_slot)
             {
                 from_node = c.from_node;
@@ -69,7 +69,7 @@ public class TScriptProgram
     {
         for (int i = 0; i < links.Count; i++)
         {
-            TGraphConnection c = links[i];
+            TFlowConnection c = links[i];
             if (c.from_node == from_node && c.from_pin == from_slot)
             {
                 to_node = c.to_node;
@@ -334,7 +334,7 @@ public class TScriptNodeMenu
     public bool is_disabled;
 }
 
-public class ScriptNode : ImpGraphNode
+public class ScriptNode : ImpFlowNode
 {
     public object owner;
 

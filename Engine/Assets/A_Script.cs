@@ -674,7 +674,7 @@ public class A_Script : ImpAsset
     [ImpVar] public TClass<Object> parent_type;
 
     [ImpVar(Hidden = true)] public List<TPulseNode> nodes = new();
-    [ImpVar(Hidden = true)] public List<TGraphConnection> connections = new();
+    [ImpVar(Hidden = true)] public List<TFlowConnection> connections = new();
     [ImpVar] public List<TScriptVar> vars = new();
 
     // Compiled form. Plain fields — never serialized, so a script loaded off disk always
@@ -829,7 +829,7 @@ public class A_Script : ImpAsset
                 }
             }
         }
-        copy.connections = new List<TGraphConnection>();
+        copy.connections = new List<TFlowConnection>();
         if (connections != null)
         {
             for (int i = 0; i < connections.Count; i++)

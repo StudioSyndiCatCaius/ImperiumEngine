@@ -3,19 +3,15 @@ using Raylib_cs;
 
 namespace ImperiumEngine;
 
-// baseclass for graph data
-public class ImpGraph
+
+
+public struct TFlowData
 {
-    
+    public ImpFlowNode[] nodes;
+    public TFlowConnection[] connections;
 }
 
-public struct TGraphData
-{
-    public ImpGraphNode[] nodes;
-    public TGraphConnection[] connections;
-}
-
-public struct TGraphConnection
+public struct TFlowConnection
 {
     public Guid from_node;
     public byte from_pin;
@@ -23,21 +19,29 @@ public struct TGraphConnection
     public byte to_pin;
 }
 
-public struct TGraphNodePin
+public struct TFlowNodePin
 {
     public string name;
 }
 
-public class ImpGraphNode
+public class ImpFlowNode
 {
     public Guid guid;
+
+    public List<TFlowNodePin> inputs = new() { new() };
+    public List<TFlowNodePin> outputs = new() { new() };
+
+    public Action<ImpFlowNode,int,int> on_exit;
+
+    public void TriggerOutput(int pin, int connections = -1)
+    {
+        on_exit.Invoke(this,pin,connections);
+    }
     
-    public virtual void OnEnter(byte pin,ValueType val)  { }
-    public virtual void OnExit(byte pin, ValueType val) { }
-    public virtual void OnUpdate(float dt) { }
-    
-    public virtual TGraphNodePin[] GetPins_Input() {  return new TGraphNodePin[] { }; }
-    public virtual TGraphNodePin[] GetPins_Output() {  return new TGraphNodePin[] { }; }
+    public virtual void OnNode_Define() { }
+    public virtual void OnNode_Enter(byte pin,ValueType val)  { }
+    public virtual void OnNode_Exit(byte pin, ValueType val) { }
+    public virtual void OnNode_Update(float dt) { }
     
     public virtual Color GetNode_Color() { return Color.White; }
     public virtual String GetNode_Title() { return this.GetType().Name; }
