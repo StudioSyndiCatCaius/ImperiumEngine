@@ -458,7 +458,7 @@ public class WND_Scene : EdWindow
 
             bool was_sel = tab_scenes.selected_tab == page;
             bool before = page < tab_scenes.selected_tab;
-            if (Scene_Editor.active != null && Scene_Editor.active.view_game != null && Scene_Editor.active.view_game.IsDescendantOf(c))
+            if (Scene_Editor.active != null && c is PNL_SceneView sv && sv.game_view != null && sv.game_view.IsPlaying)
             {
                 Scene_Editor.active.MOpt_Play_Stop();
             }
@@ -490,7 +490,7 @@ public class WND_Scene : EdWindow
 
     public void Scene_CloseAll()
     {
-        if (Scene_Editor.active != null && Scene_Editor.active.view_game != null && Scene_Editor.active.view_game.parent != null)
+        if (Scene_Editor.active != null && ImpGame.Get(ImpGame.ID_PLAY) != null)
         {
             Scene_Editor.active.MOpt_Play_Stop();
         }

@@ -153,7 +153,7 @@ node kind you write **one class**, not a widget-layout function plus a separate 
 
 ### Editor chrome
 
-- Scene window inner tabs: **Scene** | **Script**. Play (`MOpt_Play`) forces tab 0.
+- Scene window inner tabs: **Scene** | **Game** | **Script**. Play (`MOpt_Play`) binds PIE into Game and selects that tab.
 - Script panel: override/call/var tree (left, above it a **Compile** button + result label) +
   graph + `A_Script` inspector (parent_type, `vars`).
 - Source label reads e.g. `Builtin (ImpComp)` / `Override: Foo (ImpComp)` — shows the resolved
@@ -353,7 +353,8 @@ Roughly in order of value, but ask the user — do not assume:
 | `Engine/Script/ScriptVM.cs` | `TScriptProgram`, `ScriptVM` interpreter, latent scheduling |
 | `Engine/Assets/A_Script.cs` | Asset, `TPulseNode`, `Pulse.*` reflection, `Compile()` |
 | `Editor/Panel/PNL_ScriptGraph.cs` | Editor host: menu, `BuildWidget`, Compile button, persist |
-| `Editor/Panel/PNL_SceneView.cs` | Script tab + Bind |
+| `Editor/Panel/PNL_SceneView.cs` | Scene / Game / Script tabs + Bind |
+| `Editor/Panel/PNL_GameView.cs` | PIE host tab; owns `C2_GameView` |
 | `Engine/Comps/2D/C2_Graph.cs` | Generic graph widget + pin default widgets. **No Pulse types.** |
 | `Engine/Attributes.cs` | `[PulseCall]` / `[PulseOverride]` / `[ImpVar(Edit=...)]` |
 | `Engine/ImpScene.cs` | `script_builtin`/`script_override`, `RootType_Get`, `RBegin`/`Update`/`REnd` |

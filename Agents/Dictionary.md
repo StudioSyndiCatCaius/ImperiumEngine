@@ -236,7 +236,11 @@ Editor outliner panel. Search bar + `C2_Tree`. Binds `scene` (or `root_comp` if 
 
 Scene viewport tab (`C2_Box`, `cursor_filter = Hit`). Owns `scene`, `undo`, `edit_mode`, `gizmo_data`, `C2_Viewport3D` + `C2_Viewport2D` (both `Pass` so clicks land on the panel), 2D/3D gizmos, camera nav, marquee/selection, asset drop, and the mode/gizmo/space/snap toolbar. `WND_Scene` still hosts the tab box, selection/inspector bind, and dup/delete hotkeys.
 
-Inner `tabs_view` pages: **Scene** (`view_root` — toolbar + 3D/2D viewports) and **Script** (`PNL_ScriptGraph`). Camera / gizmo / marquee only run on Scene. Play forces `selected_tab = 0`.
+Inner `tabs_view` pages: **Scene** (`view_root` — toolbar + 3D/2D viewports), **Game** (`PNL_GameView`), **Script** (`PNL_ScriptGraph`). Camera / gizmo / marquee only run on Scene. Play binds PIE into Game and selects that tab.
+
+## PNL_GameView (`Editor/Panel/PNL_GameView.cs`)
+
+Play-in-Editor tab (`EdPanel`, tab name `Game`) inside `PNL_SceneView.tabs_view`. Owns `C2_GameView`. `Play(game, cam3)` binds the session and focuses the widget; `Stop()` unbinds. The play scene ticks from `C2_GameView.OnUpdate` even while the Game tab is hidden (`ImpComp.Update` does not skip `is_visible`). Draw only happens on the selected tab.
 
 ## PNL_ScriptGraph (`Editor/Panel/PNL_ScriptGraph.cs`)
 
@@ -407,11 +411,11 @@ C# statics cannot be instanced (one AppDomain, and Raylib/R3D/Jolt are process-g
 
 `C2_GameView.view_game` is the session it *shows* (PIE). `ImpComp.game_owner` on that widget is still Get(0) — it lives in the editor tree.
 
-**Play** (`Scene_Editor.MOpt_Play`, also `PIE_Play` = Alt+P): `Play_Start` clones the active `PNL_SceneView` scene, parents `view_game` (`C2_GameView`) onto that SceneView as a FULL overlay (not a main tab), copies the 3D camera, stays on the Scene tab. Play again is a no-op while PIE is live.
+**Play** (`Scene_Editor.MOpt_Play`, also `PIE_Play` = Alt+P): `Play_Start` clones the active `PNL_SceneView` scene, binds it on that tab's `PNL_GameView` (`C2_GameView` inside), copies the 3D camera, selects the **Game** inner tab. Play again is a no-op while PIE is live. Scene / Script stay usable — switch back to edit the authored scene while play keeps ticking (Update does not skip hidden tabs).
 
-**Stop** (`MOpt_Play_Stop` / toolbar Stop / `PIE_Quit` = Alt+Escape): unbinds + detaches the overlay, then `Play_Stop`. Closing the hosting scene tab also stops PIE. Toolbar: Stop is `is_disabled` when `Get(1)` is null; Play and Play From Start are `is_disabled` during PIE.
+**Stop** (`MOpt_Play_Stop` / toolbar Stop / `PIE_Quit` = Alt+Escape): unbinds every scene tab's Game view, then `Play_Stop`. Closing the hosting scene tab also stops PIE. Toolbar: Stop is `is_disabled` when `Get(1)` is null; Play and Play From Start are `is_disabled` during PIE.
 
-`C2_GameView` ticks `view_game.scene` under `Bind`. Parent it into `PNL_SceneView.view_root` (the viewport list) so it gets the same fill slot as the editor camera. 3D is `C2_Viewport3D` with `R3D.SetAspectMode(Expand)` so the blit fills the widget. 2D HUD (`clear_background` / `draw_canvas` false) draws in-place over that blit — not through a second RT (R3D scissor leftover was covering the bottom of the 3D image). Hosting `PNL_SceneView` hides its editor toolbar/viewports while the overlay is visible. Physics is per-`ImpGame` (`ImpGame.phys`). `ImpPlayer.players` is still process-global, but **action input is now routed per session** — see below.
+`C2_GameView` ticks `view_game.scene` under `Bind`. It lives in `PNL_GameView` (the Game inner tab), not as an overlay on Scene. 3D is `C2_Viewport3D` with `R3D.SetAspectMode(Expand)` so the blit fills the widget. 2D HUD (`clear_background` / `draw_canvas` false) draws in-place over that blit — not through a second RT (R3D scissor leftover was covering the bottom of the 3D image). Physics is per-`ImpGame` (`ImpGame.phys`). `ImpPlayer.players` is still process-global, but **action input is now routed per session** — see below.
 
 ### Input target game
 

@@ -12,6 +12,7 @@ public class PNL_SceneView : C2_Box
 {
     public ImpScene scene;
     
+    public PNL_GameView game_view = new();
     public PNL_ScriptGraph script_graph = new();
 
     //one history per camera tab, so undo in one camera never reaches into another
@@ -163,6 +164,7 @@ public class PNL_SceneView : C2_Box
         view_root.Child_Add(viewport3D);
         view_root.Child_Add(viewport2D);
         tabs_view.Child_Add(view_root);
+        tabs_view.Child_Add(game_view);
         tabs_view.Child_Add(script_graph);
         Child_Add(tabs_view);
 
@@ -210,41 +212,9 @@ public class PNL_SceneView : C2_Box
             script_graph.Bind(scene);
         }
 
-        bool pie_over = false;
-        if (view_root != null)
-        {
-            for (int i = 0; i < view_root.children.Count; i++)
-            {
-                if (view_root.children[i] is C2_GameView gv && gv.is_visible)
-                {
-                    pie_over = true;
-                    break;
-                }
-            }
-        }
-        if (!pie_over)
-        {
-            for (int i = 0; i < children.Count; i++)
-            {
-                if (children[i] is C2_GameView gv && gv.is_visible)
-                {
-                    pie_over = true;
-                    break;
-                }
-            }
-        }
-        if (pie_over)
-        {
-            toolbar.is_visible = false;
-            viewport3D.is_visible = false;
-            viewport2D.is_visible = false;
-        }
-        else
-        {
-            toolbar.is_visible = true;
-            viewport3D.is_visible = edit_mode == ESceneEditorMode.Mode_3D;
-            viewport2D.is_visible = edit_mode == ESceneEditorMode.Mode_2D;
-        }
+        toolbar.is_visible = true;
+        viewport3D.is_visible = edit_mode == ESceneEditorMode.Mode_3D;
+        viewport2D.is_visible = edit_mode == ESceneEditorMode.Mode_2D;
         opt_edit.selected_enum = edit_mode;
         opt_gizmo.selected_enum = gizmo_mode;
         opt_space.selected_enum = gizmo_orientation;
@@ -270,11 +240,9 @@ public class PNL_SceneView : C2_Box
             }
         }
 
-        // Editor picking / gizmos / camera hotkeys are off while a game is running — the view
-        // belongs to PIE, so clicking it must not select scene comps. Same cleanup as the
-        // Script tab path, so starting play mid-drag does not leave a drag or hog behind.
-        bool play_active = ImpGame.Get(ImpGame.ID_PLAY) != null;
-        if ((tabs_view != null && tabs_view.selected_tab != 0) || play_active)
+        // Camera / gizmo / marquee only run on the Scene tab. Game and Script leave
+        // any in-progress drag so switching mid-look does not leave a hog behind.
+        if (tabs_view != null && tabs_view.selected_tab != 0)
         {
             if (ImpPlayer.players.Count > 0)
             {
@@ -632,11 +600,6 @@ public class PNL_SceneView : C2_Box
     {
         base.OnDraw2DForeground(dt, flags);
         if (tabs_view != null && tabs_view.selected_tab != 0)
-        {
-            return;
-        }
-        // No gizmo / grid overlay on top of a running game.
-        if (ImpGame.Get(ImpGame.ID_PLAY) != null)
         {
             return;
         }

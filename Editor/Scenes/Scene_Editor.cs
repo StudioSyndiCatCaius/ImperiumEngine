@@ -78,7 +78,6 @@ public class Scene_Editor : ImpComp
     public WND_ConfigComp mtab_config_comp = new();
     public WND_ConfigGame mtab_config_game = new();
     public WND_ConfigEditor mtab_config_editor = new();
-    public C2_GameView view_game = new();
 
     public C2_Button btn_stop;
     public C2_Button btn_play;
@@ -393,7 +392,7 @@ public class Scene_Editor : ImpComp
             return;
         }
         PNL_SceneView view = mtab_scene.ActiveEdScene();
-        if (view == null || view.scene == null)
+        if (view == null || view.scene == null || view.game_view == null)
         {
             return;
         }
@@ -402,20 +401,10 @@ public class Scene_Editor : ImpComp
         {
             return;
         }
-        if (view.view_root != null)
-        {
-            view.view_root.Child_Add(view_game);
-        }
-        else
-        {
-            view.Child_Add(view_game);
-        }
-        view_game.layout = TLayout2.FULL;
-        view_game.is_visible = true;
-        view_game.Bind(game, view.viewport3D.camera);
+        view.game_view.Play(game, view.viewport3D.camera);
         if (view.tabs_view != null)
         {
-            view.tabs_view.selected_tab = 0;
+            view.tabs_view.selected_tab = 1;
         }
         ui_main_tabs.selected_tab = 0;
     }
@@ -427,9 +416,20 @@ public class Scene_Editor : ImpComp
 
     public void MOpt_Play_Stop()
     {
-        view_game.Unbind();
-        view_game.is_visible = false;
-        view_game.Detach();
+        if (mtab_scene != null)
+        {
+            for (int i = 0; i < mtab_scene.tab_scenes.children.Count; i++)
+            {
+                if (mtab_scene.tab_scenes.children[i] is PNL_SceneView ed && ed.game_view != null)
+                {
+                    ed.game_view.Stop();
+                    if (ed.tabs_view != null && ed.tabs_view.selected_tab == 1)
+                    {
+                        ed.tabs_view.selected_tab = 0;
+                    }
+                }
+            }
+        }
         ImpGame.Play_Stop();
     }
 

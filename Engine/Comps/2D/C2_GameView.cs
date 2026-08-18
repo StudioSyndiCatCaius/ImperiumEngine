@@ -34,7 +34,7 @@ public class C2_GameView : C2_Box
         name = "Game";
         layout = TLayout2.FULL;
         clip_children = false;
-        is_visible = false;
+        is_visible = true;
         cursor_filter = ECursorFilter.Hit;
         style = UiStyle_Box.STYLE_BKG_DARK;
         Child_Add(viewport3D);
