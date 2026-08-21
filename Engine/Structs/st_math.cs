@@ -100,6 +100,46 @@ public struct TBounds3
     // ------------------------------------------------
     // STATIC
     // ------------------------------------------------
+    public static TBounds3 Merge(Span<TBounds3> bounds)
+    {
+        Vector3 min = new(float.MaxValue);
+        Vector3 max = new(float.MinValue);
+        bool any = false;
+        TBounds3 only = ZERO;
+        int count = 0;
+        Span<Vector3> corners = stackalloc Vector3[8];
+        for (int i = 0; i < bounds.Length; i++)
+        {
+            TBounds3 b = bounds[i];
+            if (b.IsEmpty)
+            {
+                continue;
+            }
+            b.Corners(corners);
+            for (int k = 0; k < 8; k++)
+            {
+                min = Vector3.Min(min, corners[k]);
+                max = Vector3.Max(max, corners[k]);
+            }
+            only = b;
+            count++;
+            any = true;
+        }
+        if (!any)
+        {
+            return ZERO;
+        }
+        if (count == 1)
+        {
+            return only;
+        }
+        return new TBounds3
+        {
+            center = (min + max) * 0.5f,
+            size = max - min,
+            rotation = Vector3.Zero,
+        };
+    }
 
     public static TBounds3 ZERO = new() { center = Vector3.Zero, size = Vector3.Zero, rotation = Vector3.Zero, };
 }

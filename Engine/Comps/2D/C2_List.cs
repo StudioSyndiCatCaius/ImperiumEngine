@@ -257,7 +257,7 @@ public class C2_List : Imp2D
 
 public class UI_List : ImpAsset
 {
-    [ImpVar] public UiStyle_Box box_background = null;
+    [ImpVar] public UI_Box box_background = null;
 
     public static UI_List DEFAULT = new();
 }

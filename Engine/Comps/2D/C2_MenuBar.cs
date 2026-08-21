@@ -68,10 +68,10 @@ public class C2_MenuBar : Imp2D
     public C2_MenuBar_List open_list;
     public int open_index = -1;
 
-    public UiStyle_Box style_background = UiStyle_Box.STYLE_BKG_DARK;
-    public UiStyle_Box style_options_idle = UiStyle_Box.STYLE_BTN_IDLE;
-    public UiStyle_Box style_options_hovered = UiStyle_Box.STYLE_BTN_HOVER;
-    public UiStyle_Box style_options_pressed = UiStyle_Box.STYLE_BTN_PRESS;
+    public UI_Box background = UI_Box.BkgDark;
+    public UI_Box optionsIdle = UI_Box.BtnIdle;
+    public UI_Box optionsHovered = UI_Box.BtnHover;
+    public UI_Box optionsPressed = UI_Box.BtnPress;
 
     public float option_width = 72;
     public float dropdown_width = 180;
@@ -125,9 +125,9 @@ public class C2_MenuBar : Imp2D
                 },
                 style = new UI_Button
                 {
-                    style_unhovered = style_options_idle,
-                    style_hovered = style_options_hovered,
-                    style_pressed = style_options_pressed,
+                    unhovered = optionsIdle,
+                    hovered = optionsHovered,
+                    pressed = optionsPressed,
                 },
                 text_style = UI_Text.DEFAULT,
             };
@@ -319,9 +319,9 @@ public class C2_MenuBar_List : C2_List
                 is_disabled = s.is_disabled,
                 style = new UI_Button
                 {
-                    style_unhovered = bar.style_options_idle,
-                    style_hovered = bar.style_options_hovered,
-                    style_pressed = bar.style_options_pressed,
+                    unhovered = bar.optionsIdle,
+                    hovered = bar.optionsHovered,
+                    pressed = bar.optionsPressed,
                 },
             };
             Child_Add(btn);

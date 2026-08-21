@@ -26,7 +26,7 @@ public class C2_PopupMenu : C2_Box
 
     public C2_PopupMenu()
     {
-        style = new UiStyle_Box { tint = ColBg };
+        style = new UI_Box { tint = ColBg };
         cursor_filter = ECursorFilter.Hit;
         layout = new TLayout2
         {
@@ -131,9 +131,9 @@ public class C2_PopupMenu : C2_Box
                 text_style = UI_Text.LIGHT,
                 style = new UI_Button
                 {
-                    style_unhovered = new UiStyle_Box { tint = ColBg },
-                    style_hovered = new UiStyle_Box { tint = ColHover },
-                    style_pressed = new UiStyle_Box { tint = ColPress },
+                    unhovered = new UI_Box { tint = ColBg },
+                    hovered = new UI_Box { tint = ColHover },
+                    pressed = new UI_Box { tint = ColPress },
                 },
             };
             btn.on_click = () =>

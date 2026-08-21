@@ -1,6 +1,7 @@
 using System.Numerics;
 using Editor.Dialog;
 using Editor.Panel;
+using Editor.Scenes;
 using ImperiumEngine;
 using ImperiumEngine.Comps._2D;
 using ImperiumEngine.Enums;
@@ -21,18 +22,6 @@ public class WND_Asset : EdWindow
         },
     };
 
-    public PNL_FileBrowser file_browser = new()
-    {
-        layout = new TLayout2
-        {
-            orient_H = EUIViewportAlignment.Fill,
-            orient_V = EUIViewportAlignment.Fill,
-            size_min = new(0, 200),
-        },
-    };
-
-    C2_Expandable file_browser_wrap;
-
     public WND_Asset()
     {
         active = this;
@@ -40,35 +29,7 @@ public class WND_Asset : EdWindow
         layout.orient_H = EUIViewportAlignment.Fill;
         layout.orient_V = EUIViewportAlignment.Fill;
 
-        C2_List list_asset_file = new()
-        {
-            layout = new TLayout2
-            {
-                orient_H = EUIViewportAlignment.Fill,
-                orient_V = EUIViewportAlignment.Fill,
-            },
-            orentation = EUIOrentation.V,
-        };
-
-        file_browser_wrap = new()
-        {
-            name = "File Browser",
-            is_expanded = true,
-            bar_height = 22,
-            layout = new TLayout2
-            {
-                orient_H = EUIViewportAlignment.Fill,
-                orient_V = EUIViewportAlignment.Fill,
-                size_min = new(0, 22),
-            },
-            stretch_ratio = 0.5f,
-        };
-        file_browser_wrap.Child_Add(file_browser);
-
-        list_asset_file.Child_Add(tab_assets);
-        list_asset_file.Child_Add(new C2_Seperator { orentation = EUIOrentation.V });
-        list_asset_file.Child_Add(file_browser_wrap);
-        Child_Add(list_asset_file);
+        Child_Add(tab_assets);
 
         tab_assets.show_close_tab_button = true;
         tab_assets.request_close_tab = Asset_Close;
@@ -167,12 +128,6 @@ public class WND_Asset : EdWindow
         {
             return;
         }
-        data.file_browser_asset_expanded = file_browser_wrap == null || file_browser_wrap.is_expanded;
-        if (file_browser_wrap != null)
-        {
-            data.browser_asset_stretch = file_browser_wrap.stretch_ratio;
-        }
-        data.asset_tabs_stretch = tab_assets.stretch_ratio;
         data.active_asset = tab_assets.selected_tab;
         data.assets.Clear();
         for (int i = 0; i < tab_assets.children.Count; i++)
@@ -194,18 +149,6 @@ public class WND_Asset : EdWindow
         if (data == null)
         {
             return;
-        }
-        if (file_browser_wrap != null)
-        {
-            file_browser_wrap.is_expanded = data.file_browser_asset_expanded;
-            if (EdState.Stretch_IsWeight(data.browser_asset_stretch))
-            {
-                file_browser_wrap.stretch_ratio = data.browser_asset_stretch;
-            }
-        }
-        if (EdState.Stretch_IsWeight(data.asset_tabs_stretch))
-        {
-            tab_assets.stretch_ratio = data.asset_tabs_stretch;
         }
         if (data.assets.Count == 0)
         {
@@ -264,7 +207,7 @@ public class WND_Asset : EdWindow
     {
         ImpAsset asset = ActiveEditor()?.asset;
         if (asset == null) return;
-        string folder = file_browser.CurrentDir;
+        string folder = Scene_Editor.active?.file_browser.CurrentDir;
         DLG_SaveFile.Run(asset, path =>
         {
             asset.File_SaveTo(path);

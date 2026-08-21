@@ -76,7 +76,8 @@ public class A_Texture : ImpAsset
     public static A_Texture? ICO_COMP3D = Import<A_Texture>("{engine}/Thumbnails/Imp3D.png");
     public static A_Texture? THUMB_FILE = ImpAsset.Import<A_Texture>("{engine}/Thumbnails/_file.png");
     public static A_Texture? THUMB_FOLDER = ImpAsset.Import<A_Texture>("{engine}/Thumbnails/_folder.png");
-    
+    public static A_Texture? THUMB_FOLDER_OPEN = ImpAsset.Import<A_Texture>("{engine}/Thumbnails/_folder_open.png");
+
 
     public override Texture2D? Editor_GetThumbnail_Texture()
     {

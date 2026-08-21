@@ -136,6 +136,12 @@ public class Imp2D : ImpComp
         if (node == null || !node.is_visible) return null;
         if (node is Imp2D c2 && c2.cursor_filter == ECursorFilter.Ignore) return null;
 
+        // Children drawn outside a clipping parent are invisible, so they must not be hittable
+        // either - a scrolled-off row would otherwise steal clicks from whatever it sits over.
+        // Same rect the draw pass scissors children to. Outside it the node itself cannot be hit
+        // either, so there is nothing left below to test.
+        if (node is Imp2D clip && clip.clip_children && !clip.Dimensions_Get().Contains(pos)) return null;
+
         for (int i = node.children.Count - 1; i >= 0; i--)
         {
             Imp2D? hit = Trace_Point(pos, node.children[i]);

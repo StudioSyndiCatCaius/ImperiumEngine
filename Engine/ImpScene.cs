@@ -583,21 +583,9 @@ public class ImpScene : ImpAsset
         {
             return null;
         }
-        ImpComp dest = comp;
-        ImpScene dest_scene = SceneOf(_drop_view) ?? dest?.scene;
-        if (dest != null && (dest.IsPackedForeign || dest.IsOwned))
-        {
-            dest = ImpComp.OutlinerHost(dest);
-        }
-        if (dest != null && dest.IsInstanceRoot)
-        {
-            dest = dest.parent;
-        }
+        ImpScene dest_scene = SceneOf(_drop_view) ?? comp?.scene;
+        ImpComp dest = dest_scene?.root;
         if (dest == null || dest == _drop_ghost || _drop_ghost.IsAncestorOf(dest))
-        {
-            dest = dest_scene?.root;
-        }
-        if (dest == null)
         {
             SceneDrop_Exit(_drop_view, player);
             return null;

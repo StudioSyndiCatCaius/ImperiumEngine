@@ -227,7 +227,7 @@ public class C2_Inspector : Imp2D
 
     string _search_query = "";
 
-    UiStyle_Box style_box = UiStyle_Box.STYLE_BKG_DARK;
+    UI_Box _box = UI_Box.BkgDark;
     readonly HashSet<string> _collapsed = new();
     
     
@@ -236,11 +236,44 @@ public class C2_Inspector : Imp2D
         orentation = EUIOrentation.V,
         is_scrollable = true,
         spacing = 2,
+        stretch_ratio = 1f,
+        layout = new TLayout2
+        {
+            orient_H = EUIViewportAlignment.Fill,
+            orient_V = EUIViewportAlignment.Fill,
+            size_min = new Vector2(0, 80),
+        },
+    };
+
+    C2_Expandable _comp_pane = new()
+    {
+        name = "Components",
+        bar_height = 22,
+        content_indent = 0,
+        is_visible = false,
+        stretch_ratio = 0.4f,
+        layout = new TLayout2
+        {
+            orient_H = EUIViewportAlignment.Fill,
+            orient_V = EUIViewportAlignment.Fill,
+            size_min = new Vector2(0, 64),
+        },
+    };
+
+    C2_Tree _comp_tree = new()
+    {
+        allow_reorder = false,
         layout = new TLayout2
         {
             orient_H = EUIViewportAlignment.Fill,
             orient_V = EUIViewportAlignment.Fill,
         },
+    };
+
+    C2_Seperator _comp_sep = new()
+    {
+        orentation = EUIOrentation.V,
+        is_visible = false,
     };
 
     C2_List _header = new()
@@ -304,8 +337,38 @@ public class C2_Inspector : Imp2D
             spacing = 2,
         };
         _header.Child_Add(_check_advanced);
+
+        _comp_pane.icon = C2_Tree.Class_Icon(typeof(ImpComp));
+        _comp_pane.content_box.layout.orient_H = EUIViewportAlignment.Fill;
+        _comp_pane.content_box.layout.orient_V = EUIViewportAlignment.Fill;
+        _comp_pane.on_expand = open =>
+        {
+            if (open)
+            {
+                _collapsed.Remove("Components");
+            }
+            else
+            {
+                _collapsed.Add("Components");
+            }
+        };
+        _comp_tree.on_item_click = item =>
+        {
+            if (item.data is not ImpComp c)
+            {
+                return;
+            }
+            selected_objects.Clear();
+            selected_objects.Add(c);
+            Rebuild();
+            on_component_click?.Invoke(c);
+        };
+        _comp_pane.Child_Add(_comp_tree);
+
         body.Child_Add(_search);
         body.Child_Add(_header);
+        body.Child_Add(_comp_pane);
+        body.Child_Add(_comp_sep);
         body.Child_Add(list_properties);
         Child_Add(body);
     }
@@ -360,6 +423,40 @@ public class C2_Inspector : Imp2D
         else list_properties.Child_RemoveAll();
 
         List<object> targets = Targets();
+        ImpComp focus = null;
+        ImpComp host = null;
+        if (targets.Count == 1 && targets[0] is ImpComp picked)
+        {
+            focus = picked;
+            host = ImpComp.OutlinerHost(picked);
+            if (host == null)
+            {
+                host = picked;
+            }
+        }
+        bool show_tree = host != null && CompTree_HasAny(host);
+        _comp_pane.is_visible = show_tree;
+        _comp_sep.is_visible = show_tree;
+        if (show_tree)
+        {
+            bool same_host = _tree_host == host;
+            _tree_host = host;
+            _comp_pane.icon = C2_Tree.Class_Icon(host.GetType());
+            if (!same_host)
+            {
+                _comp_tree.Tree_Populate_Components(host);
+            }
+            if (focus != null)
+            {
+                _comp_tree.Tree_SelectData(focus);
+            }
+        }
+        else
+        {
+            _tree_host = null;
+            _comp_tree.Tree_Clear();
+        }
+
         if (targets.Count == 0)
         {
             AddRow(new C2_Text
@@ -393,25 +490,6 @@ public class C2_Inspector : Imp2D
         }
 
         bool searching = !string.IsNullOrWhiteSpace(_search_query);
-        ImpComp focus = null;
-        if (targets.Count == 1 && targets[0] is ImpComp picked)
-        {
-            focus = picked;
-            ImpComp host = ImpComp.OutlinerHost(picked);
-            if (host == null)
-            {
-                host = picked;
-            }
-            _tree_host = host;
-            if (!searching && CompTree_HasAny(host))
-            {
-                AddComponentTree(host, focus);
-            }
-        }
-        else
-        {
-            _tree_host = null;
-        }
 
         if (members.Count == 0 && searching)
         {
@@ -506,85 +584,6 @@ public class C2_Inspector : Imp2D
             }
         }
         return false;
-    }
-
-    static int CompTree_Count(ImpComp c)
-    {
-        int n = 1;
-        for (int i = 0; i < c.children.Count; i++)
-        {
-            ImpComp child = c.children[i];
-            if (child == null)
-            {
-                continue;
-            }
-            FieldInfo slot = c.OwnedFieldOf(child);
-            bool include = child.IsPackedForeign
-                || (slot != null && slot.IsPublic)
-                || ((c.IsOwned || c.IsPackedForeign || c.IsInstanceRoot) && !child.IsOwned);
-            if (!include)
-            {
-                continue;
-            }
-            n += CompTree_Count(child);
-        }
-        return n;
-    }
-
-    void AddComponentTree(ImpComp host, ImpComp focus)
-    {
-        const string key = "Components";
-        C2_Expandable box = new()
-        {
-            name = key,
-            icon = C2_Tree.Class_Icon(typeof(ImpComp)),
-            is_expanded = !_collapsed.Contains(key),
-            bar_height = 22,
-            content_indent = 10f,
-            layout = new TLayout2
-            {
-                orient_H = EUIViewportAlignment.Fill,
-                orient_V = EUIViewportAlignment.Start,
-            },
-        };
-        box.on_expand = open =>
-        {
-            if (open) _collapsed.Remove(key);
-            else _collapsed.Add(key);
-        };
-
-        int count = CompTree_Count(host);
-        float h = Math.Clamp(22f * count + 8f, 48f, 240f);
-        C2_Tree tree = new()
-        {
-            allow_reorder = false,
-            layout = new TLayout2
-            {
-                orient_H = EUIViewportAlignment.Fill,
-                size = new Vector2(0, h),
-                size_min = new Vector2(0, 48),
-            },
-        };
-        tree.on_item_click = item =>
-        {
-            if (item.data is not ImpComp c)
-            {
-                return;
-            }
-            selected_objects.Clear();
-            selected_objects.Add(c);
-            Rebuild();
-            on_component_click?.Invoke(c);
-        };
-        tree.Tree_Populate_Components(host);
-        if (focus != null)
-        {
-            tree.Tree_SelectData(focus);
-        }
-        box.Child_Add(tree);
-        box.layout.size = new Vector2(0, box.bar_height + h + 4);
-        box.layout.size_min = box.layout.size;
-        AddRow(box);
     }
 
     void AddRow(Imp2D row)
@@ -992,7 +991,7 @@ public class C2_Inspector : Imp2D
     public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
-        style_box?.Draw(Dimensions_Get());
+        _box?.Draw(Dimensions_Get());
     }
 }
 
@@ -1582,9 +1581,9 @@ public class C2_ButtonRevert : C2_Button
 {
     static readonly UI_Button STYLE = new()
     {
-        style_unhovered = new UiStyle_Box { texture = null, tint = new Color(0, 0, 0, 0) },
-        style_hovered = UiStyle_Box.STYLE_BTN_HOVER,
-        style_pressed = UiStyle_Box.STYLE_BTN_PRESS,
+        unhovered = new UI_Box { texture = null, tint = new Color(0, 0, 0, 0) },
+        hovered = UI_Box.BtnHover,
+        pressed = UI_Box.BtnPress,
     };
 
     public Color icon_color = new(235, 195, 90, 255);

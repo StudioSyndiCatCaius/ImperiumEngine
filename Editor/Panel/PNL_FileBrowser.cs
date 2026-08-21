@@ -17,7 +17,7 @@ public class PNL_FileBrowser : EdPanel
     [ImpVar] public bool show_source_files = true;
     [ImpVar] public bool show_file_extensions = false;
     [ImpVar] public bool show_engine_content = true;
-    [ImpVar(Min = 10, Max = 160)] public float thumbnail_size = 80;
+    [ImpVar(Min = 16, Max = 32)] public float row_height = 22;
 
     C2_List _root = new()
     {
@@ -30,71 +30,15 @@ public class PNL_FileBrowser : EdPanel
         spacing = 0,
     };
 
-    C2_List _toolbar = new()
+    C2_SearchBar _search = new()
     {
-        orentation = EUIOrentation.H,
+        placeholder = "Search Assets",
         layout = new TLayout2
         {
             orient_H = EUIViewportAlignment.Fill,
-            size = new Vector2(0, 30),
-            size_min = new Vector2(0, 30),
+            size = new Vector2(0, 26),
+            size_min = new Vector2(0, 26),
         },
-        spacing = 4,
-    };
-
-    C2_List _crumbs = new()
-    {
-        orentation = EUIOrentation.H,
-        layout = new TLayout2
-        {
-            orient_H = EUIViewportAlignment.Fill,
-            orient_V = EUIViewportAlignment.Fill,
-        },
-        spacing = 0,
-    };
-
-    C2_List _body = new()
-    {
-        orentation = EUIOrentation.H,
-        layout = new TLayout2
-        {
-            orient_H = EUIViewportAlignment.Fill,
-            orient_V = EUIViewportAlignment.Fill,
-        },
-        spacing = 0,
-    };
-
-    C2_List _sidebar = new()
-    {
-        orentation = EUIOrentation.V,
-        layout = new TLayout2
-        {
-            orient_V = EUIViewportAlignment.Fill,
-            size = new Vector2(220, 0),
-            size_min = new Vector2(160, 0),
-        },
-        spacing = 0,
-    };
-
-    C2_Expandable _favorites = new()
-    {
-        name = "Favorites",
-        layout = new TLayout2
-        {
-            orient_H = EUIViewportAlignment.Fill,
-        },
-        bar_height = 22,
-        is_expanded = false,
-    };
-
-    C2_List _fav_list = new()
-    {
-        orentation = EUIOrentation.V,
-        layout = new TLayout2
-        {
-            orient_H = EUIViewportAlignment.Fill,
-        },
-        spacing = 0,
     };
 
     C2_TabBox tab_dir = new()
@@ -120,54 +64,16 @@ public class PNL_FileBrowser : EdPanel
         root_path = ImpFile.ContentDir_Engine(),
     };
 
-    C2_List _asset_col = new()
+    C2_Expandable _settings = new()
     {
-        orentation = EUIOrentation.V,
+        name = "Settings",
         layout = new TLayout2
         {
             orient_H = EUIViewportAlignment.Fill,
-            orient_V = EUIViewportAlignment.Fill,
+            orient_V = EUIViewportAlignment.Start,
         },
-        spacing = 2,
-    };
-
-    C2_SearchBar _search = new()
-    {
-        placeholder = "Search Assets",
-        layout = new TLayout2
-        {
-            orient_H = EUIViewportAlignment.Fill,
-            size = new Vector2(0, 26),
-            size_min = new Vector2(0, 26),
-        },
-    };
-
-    C2_List file_list = new()
-    {
-        layout = new TLayout2
-        {
-            orient_H = EUIViewportAlignment.Fill,
-            orient_V = EUIViewportAlignment.Fill,
-        },
-        orentation = EUIOrentation.H,
-        is_scrollable = true,
-        auto_scale_section_count = true,
-        spacing = 8,
-    };
-
-    C2_Text _status = new()
-    {
-        text = "0 items",
-        style = UI_Text.MUTED,
-        font_size_override = 11,
-        text_alignment_h = EUIPositionAlignment.Start,
-        wrap = ETextWrap.None,
-        layout = new TLayout2
-        {
-            orient_H = EUIViewportAlignment.Fill,
-            size = new Vector2(0, 20),
-            size_min = new Vector2(0, 20),
-        },
+        bar_height = 22,
+        is_expanded = false,
     };
 
     C2_Inspector settings_inspector = new()
@@ -175,43 +81,26 @@ public class PNL_FileBrowser : EdPanel
         name = "Settings",
         layout = new TLayout2
         {
-            orient_H = EUIViewportAlignment.Start,
-            orient_V = EUIViewportAlignment.Fill,
-            size = new Vector2(260, 0),
-            size_min = new Vector2(200, 0),
+            orient_H = EUIViewportAlignment.Fill,
+            size = new Vector2(0, 120),
+            size_min = new Vector2(0, 120),
         },
-        is_visible = false,
         declared_only = true,
         use_categories = false,
         show_header = false,
         show_search = false,
     };
 
-    C2_Seperator _settings_split = new()
-    {
-        orentation = EUIOrentation.H,
-        is_visible = false,
-    };
-
     string _current_dir = "";
     public string CurrentDir => _current_dir;
     string _query = "";
-    bool _settings_open;
-    EdFileThumbnail _selected;
-    readonly List<string> _favorite_paths = new();
+    string _selected_path = "";
     static readonly List<PNL_FileBrowser> _browsers = new();
 
     bool _last_src = true;
     bool _last_ext;
     bool _last_engine = true;
-    float _last_thumb = 80;
-
-    static readonly UI_Button ToolStyle = new()
-    {
-        style_unhovered = new UiStyle_Box { tint = new Color(48, 48, 48, 255) },
-        style_hovered = new UiStyle_Box { tint = new Color(0, 120, 215, 255) },
-        style_pressed = new UiStyle_Box { tint = new Color(0, 84, 153, 255) },
-    };
+    float _last_row_height = 22;
 
     public PNL_FileBrowser()
     {
@@ -219,57 +108,23 @@ public class PNL_FileBrowser : EdPanel
         layout.orient_H = EUIViewportAlignment.Fill;
         layout.orient_V = EUIViewportAlignment.Fill;
         clip_children = true;
-        style = new UiStyle_Box { tint = new Color(36, 36, 36, 255) };
+        style = new UI_Box { tint = new Color(36, 36, 36, 255) };
 
         Child_Add(_root);
-        _root.Child_Add(_toolbar);
-        _root.Child_Add(_body);
+        _root.Child_Add(_search);
+        _root.Child_Add(tab_dir);
+        _root.Child_Add(_settings);
 
-        C2_Button add = ToolBtn("+ Add", 72);
-        add.on_click = () =>
+        _search.on_search = q =>
         {
-            Vector2 p = add.Dimensions_Get().position;
-            p.Y += add.Dimensions_Get().size.Y;
-            ImpPlayer.Popup_Run(this, new A_PopupConfig
-            {
-                options = new List<TPopupMenuOption>
-                {
-                    new() { text = "New Folder", on_press = NewFolder },
-                    new() { text = "New Scene", on_press = NewScene },
-                    new() { is_separator = true },
-                    new() { text = "Import Sources as Assets", on_press = ImportSources },
-                },
-            }, null, p);
+            _query = q ?? "";
+            Query_Apply();
         };
-        _toolbar.Child_Add(add);
-        _toolbar.Child_Add(ToolBtn("Import", 70, ImportSources));
-        _toolbar.Child_Add(ToolBtn("Refresh", 72, RefreshAll));
-        _toolbar.Child_Add(_crumbs);
-
-        C2_Button settings_btn = ToolBtn("Settings", 80);
-        settings_btn.on_click = () =>
-        {
-            _settings_open = !_settings_open;
-            settings_inspector.is_visible = _settings_open;
-            _settings_split.is_visible = _settings_open;
-        };
-        _toolbar.Child_Add(settings_btn);
-
-        _favorites.Child_Add(_fav_list);
-        RebuildFavorites();
 
         tab_dir.Child_Add(tree_dir_game);
         if (show_engine_content) tab_dir.Child_Add(tree_dir_engine);
-        tree_dir_game.on_item_click = _DirSelect;
-        tree_dir_engine.on_item_click = _DirSelect;
-        tree_dir_game.on_item_right_click = _DirRightClick;
-        tree_dir_engine.on_item_right_click = _DirRightClick;
-        tree_dir_game.on_item_drop_external = _DirDropExternal;
-        tree_dir_engine.on_item_drop_external = _DirDropExternal;
-        tree_dir_game.item_drag_payload = _DirDragPayload;
-        tree_dir_engine.item_drag_payload = _DirDragPayload;
-        tree_dir_game.on_rebuilt = SyncTreeSelection;
-        tree_dir_engine.on_rebuilt = SyncTreeSelection;
+        Tree_Wire(tree_dir_game);
+        Tree_Wire(tree_dir_engine);
         tab_dir.on_tab_change = i =>
         {
             EdFileTree tree = i == 0 ? tree_dir_game : tree_dir_engine;
@@ -279,42 +134,7 @@ public class PNL_FileBrowser : EdPanel
             CurrentDir_Set(new TDirectory { path = path });
         };
 
-        _sidebar.Child_Add(_favorites);
-        _sidebar.Child_Add(tab_dir);
-
-        C2_Seperator split = new()
-        {
-            orentation = EUIOrentation.H,
-        };
-
-        _search.on_search = q =>
-        {
-            _query = q ?? "";
-            Grid_Refresh();
-        };
-
-        C2_Box grid_host = new()
-        {
-            style = new UiStyle_Box { tint = new Color(24, 24, 24, 255) },
-            layout = new TLayout2
-            {
-                orient_H = EUIViewportAlignment.Fill,
-                orient_V = EUIViewportAlignment.Fill,
-            },
-            clip_children = true,
-        };
-        grid_host.Child_Add(file_list);
-
-        _asset_col.Child_Add(_search);
-        _asset_col.Child_Add(grid_host);
-        _asset_col.Child_Add(_status);
-
-        _body.Child_Add(_sidebar);
-        _body.Child_Add(split);
-        _body.Child_Add(_asset_col);
-        _body.Child_Add(_settings_split);
-        _body.Child_Add(settings_inspector);
-
+        _settings.Child_Add(settings_inspector);
         settings_inspector.Object_Add(this, true);
 
         tree_dir_game.root_path = ImpFile.ContentDir_Game();
@@ -325,9 +145,27 @@ public class PNL_FileBrowser : EdPanel
         _browsers.Add(this);
     }
 
+    void Tree_Wire(EdFileTree tree)
+    {
+        tree.on_item_click = _Item_Select;
+        tree.on_item_double_click = _Item_Open;
+        tree.on_item_right_click = _Item_RightClick;
+        tree.on_item_drop_external = _Item_DropExternal;
+        tree.item_drag_payload = _Item_DragPayload;
+        tree.on_background_right_click = () =>
+        {
+            Vector2 pos = ImpPlayer.players.Count > 0 ? ImpPlayer.players[0].cursor.position : Vector2.Zero;
+            ImpPlayer.Popup_Run(this, new A_PopupConfig { options = EmptyFolderOptions() }, null, pos);
+        };
+        tree.on_rebuilt = SyncTreeSelection;
+        tree.show_source_files = show_source_files;
+        tree.show_file_extensions = show_file_extensions;
+        tree.row_height = row_height;
+    }
+
     /// <summary>
     /// Every open file browser after a disk change. Pass from (and to, if it moved)
-    /// so current dirs and favorites follow the path instead of going stale.
+    /// so current dirs follow the path instead of going stale.
     /// </summary>
     public static void Browsers_Notify(string from = null, string to = null)
     {
@@ -350,15 +188,10 @@ public class PNL_FileBrowser : EdPanel
         {
             if (string.IsNullOrEmpty(to))
             {
-                for (int i = _favorite_paths.Count - 1; i >= 0; i--)
+                if (PathsEqual(_selected_path, from) || IsUnder(_selected_path, from))
                 {
-                    if (PathsEqual(_favorite_paths[i], from) || IsUnder(_favorite_paths[i], from))
-                    {
-                        _favorite_paths.RemoveAt(i);
-                    }
+                    _selected_path = "";
                 }
-                RebuildFavorites();
-
                 if (PathsEqual(_current_dir, from) || IsUnder(_current_dir, from))
                 {
                     string parent = Path.GetDirectoryName(from);
@@ -371,12 +204,7 @@ public class PNL_FileBrowser : EdPanel
             }
             else
             {
-                for (int i = 0; i < _favorite_paths.Count; i++)
-                {
-                    _favorite_paths[i] = Path_Moved(_favorite_paths[i], from, to);
-                }
-                RebuildFavorites();
-
+                _selected_path = Path_Moved(_selected_path, from, to);
                 string moved_dir = Path_Moved(_current_dir, from, to);
                 if (!string.Equals(moved_dir, _current_dir, StringComparison.Ordinal))
                 {
@@ -428,26 +256,38 @@ public class PNL_FileBrowser : EdPanel
         }
 
         if (_last_src != show_source_files || _last_ext != show_file_extensions
-            || MathF.Abs(_last_thumb - thumbnail_size) > 0.25f)
+            || MathF.Abs(_last_row_height - row_height) > 0.25f)
         {
             _last_src = show_source_files;
             _last_ext = show_file_extensions;
-            _last_thumb = thumbnail_size;
-            Grid_Refresh();
+            _last_row_height = row_height;
+            Tree_Wire(tree_dir_game);
+            Tree_Wire(tree_dir_engine);
+            RefreshAll();
         }
 
-        if (ImpPlayer.Key_IsPressed(EInputKey.Mouse_Right) && ImpPlayer.players.Count > 0)
+        Keys_Poll();
+    }
+
+    // F2 / Delete / Ctrl+D on whatever row was last clicked. The tree rows live in the engine
+    // assembly and have no idea what a file is, so the shortcuts sit here instead.
+    void Keys_Poll()
+    {
+        if (EdRenameField.IsOpen || string.IsNullOrEmpty(_selected_path) || !Focus_IsOurs()) return;
+
+        if (ImpPlayer.Key_IsPressed(EInputKey.Key_F2))
         {
-            ImpPlayer p = ImpPlayer.players[0];
-            if (p.Cursor_IsInDimensions(file_list.Dimensions_Get())
-                && p.target_cursor is not EdFileThumbnail)
-            {
-                ImpPlayer.Popup_Run(this, new A_PopupConfig { options = EmptyFolderOptions() }, null, p.cursor.position);
-            }
+            Rename_Begin(_selected_path);
         }
-
-        if (!EdRenameField.IsOpen && Focus_IsOurs() && ImpPlayer.Key_IsPressed(EInputKey.Key_F2))
-            Rename_Selected();
+        else if (ImpPlayer.Key_IsPressed(EInputKey.Key_Delete))
+        {
+            Path_DeleteAsk(_selected_path);
+        }
+        else if (ImpPlayer.Key_IsPressed(EInputKey.Key_D)
+                 && (ImpPlayer.Key_IsDown(EInputKey.Key_LeftControl) || ImpPlayer.Key_IsDown(EInputKey.Key_RightControl)))
+        {
+            Path_Duplicate(_selected_path);
+        }
     }
 
     // "The browser has the keyboard": the last thing clicked was inside this panel, and it was not
@@ -477,41 +317,109 @@ public class PNL_FileBrowser : EdPanel
             CurrentDir_Set(new TDirectory { path = tree_dir_game.root_path });
     }
 
-    C2_Button ToolBtn(string text, float width, Action on_click = null)
+    // -------------------------------------------------------------------
+    // Search
+    // -------------------------------------------------------------------
+
+    /// <summary>
+    /// Splits "type==Texture some name" into the type clause the old grid understood and the
+    /// plain text left over, then hands both to the trees.
+    /// </summary>
+    void Query_Apply()
     {
-        return new C2_Button
+        string q = _query?.Trim() ?? "";
+        string type_filter = "";
+        Match tm = Regex.Match(q, @"type\s*==?\s*([A-Za-z0-9_]+)", RegexOptions.IgnoreCase);
+        if (tm.Success)
         {
-            text = text,
-            text_style = UI_Text.LIGHT,
-            override_font_size = 12,
-            content_pad = 6,
-            style = ToolStyle,
-            on_click = on_click,
-            layout = new TLayout2
-                {
-                    size = new Vector2(width, 26),
-                    size_min = new Vector2(width, 26),
-                    orient_V = EUIViewportAlignment.Center,
-                },
-        };
+            type_filter = tm.Groups[1].Value;
+            q = q.Remove(tm.Index, tm.Length).Trim();
+        }
+        tree_dir_game.Filter_Set(q, type_filter);
+        tree_dir_engine.Filter_Set(q, type_filter);
     }
 
-    void _DirSelect(TTreeItem item)
+    // -------------------------------------------------------------------
+    // Rows
+    // -------------------------------------------------------------------
+
+    void _Item_Select(TTreeItem item)
     {
-        if (item.data is TDirectory dir) CurrentDir_Set(dir);
+        if (item.data is TDirectory dir)
+        {
+            _selected_path = dir.path;
+            CurrentDir_Set(dir);
+            return;
+        }
+        if (item.data is not TFile file || string.IsNullOrEmpty(file.path)) return;
+        _selected_path = file.path;
+        // The folder a new scene or asset would land in follows the selection, so "New Scene"
+        // from a file row puts it next to that file.
+        string parent = Path.GetDirectoryName(file.path);
+        if (!string.IsNullOrEmpty(parent)) CurrentDir_Set(new TDirectory { path = parent });
     }
 
-    void _DirRightClick(TTreeItem item)
+    void _Item_Open(TTreeItem item)
     {
-        if (item.data is not TDirectory dir || string.IsNullOrEmpty(dir.path)) return;
+        if (item.data is TDirectory dir)
+        {
+            EdFileTree tree = TreeForPath(dir.path);
+            tree?.Tree_ExpandKey(dir.path, !tree.Tree_IsExpanded(dir.path));
+            return;
+        }
+        if (item.data is TFile file) File_For(file.path)?.Editor_File_Open();
+    }
+
+    void _Item_RightClick(TTreeItem item)
+    {
         Vector2 pos = ImpPlayer.players.Count > 0 ? ImpPlayer.players[0].cursor.position : Vector2.Zero;
-        ImpPlayer.Popup_Run(this, new A_PopupConfig { options = FolderOptions(dir.path) }, null, pos);
+
+        if (item.data is TDirectory dir && !string.IsNullOrEmpty(dir.path))
+        {
+            _selected_path = dir.path;
+            ImpPlayer.Popup_Run(this, new A_PopupConfig { options = FolderOptions(dir.path) }, null, pos);
+            return;
+        }
+        if (item.data is not TFile file || string.IsNullOrEmpty(file.path)) return;
+
+        _selected_path = file.path;
+        ImpPlayer.Popup_Run(this, new A_PopupConfig { options = FileOptions(file.path) }, null, pos);
     }
 
-    void _DirDropExternal(object payload, TTreeItem item)
+    void _Item_DropExternal(object payload, TTreeItem item)
     {
-        if (payload is not string src || item.data is not TDirectory dir) return;
-        Path_MoveInto(src, dir.path);
+        if (payload is not string src) return;
+        if (item.data is TDirectory dir) Path_MoveInto(src, dir.path);
+        //Dropping onto a file means "put it beside this", same as dropping onto its folder.
+        else if (item.data is TFile file) Path_MoveInto(src, Path.GetDirectoryName(file.path));
+    }
+
+    object _Item_DragPayload(TTreeItem item)
+    {
+        string path = item.data switch
+        {
+            TDirectory d => d.path,
+            TFile f => f.path,
+            _ => null,
+        };
+        if (string.IsNullOrEmpty(path)) return null;
+        // The two content roots stay put.
+        if (PathsEqual(path, tree_dir_game.root_path) || PathsEqual(path, tree_dir_engine.root_path))
+            return null;
+        return path;
+    }
+
+    /// <summary>The asset or source file behind a path, or null when it is neither.</summary>
+    internal static I_File File_For(string path)
+    {
+        if (string.IsNullOrEmpty(path) || !File.Exists(path)) return null;
+        string ext = Path.GetExtension(path);
+        if (ext.StartsWith(".Imp", StringComparison.OrdinalIgnoreCase))
+        {
+            ImpAsset asset = ImpAsset.Load(path);
+            if (asset != null) return asset;
+        }
+        return ImpFile.GetOrCreate(path);
     }
 
     // -------------------------------------------------------------------
@@ -520,8 +428,8 @@ public class PNL_FileBrowser : EdPanel
 
     EdDragGhost _ghost;
 
-    // Driven from OnUpdate rather than from a grab callback, so a drag out of the grid and a
-    // drag out of the folder tree both get the same ghost.
+    // Driven from OnUpdate rather than from a grab callback, so a drag between the two trees and a
+    // drag out into a viewport both get the same ghost.
     void Drag_Sync()
     {
         if (ImpPlayer.players.Count == 0) { Ghost_Hide(); return; }
@@ -542,10 +450,11 @@ public class PNL_FileBrowser : EdPanel
             host.Child_Add(_ghost);
         }
 
-        EdFileThumbnail thumb = p.target_grabbed as EdFileThumbnail;
-        _ghost.label = thumb?.display_name ?? Path.GetFileName(
+        _ghost.label = Path.GetFileName(
             path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-        _ghost.accent = thumb?.type_color ?? new Color(120, 170, 220, 255);
+        _ghost.accent = Directory.Exists(path)
+            ? new Color(120, 170, 220, 255)
+            : File_For(path)?.Editor_GetThumbnail_Color() ?? new Color(120, 170, 220, 255);
         //Placed here rather than in the ghost's own update, so it never shows at the origin first.
         _ghost.transform.position = p.cursor.position + new Vector2(14, 12);
         _ghost.is_valid = Drop_TargetIsValid(p.target_cursor, path);
@@ -567,7 +476,6 @@ public class PNL_FileBrowser : EdPanel
     bool Drop_TargetIsValid(ImpComp target, string path)
     {
         if (target == null) return false;
-        if (target is EdFileThumbnail t) return t.is_folder && !PathsEqual(t.path, path);
         if (target is C2_Picker picker) return picker.Drop_Accepts(path);
         if (target is PNL_SceneView)
         {
@@ -585,15 +493,6 @@ public class PNL_FileBrowser : EdPanel
         for (ImpComp n = target; n != null; n = n.parent)
             if (n is EdFileTree) return true;
         return false;
-    }
-
-    object _DirDragPayload(TTreeItem item)
-    {
-        if (item.data is not TDirectory d || string.IsNullOrEmpty(d.path)) return null;
-        // The two content roots stay put.
-        if (PathsEqual(d.path, tree_dir_game.root_path) || PathsEqual(d.path, tree_dir_engine.root_path))
-            return null;
-        return d.path;
     }
 
     /// <summary>Moves a file or folder into dest_dir, renaming on collision.</summary>
@@ -635,6 +534,7 @@ public class PNL_FileBrowser : EdPanel
 
         ImpAsset.Cache_Rekey(from, to);
         ImpFile.Cache_Rekey(from, to);
+        EdFolderColors.Path_Moved(from, to);
         Browsers_Notify(from, to);
     }
 
@@ -642,14 +542,8 @@ public class PNL_FileBrowser : EdPanel
     // Rename
     // -------------------------------------------------------------------
 
-    void Rename_Selected()
-    {
-        if (_selected == null) return;
-        Rename_Begin(_selected.path, _selected);
-    }
-
-    /// <summary>Opens the rename field over a grid card, or at the cursor when there is no card.</summary>
-    void Rename_Begin(string path, EdFileThumbnail thumb)
+    /// <summary>Opens the rename field over the row, or at the cursor when the row is off screen.</summary>
+    void Rename_Begin(string path)
     {
         if (string.IsNullOrEmpty(path)) return;
         bool is_dir = Directory.Exists(path);
@@ -660,16 +554,12 @@ public class PNL_FileBrowser : EdPanel
         string name = Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
         string shown = is_dir || show_file_extensions ? name : Path.GetFileNameWithoutExtension(name);
 
+        object data = is_dir ? new TDirectory { path = path } : new TFile { path = path };
         Vector2 pos, size;
-        if (thumb != null)
+        if (TreeForPath(path) is { } tree && tree.Row_Rect(data, out TDimensions2 dim))
         {
-            //Sits over the card's name strip, laid out the same way EdFileThumbnail draws it.
-            TDimensions2 dim = thumb.Dimensions_Get();
-            float preview = MathF.Max(24, dim.size.Y - 40);
-            float y = dim.position.Y + 4 + preview + 2;
-            pos = new Vector2(dim.position.X + 2, y);
-            size = new Vector2(MathF.Max(dim.size.X - 4, 130),
-                MathF.Max(18, dim.position.Y + dim.size.Y - y - 2));
+            pos = dim.position + new Vector2(2, 1);
+            size = new Vector2(MathF.Max(dim.size.X - 4, 130), MathF.Max(18, dim.size.Y - 2));
         }
         else
         {
@@ -691,7 +581,7 @@ public class PNL_FileBrowser : EdPanel
         if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) return null;
         if (Directory.Exists(path)) return name;
 
-        // The field only ever edits what the grid shows, so a hidden extension is put back rather
+        // The field only ever edits what the row shows, so a hidden extension is put back rather
         // than left to whatever the typed name happened to end in.
         string ext = Path.GetExtension(path);
         if (!show_file_extensions) return name + ext;
@@ -754,6 +644,7 @@ public class PNL_FileBrowser : EdPanel
 
         ImpAsset.Cache_Rekey(from, to);
         ImpFile.Cache_Rekey(from, to);
+        EdFolderColors.Path_Moved(from, to);
         ImpRefs.Repath(from, to);
         Browsers_Notify(from, to);
     }
@@ -779,9 +670,14 @@ public class PNL_FileBrowser : EdPanel
         try { path = Path.GetFullPath(path); }
         catch { return; }
         _current_dir = path;
-        _selected = null;
-        RebuildCrumbs();
-        Grid_Refresh();
+
+        // A selection only survives a move of the current dir when it is the folder itself or
+        // something sitting directly in it - navigating anywhere else drops it.
+        if (!PathsEqual(_selected_path, path)
+            && !PathsEqual(Path.GetDirectoryName(_selected_path) ?? "", path))
+        {
+            _selected_path = "";
+        }
         SyncTreeSelection();
     }
 
@@ -789,7 +685,6 @@ public class PNL_FileBrowser : EdPanel
     {
         tree_dir_game.Refresh();
         tree_dir_engine.Refresh();
-        Grid_Refresh();
     }
 
     public void State_Capture(EdStateBrowser data)
@@ -804,15 +699,8 @@ public class PNL_FileBrowser : EdPanel
         data.show_source_files = show_source_files;
         data.show_file_extensions = show_file_extensions;
         data.show_engine_content = show_engine_content;
-        data.thumbnail_size = thumbnail_size;
-        data.settings_open = _settings_open;
-        data.favorites_expanded = _favorites.is_expanded;
-        data.sidebar_width = _sidebar.layout.size.X;
-        data.favorites.Clear();
-        for (int i = 0; i < _favorite_paths.Count; i++)
-        {
-            data.favorites.Add(EdState.Path_Store(_favorite_paths[i]));
-        }
+        data.row_height = row_height;
+        data.settings_open = _settings.is_expanded;
         data.expanded.Clear();
         AddExpanded(tree_dir_game, data.expanded);
         AddExpanded(tree_dir_engine, data.expanded);
@@ -828,32 +716,17 @@ public class PNL_FileBrowser : EdPanel
         show_source_files = data.show_source_files;
         show_file_extensions = data.show_file_extensions;
         show_engine_content = data.show_engine_content;
-        if (data.thumbnail_size >= 10)
+        if (data.row_height >= 16)
         {
-            thumbnail_size = data.thumbnail_size;
+            row_height = data.row_height;
         }
         _last_src = show_source_files;
         _last_ext = show_file_extensions;
         _last_engine = show_engine_content;
-        _last_thumb = thumbnail_size;
+        _last_row_height = row_height;
+        Tree_Wire(tree_dir_game);
+        Tree_Wire(tree_dir_engine);
         ApplyEngineContent();
-
-        if (data.sidebar_width >= 80)
-        {
-            _sidebar.layout.size = new Vector2(data.sidebar_width, _sidebar.layout.size.Y);
-        }
-
-        _favorite_paths.Clear();
-        for (int i = 0; i < data.favorites.Count; i++)
-        {
-            string p = EdState.Path_Load(data.favorites[i]);
-            if (!string.IsNullOrEmpty(p) && (Directory.Exists(p) || File.Exists(p)))
-            {
-                _favorite_paths.Add(p);
-            }
-        }
-        _favorites.is_expanded = data.favorites_expanded;
-        RebuildFavorites();
 
         string game_root = ImpFile.ContentDir_Game();
         string engine_root = ImpFile.ContentDir_Engine();
@@ -886,9 +759,7 @@ public class PNL_FileBrowser : EdPanel
         tree_dir_game.Tree_SetExpandedKeys(game_keys);
         tree_dir_engine.Tree_SetExpandedKeys(engine_keys);
 
-        _settings_open = data.settings_open;
-        settings_inspector.is_visible = _settings_open;
-        _settings_split.is_visible = _settings_open;
+        _settings.is_expanded = data.settings_open;
 
         string dir = EdState.Path_Load(data.current_dir);
         if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
@@ -977,10 +848,17 @@ public class PNL_FileBrowser : EdPanel
         }
     }
 
+    // The highlight follows what was actually clicked, which for a file row is the file - the
+    // current dir has already moved to its folder by then and would drag the highlight with it.
     void SyncTreeSelection()
     {
-        EdFileTree tree = TreeForPath(_current_dir);
-        tree?.Tree_SelectData(new TDirectory { path = _current_dir });
+        string path = string.IsNullOrEmpty(_selected_path) ? _current_dir : _selected_path;
+        if (string.IsNullOrEmpty(path)) return;
+        EdFileTree tree = TreeForPath(path);
+        if (tree == null) return;
+        tree.Tree_SelectData(Directory.Exists(path)
+            ? new TDirectory { path = path }
+            : new TFile { path = path });
     }
 
     EdFileTree TreeForPath(string path)
@@ -990,272 +868,74 @@ public class PNL_FileBrowser : EdPanel
         return tab_dir.selected_tab == 0 ? tree_dir_game : tree_dir_engine;
     }
 
-    void RebuildCrumbs()
+    // -------------------------------------------------------------------
+    // Menus
+    // -------------------------------------------------------------------
+
+    List<TPopupMenuOption> FolderOptions(string path)
     {
-        _crumbs.Child_RemoveAll();
-        EdFileTree tree = TreeForPath(_current_dir);
-        string root = tree?.root_path ?? _current_dir;
-        string root_name = tree?.name ?? "Content";
-
-        void AddCrumb(string label, string path, bool last)
-        {
-            C2_Button btn = new()
-            {
-                text = last ? label : label + "  >",
-                text_style = last ? UI_Text.LIGHT : UI_Text.MUTED,
-                override_font_size = 12,
-                content_pad = 4,
-                layout = new TLayout2
-                {
-                    size = new Vector2(MathF.Max(28, label.Length * 8 + (last ? 12 : 22)), 24),
-                    size_min = new Vector2(24, 24),
-                    orient_V = EUIViewportAlignment.Center,
-                },
-                style = new UI_Button
-                {
-                    style_unhovered = new UiStyle_Box { tint = new Color(36, 36, 36, 0) },
-                    style_hovered = new UiStyle_Box { tint = new Color(0, 96, 166, 180) },
-                    style_pressed = new UiStyle_Box { tint = new Color(0, 70, 130, 220) },
-                },
-            };
-            string captured = path;
-            btn.on_click = () => CurrentDir_Set(new TDirectory { path = captured });
-            _crumbs.Child_Add(btn);
-        }
-
-        AddCrumb(root_name, root, PathsEqual(root, _current_dir));
-        if (string.IsNullOrEmpty(_current_dir) || !Directory.Exists(_current_dir)) return;
-
-        string rel;
-        try { rel = Path.GetRelativePath(root, _current_dir); }
-        catch { rel = ""; }
-        if (string.IsNullOrEmpty(rel) || rel == "." || rel.StartsWith("..")) return;
-
-        string walk = root;
-        string[] parts = rel.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
-            StringSplitOptions.RemoveEmptyEntries);
-        for (int i = 0; i < parts.Length; i++)
-        {
-            walk = Path.Combine(walk, parts[i]);
-            AddCrumb(parts[i], walk, i == parts.Length - 1);
-        }
-    }
-
-    void Grid_Clear()
-    {
-        if (file_list.scroll_box != null)
-            file_list.scroll_box.Child_RemoveAll();
-        for (int i = file_list.children.Count - 1; i >= 0; i--)
-        {
-            if (file_list.children[i] == file_list.scroll_box) continue;
-            file_list.children[i].Destroy();
-        }
-        if (file_list.scroll_box != null) file_list.scroll_box.scroll = 0;
-    }
-
-    public void Grid_Refresh()
-    {
-        string keep = _selected?.path;
-        Grid_Clear();
-        _selected = null;
-
-        if (string.IsNullOrEmpty(_current_dir) || !Directory.Exists(_current_dir))
-        {
-            _status.text = "0 items";
-            return;
-        }
-
-        float thumb = Math.Clamp(thumbnail_size, 10, 160);
-        float card_w = MathF.Max(72, thumb + 10);
-        float card_h = thumb + 40;
-
-        List<EdFileThumbnail> items = new();
-
-        try
-        {
-            foreach (string dir in Directory.GetDirectories(_current_dir))
-            {
-                string name = Path.GetFileName(dir);
-                if (ShouldSkipName(name)) continue;
-                items.Add(MakeThumb(dir, true, null, name, "Folder", new Color(120, 170, 220, 255)));
-            }
-
-            foreach (string file in Directory.GetFiles(_current_dir))
-            {
-                string name = Path.GetFileName(file);
-                if (ShouldSkipName(name)) continue;
-                string ext = Path.GetExtension(file);
-
-                if (ext.Equals(".ImpAsset", StringComparison.OrdinalIgnoreCase)
-                    || ext.Equals(".ImpScene", StringComparison.OrdinalIgnoreCase)
-                    || ext.Equals(".ImpGame", StringComparison.OrdinalIgnoreCase))
-                {
-                    ImpAsset asset = ImpAsset.Load(file);
-                    if (asset == null)
-                    {
-                        if (ext.Equals(".ImpScene", StringComparison.OrdinalIgnoreCase))
-                            asset = new ImpScene { filepath = file };
-                        else
-                            asset = new ImpAsset(file);
-                    }
-                    string label = asset.Editor_GetTypeLabel();
-                    string shown = show_file_extensions ? Path.GetFileName(file) : asset.GetName();
-                    items.Add(MakeThumb(file, false, asset, shown, label, asset.Editor_GetThumbnail_Color()));
-                }
-                else if (show_source_files)
-                {
-                    ImpFile src = ImpFile.GetOrCreate(file);
-                    string label = SourceTypeLabel(ext, src);
-                    string shown = show_file_extensions ? name : Path.GetFileNameWithoutExtension(name);
-                    items.Add(MakeThumb(file, false, src, shown, label, src.Editor_GetThumbnail_Color()));
-                }
-            }
-        }
-        catch
-        {
-            _status.text = "0 items";
-            return;
-        }
-
-        items.Sort((a, b) =>
-        {
-            if (a.is_folder != b.is_folder) return a.is_folder ? -1 : 1;
-            return string.Compare(a.display_name, b.display_name, StringComparison.OrdinalIgnoreCase);
-        });
-
-        string q = _query?.Trim() ?? "";
-        string type_filter = "";
-        Match tm = Regex.Match(q, @"type\s*==?\s*([A-Za-z0-9_]+)", RegexOptions.IgnoreCase);
-        if (tm.Success)
-        {
-            type_filter = tm.Groups[1].Value;
-            q = (q.Remove(tm.Index, tm.Length)).Trim();
-        }
-
-        int shown_count = 0;
-        EdFileThumbnail keep_thumb = null;
-        for (int i = 0; i < items.Count; i++)
-        {
-            EdFileThumbnail t = items[i];
-            if (!PassesFilter(t, q, type_filter)) continue;
-            t.layout.size = new Vector2(card_w, card_h);
-            t.layout.size_min = new Vector2(card_w, card_h);
-            file_list.Child_Add(t);
-            shown_count++;
-            if (keep_thumb == null && !string.IsNullOrEmpty(keep) && PathsEqual(t.path, keep))
-            {
-                keep_thumb = t;
-            }
-        }
-
-        _status.text = shown_count == 1 ? "1 item" : shown_count + " items";
-        if (keep_thumb != null)
-        {
-            Thumbnail_Select(keep_thumb);
-        }
-    }
-
-    EdFileThumbnail MakeThumb(string path, bool folder, I_File file, string name, string type, Color color)
-    {
-        EdFileThumbnail t = new()
-        {
-            owner = this,
-            path = path,
-            is_folder = folder,
-            file = file,
-            display_name = name,
-            type_label = type,
-            type_color = color,
-        };
-        return t;
-    }
-
-    static bool PassesFilter(EdFileThumbnail t, string q, string type_filter)
-    {
-        if (!string.IsNullOrEmpty(type_filter))
-        {
-            string cmp = (t.type_label ?? "") + " " + t.file?.GetType().Name;
-            if (cmp.IndexOf(type_filter, StringComparison.OrdinalIgnoreCase) < 0)
-                return false;
-        }
-        if (string.IsNullOrEmpty(q)) return true;
-        return (t.display_name ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
-               || (t.type_label ?? "").IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0;
-    }
-
-    static string SourceTypeLabel(string ext, ImpFile file)
-    {
-        ext = (ext ?? "").TrimStart('.').ToLowerInvariant();
-        return ext switch
-        {
-            "png" or "jpg" or "jpeg" or "tga" or "bmp" => "Texture Source",
-            "hdr" or "exr" => "HDR Source",
-            "ttf" or "otf" => "Font Source",
-            "glb" or "gltf" or "fbx" or "obj" => "Model Source",
-            "wav" or "ogg" or "mp3" => "Sound Source",
-            _ => file.file_type != 0 ? file.file_type + " Source" : (string.IsNullOrEmpty(ext) ? "File" : ext.ToUpperInvariant()),
-        };
-    }
-
-    internal void Thumbnail_Select(EdFileThumbnail thumb)
-    {
-        if (_selected != null) _selected.is_selected = false;
-        _selected = thumb;
-        if (_selected != null) _selected.is_selected = true;
-    }
-
-    internal void Thumbnail_Open(EdFileThumbnail thumb)
-    {
-        if (thumb == null) return;
-        if (thumb.is_folder)
-        {
-            CurrentDir_Set(new TDirectory { path = thumb.path });
-            return;
-        }
-        thumb.file?.Editor_File_Open();
-    }
-
-    internal void Thumbnail_Menu(EdFileThumbnail thumb)
-    {
-        Vector2 pos = ImpPlayer.players.Count > 0 ? ImpPlayer.players[0].cursor.position : Vector2.Zero;
-        if (thumb.is_folder)
-        {
-            ImpPlayer.Popup_Run(this, new A_PopupConfig { options = FolderOptions(thumb.path, thumb) }, null, pos);
-            return;
-        }
-
-        List<TPopupMenuOption> opts = thumb.file?.Editor_File_GetOptions() ?? new List<TPopupMenuOption>();
-        if (opts.Count == 0)
-        {
-            opts.Add(new() { text = "Open", on_press = () => Thumbnail_Open(thumb) });
-        }
-        if (thumb.file is ImpFile src && src.default_asset_type != null)
-            opts.Add(new() { text = "Create Asset", on_press = () => { src.Editor_CreateAsset(); Browsers_Notify(); } });
-        opts.Add(new() { is_separator = true });
-        opts.Add(new() { text = "Rename", on_press = () => Rename_Begin(thumb.path, thumb) });
-        opts.Add(new() { text = "Duplicate", on_press = () => Path_Duplicate(thumb.path) });
-        opts.Add(new() { text = "Show in Explorer", on_press = () => ShowInExplorer(thumb.path, true) });
-        opts.Add(new() { text = "Delete", on_press = () => Path_DeleteAsk(thumb.path) });
-        ImpPlayer.Popup_Run(this, new A_PopupConfig { options = opts }, null, pos);
-    }
-
-    List<TPopupMenuOption> FolderOptions(string path, EdFileThumbnail thumb = null)
-    {
-        bool fav = _favorite_paths.Exists(p => PathsEqual(p, path));
         return new List<TPopupMenuOption>
         {
             new() { text = "Open", on_press = () => CurrentDir_Set(new TDirectory { path = path }) },
-            new() { text = fav ? "Remove from Favorites" : "Add to Favorites", on_press = () => ToggleFavorite(path) },
+            new() { text = "Folder Color", suboptions = ColorOptions(path) },
             new() { is_separator = true },
             new() { text = "New Folder", on_press = NewFolder },
             new() { text = "New Scene", on_press = NewScene },
             new() { text = "New Asset", on_press = NewAsset },
+            new() { text = "Import Sources as Assets", on_press = ImportSources },
             new() { is_separator = true },
-            new() { text = "Rename", on_press = () => Rename_Begin(path, thumb) },
+            new() { text = "Rename", on_press = () => Rename_Begin(path) },
             new() { text = "Duplicate", on_press = () => Path_Duplicate(path) },
             new() { text = "Show in Explorer", on_press = () => ShowInExplorer(path, false) },
             new() { text = "Delete", on_press = () => Path_DeleteAsk(path) },
         };
+    }
+
+    /// <summary>
+    /// A fixed palette rather than a picker, matching Godot. Clearing a folder drops it back to
+    /// whatever colour its nearest coloured ancestor is handing down.
+    /// </summary>
+    List<TPopupMenuOption> ColorOptions(string path)
+    {
+        List<TPopupMenuOption> opts = new();
+        for (int i = 0; i < EdFolderColors.PALETTE.Length; i++)
+        {
+            (string label, Color color) = EdFolderColors.PALETTE[i];
+            opts.Add(new TPopupMenuOption { text = label, on_press = () => Color_Set(path, color) });
+        }
+        opts.Add(new TPopupMenuOption { is_separator = true });
+        opts.Add(new TPopupMenuOption
+        {
+            text = "Clear",
+            is_disabled = EdFolderColors.Get(path).A == 0,
+            on_press = () => Color_Set(path, null),
+        });
+        return opts;
+    }
+
+    void Color_Set(string path, Color? color)
+    {
+        EdFolderColors.Set(path, color);
+        //Every browser shares the store, so they all owe a rebuild.
+        Browsers_Notify();
+    }
+
+    List<TPopupMenuOption> FileOptions(string path)
+    {
+        I_File file = File_For(path);
+        List<TPopupMenuOption> opts = file?.Editor_File_GetOptions() ?? new List<TPopupMenuOption>();
+        if (opts.Count == 0)
+        {
+            opts.Add(new() { text = "Open", on_press = () => file?.Editor_File_Open() });
+        }
+        if (file is ImpFile src && src.default_asset_type != null)
+            opts.Add(new() { text = "Create Asset", on_press = () => { src.Editor_CreateAsset(); Browsers_Notify(); } });
+        opts.Add(new() { is_separator = true });
+        opts.Add(new() { text = "Rename", on_press = () => Rename_Begin(path) });
+        opts.Add(new() { text = "Duplicate", on_press = () => Path_Duplicate(path) });
+        opts.Add(new() { text = "Show in Explorer", on_press = () => ShowInExplorer(path, true) });
+        opts.Add(new() { text = "Delete", on_press = () => Path_DeleteAsk(path) });
+        return opts;
     }
 
     List<TPopupMenuOption> EmptyFolderOptions()
@@ -1291,7 +971,7 @@ public class PNL_FileBrowser : EdPanel
 
     void ImportSources()
     {
-        if (_selected is { file: ImpFile selected_src })
+        if (File_For(_selected_path) is ImpFile selected_src)
         {
             selected_src.Editor_CreateAsset();
             Browsers_Notify();
@@ -1311,59 +991,6 @@ public class PNL_FileBrowser : EdPanel
             src.Editor_CreateAsset();
         }
         Browsers_Notify();
-    }
-
-    void ToggleFavorite(string path)
-    {
-        int i = _favorite_paths.FindIndex(p => PathsEqual(p, path));
-        if (i >= 0) _favorite_paths.RemoveAt(i);
-        else _favorite_paths.Add(path);
-        RebuildFavorites();
-    }
-
-    void RebuildFavorites()
-    {
-        _fav_list.Child_RemoveAll();
-        if (_favorite_paths.Count == 0)
-        {
-            _fav_list.Child_Add(new C2_Text
-            {
-                text = "No favorites",
-                style = UI_Text.MUTED,
-                text_alignment_h = EUIPositionAlignment.Start,
-                layout = new TLayout2
-                    {
-                        size = new Vector2(0, 20),
-                        size_min = new Vector2(0, 20),
-                        orient_H = EUIViewportAlignment.Fill,
-                    },
-        });
-            return;
-        }
-        for (int i = 0; i < _favorite_paths.Count; i++)
-        {
-            string path = _favorite_paths[i];
-            C2_Button btn = new()
-            {
-                text = Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)),
-                text_style = UI_Text.LIGHT,
-                override_font_size = 12,
-                content_align_h = EUIPositionAlignment.Start,
-                content_pad = 8,
-                icon = A_Texture.THUMB_FOLDER,
-                icon_size = 14,
-                layout = new TLayout2
-                {
-                    size = new Vector2(0, 22),
-                    size_min = new Vector2(0, 22),
-                    orient_H = EUIViewportAlignment.Fill,
-                },
-                style = ToolStyle,
-            };
-            string captured = path;
-            btn.on_click = () => CurrentDir_Set(new TDirectory { path = captured });
-            _fav_list.Child_Add(btn);
-        }
     }
 
     /// <summary>Asks before deleting, except empty folders which go straight through.</summary>
@@ -1416,6 +1043,7 @@ public class PNL_FileBrowser : EdPanel
 
         ImpAsset.Cache_Drop(from);
         ImpFile.Cache_Drop(from);
+        EdFolderColors.Path_Dropped(from);
         Browsers_Notify(from);
     }
 
@@ -1493,6 +1121,20 @@ public class PNL_FileBrowser : EdPanel
         return dest;
     }
 
+    internal static string SourceTypeLabel(string ext, ImpFile file)
+    {
+        ext = (ext ?? "").TrimStart('.').ToLowerInvariant();
+        return ext switch
+        {
+            "png" or "jpg" or "jpeg" or "tga" or "bmp" => "Texture Source",
+            "hdr" or "exr" => "HDR Source",
+            "ttf" or "otf" => "Font Source",
+            "glb" or "gltf" or "fbx" or "obj" => "Model Source",
+            "wav" or "ogg" or "mp3" => "Sound Source",
+            _ => file.file_type != 0 ? file.file_type + " Source" : (string.IsNullOrEmpty(ext) ? "File" : ext.ToUpperInvariant()),
+        };
+    }
+
     public static bool ShouldSkipName(string name)
     {
         if (string.IsNullOrEmpty(name)) return true;
@@ -1560,41 +1202,111 @@ public class PNL_FileBrowser : EdPanel
     }
 }
 
+// ====================================================================================================================
+// File Tree
+// ====================================================================================================================
+
+/// <summary>
+/// A content root as one tree of folders and files. Folder colours cascade: a folder with no colour
+/// of its own draws in whatever its nearest coloured ancestor is handing down, which is resolved
+/// here as the tree is built rather than stored per folder.
+/// </summary>
 public class EdFileTree : C2_Tree
 {
     public string root_path;
     public Action on_rebuilt;
+    public bool show_source_files = true;
+    public bool show_file_extensions;
+
+    static readonly Color TypeLabelColor = new(130, 130, 130, 255);
+
     string _built_path;
+    int _built_colors = -1;
+    bool _dirty = true;
+    string _filter = "";
+    string _type_filter = "";
+    //Expansion as it stood before a search took over, put back when the search box is cleared.
+    List<string> _pre_filter_expanded;
+
+    bool IsFiltering => _filter.Length > 0 || _type_filter.Length > 0;
 
     public void Refresh()
     {
-        _built_path = null;
+        _dirty = true;
+    }
+
+    /// <summary>Narrows the tree to matching files, keeping the folders needed to reach them.</summary>
+    public void Filter_Set(string filter, string type_filter)
+    {
+        filter = filter?.Trim() ?? "";
+        type_filter = type_filter?.Trim() ?? "";
+        if (filter == _filter && type_filter == _type_filter) return;
+
+        bool was = IsFiltering;
+        _filter = filter;
+        _type_filter = type_filter;
+        if (IsFiltering && !was) _pre_filter_expanded = Tree_ExpandedKeys();
+        _dirty = true;
+    }
+
+    public bool Tree_IsExpanded(string key)
+    {
+        if (string.IsNullOrEmpty(key)) return false;
+        List<string> keys = Tree_ExpandedKeys();
+        for (int i = 0; i < keys.Count; i++)
+            if (string.Equals(keys[i], key, StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
     }
 
     public override void OnUpdate(double dt)
     {
-        if (!string.Equals(_built_path, root_path, StringComparison.OrdinalIgnoreCase))
+        if (_dirty
+            || !string.Equals(_built_path, root_path, StringComparison.OrdinalIgnoreCase)
+            || _built_colors != EdFolderColors.version)
+        {
             RebuildFromDisk();
+        }
         base.OnUpdate(dt);
     }
 
     public void RebuildFromDisk()
     {
         _built_path = root_path;
+        _built_colors = EdFolderColors.version;
+        _dirty = false;
+
+        object keep = selected_data;
         Tree_Clear();
         if (string.IsNullOrEmpty(root_path) || !Directory.Exists(root_path)) return;
-        TTreeItem root = BuildDir(root_path, true);
+
+        TTreeItem root = BuildDir(root_path, true, default);
+        if (IsFiltering) root = Item_Prune(root, false);
         Tree_Add(root);
-        Tree_ExpandKey(C2_Tree.KeyOf(root.data, root), true);
+
+        if (IsFiltering)
+        {
+            Tree_ExpandAll(true);
+        }
+        else if (_pre_filter_expanded != null)
+        {
+            Tree_SetExpandedKeys(_pre_filter_expanded);
+            _pre_filter_expanded = null;
+        }
+        Tree_ExpandKey(KeyOf(root.data, root), true);
+
+        if (keep != null) Tree_SelectData(keep);
         on_rebuilt?.Invoke();
     }
 
-    TTreeItem BuildDir(string path, bool is_root)
+    TTreeItem BuildDir(string path, bool is_root, Color inherited)
     {
         string label = is_root
             ? (string.IsNullOrEmpty(name) ? Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar)) : name)
             : Path.GetFileName(path);
         if (string.IsNullOrEmpty(label)) label = path;
+
+        Color own = EdFolderColors.Get(path);
+        Color tint = own.A > 0 ? own : inherited;
 
         List<TTreeItem> kids = new();
         try
@@ -1605,7 +1317,17 @@ public class EdFileTree : C2_Tree
             {
                 string n = Path.GetFileName(dirs[i]);
                 if (PNL_FileBrowser.ShouldSkipName(n)) continue;
-                kids.Add(BuildDir(dirs[i], false));
+                kids.Add(BuildDir(dirs[i], false, tint));
+            }
+
+            //Files after folders, the order the grid used to sort them into.
+            string[] files = Directory.GetFiles(path);
+            Array.Sort(files, StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < files.Length; i++)
+            {
+                string n = Path.GetFileName(files[i]);
+                if (PNL_FileBrowser.ShouldSkipName(n)) continue;
+                if (BuildFile(files[i], tint) is { } item) kids.Add(item);
             }
         }
         catch { }
@@ -1618,15 +1340,130 @@ public class EdFileTree : C2_Tree
                 {
                     text = label,
                     icon = A_Texture.THUMB_FOLDER,
+                    icon_expanded = A_Texture.THUMB_FOLDER_OPEN,
+                    icon_tint = tint,
                 }
             },
             children = kids.ToArray(),
             data = new TDirectory { path = path },
+            row_tint = tint,
         };
+    }
+
+    // Files keep their own type colour on the icon and only take the folder colour as the row
+    // wash, so a coloured folder never hides what kind of asset something is.
+    TTreeItem? BuildFile(string path, Color inherited)
+    {
+        string name = Path.GetFileName(path);
+        string ext = Path.GetExtension(path);
+        string label;
+        string type;
+        Color tint;
+        Texture2D? thumb = null;
+
+        if (ext.Equals(".ImpAsset", StringComparison.OrdinalIgnoreCase)
+            || ext.Equals(".ImpScene", StringComparison.OrdinalIgnoreCase)
+            || ext.Equals(".ImpGame", StringComparison.OrdinalIgnoreCase))
+        {
+            ImpAsset asset = ImpAsset.Load(path);
+            if (asset == null)
+            {
+                if (ext.Equals(".ImpScene", StringComparison.OrdinalIgnoreCase))
+                {
+                    asset = new ImpScene { filepath = path };
+                }
+                else
+                {
+                    asset = new ImpAsset(path);
+                }
+            }
+            type = asset.Editor_GetTypeLabel();
+            label = show_file_extensions ? name : asset.GetName();
+            tint = asset.Editor_GetThumbnail_Color();
+            thumb = asset.Editor_GetThumbnail_Texture();
+        }
+        else
+        {
+            if (!show_source_files) return null;
+            ImpFile src = ImpFile.GetOrCreate(path);
+            type = PNL_FileBrowser.SourceTypeLabel(ext, src);
+            label = show_file_extensions ? name : Path.GetFileNameWithoutExtension(name);
+            tint = src.Editor_GetThumbnail_Color();
+            thumb = src.Editor_GetThumbnail_Texture();
+        }
+
+        bool has_thumb = thumb.HasValue && thumb.Value.Id != 0;
+        Color icon_tint = tint;
+        if (has_thumb)
+        {
+            icon_tint = default;
+        }
+
+        return new TTreeItem
+        {
+            sections = new[]
+            {
+                new TTreeItemSection
+                {
+                    text = label,
+                    icon = A_Texture.THUMB_FILE,
+                    icon_texture = thumb,
+                    icon_tint = icon_tint,
+                },
+                new TTreeItemSection
+                {
+                    text = type,
+                    color = TypeLabelColor,
+                },
+            },
+            children = Array.Empty<TTreeItem>(),
+            data = new TFile { path = path },
+            row_tint = inherited,
+        };
+    }
+
+    bool Item_Matches(TTreeItem item)
+    {
+        TTreeItemSection[] s = item.sections;
+        string label = s is { Length: > 0 } ? s[0].text ?? "" : "";
+        string type = s is { Length: > 1 } ? s[1].text ?? "" : "";
+
+        if (_type_filter.Length > 0
+            && type.IndexOf(_type_filter, StringComparison.OrdinalIgnoreCase) < 0)
+        {
+            return false;
+        }
+        if (_filter.Length == 0) return true;
+        return label.IndexOf(_filter, StringComparison.OrdinalIgnoreCase) >= 0
+               || type.IndexOf(_filter, StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    bool Item_Visible(TTreeItem item)
+    {
+        if (Item_Matches(item)) return true;
+        TTreeItem[] kids = item.children;
+        for (int i = 0; kids != null && i < kids.Length; i++)
+            if (Item_Visible(kids[i])) return true;
+        return false;
+    }
+
+    // A folder that matches by name brings its whole contents along; otherwise only the branches
+    // holding a match survive.
+    TTreeItem Item_Prune(TTreeItem item, bool take_all)
+    {
+        bool self = take_all || Item_Matches(item);
+        List<TTreeItem> kids = new();
+        TTreeItem[] src = item.children;
+        for (int i = 0; src != null && i < src.Length; i++)
+        {
+            if (self || Item_Visible(src[i])) kids.Add(Item_Prune(src[i], self));
+        }
+        item.children = kids.ToArray();
+        return item;
     }
 }
 
-// Inline rename box. Like the drag ghost it lives on the popup host, so it draws over the grid,
+// Inline rename box. Like the drag ghost it lives on the popup host, so it draws over the tree,
 // is not clipped by the panel, and outlives the refresh its own commit sets off.
 public class EdRenameField : C2_Box
 {
@@ -1646,7 +1483,7 @@ public class EdRenameField : C2_Box
         },
         style = new UI_TextEdit
         {
-            style_background = new UiStyle_Box { tint = new Color(18, 18, 18, 255) },
+            background = new UI_Box { tint = new Color(18, 18, 18, 255) },
             text_style = UI_Text.LIGHT,
             placeholder_style = UI_Text.MUTED,
         },
@@ -1663,7 +1500,7 @@ public class EdRenameField : C2_Box
         {
             is_valid = is_valid,
             on_commit = on_commit,
-            style = new UiStyle_Box { tint = new Color(18, 18, 18, 255) },
+            style = new UI_Box { tint = new Color(18, 18, 18, 255) },
             layout = new TLayout2
             {
                 orient_H = EUIViewportAlignment.Start,
@@ -1777,251 +1614,4 @@ public class EdDragGhost : Imp2D
             Raylib.DrawLineEx(new Vector2(cx - 3, cy + 3), new Vector2(cx + 3, cy - 3), 2f, no);
         }
     }
-}
-
-// ====================================================================================================================
-// File Thumbnail
-// ====================================================================================================================
-public class EdFileThumbnail : Imp2D
-{
-    public I_File file;
-    public string path;
-    public bool is_folder;
-    public string display_name;
-    public string type_label;
-    public Color type_color = new(90, 90, 90, 255);
-    public PNL_FileBrowser owner;
-
-    bool _hover;
-    bool _drop_hover;
-    double _last_click;
-
-    public EdFileThumbnail()
-    {
-        cursor_filter = ECursorFilter.Hit;
-    }
-
-    public override void _Notify_AsFocusTarget(ImpPlayer player, ENotifyGeneric notify, double dt)
-    {
-        base._Notify_AsFocusTarget(player, notify, dt);
-        if (notify == ENotifyGeneric.End)
-        {
-            if (is_selected)
-            {
-                owner?.Thumbnail_Select(null);
-            }
-            return;
-        }
-        if (notify != ENotifyGeneric.Update)
-        {
-            return;
-        }
-
-        if (player.Key_GetState(EInputKey.Key_Delete) == EInputState.Pressed)
-        {
-            if (AsFolder_IsEmpty())
-            {
-                Delete();
-            }
-            else
-            {
-                string kind = is_folder ? "Folder and its contents" : "File";
-                string captured = path;
-                PNL_FileBrowser browser = owner;
-                DLG_ConfirmDelete.Run("Delete " + kind + "? Cannot be undone.", () =>
-                {
-                    browser?.Path_Delete(captured);
-                });
-            }
-        }
-
-        bool ctrl = player.Key_GetState(EInputKey.Key_LeftControl) == EInputState.Down
-            || player.Key_GetState(EInputKey.Key_RightControl) == EInputState.Down;
-        if (ctrl && player.Key_GetState(EInputKey.Key_D) == EInputState.Pressed)
-        {
-            Duplicate();
-        }
-    }
-
-    public void Delete()
-    {
-        owner?.Path_Delete(path);
-    }
-
-    public void Duplicate()
-    {
-        owner?.Path_Duplicate(path);
-    }
-
-    // ---------------------------------------------------------------------------------------------------------
-    // Folder
-    // ---------------------------------------------------------------------------------------------------------
-
-    public bool AsFolder_IsEmpty()
-    {
-        if (!is_folder)
-        {
-            return false;
-        }
-        if (string.IsNullOrEmpty(path) || !Directory.Exists(path))
-        {
-            return false;
-        }
-        try
-        {
-            return Directory.GetFileSystemEntries(path).Length == 0;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-    
-    // ---------------------------------------------------------------------------------------------------------
-    // Grab
-    // ---------------------------------------------------------------------------------------------------------
-
-    public override bool CursorGrab_IsEnabled(ImpPlayer player) => !string.IsNullOrEmpty(path);
-
-    public override object CursorGrab_Payload() => path;
-
-    public override void _Notify_AsGrabbedTarget(ImpPlayer player, ENotifyGeneric notify, double dt)
-    {
-        base._Notify_AsGrabbedTarget(player, notify, dt);
-        if (notify == ENotifyGeneric.Begin) owner?.Thumbnail_Select(this);
-    }
-
-    public override void _Notify_OnGrabDrop(ImpPlayer player, ENotifyGrabTarget notify, ImpComp other, double dt)
-    {
-        base._Notify_OnGrabDrop(player, notify, other, dt);
-        if (notify == ENotifyGrabTarget.Hover_AsInstigator_Start)
-        {
-            _drop_hover = is_folder && other != this
-                && other?.CursorGrab_Payload() is string src
-                && !PNL_FileBrowser.PathsEqual(src, path);
-        }
-        else if (notify == ENotifyGrabTarget.Hover_AsInstigator_End)
-            _drop_hover = false;
-        else if (notify == ENotifyGrabTarget.Drop_AsInstigator)
-        {
-            _drop_hover = false;
-            if (!is_folder || other == this) return;
-            if (other?.CursorGrab_Payload() is string src) owner?.Path_MoveInto(src, path);
-        }
-    }
-
-    // ---------------------------------------------------------------------------------------------------------
-    // Cursor
-    // ---------------------------------------------------------------------------------------------------------
-
-    public override void _Notify_AsCursorTarget(ImpPlayer player, ENotifyGeneric notify, double dt)
-    {
-        base._Notify_AsCursorTarget(player, notify, dt);
-        switch (notify)
-        {
-            case ENotifyGeneric.Update:
-                break;
-            case ENotifyGeneric.Begin:
-                _hover = true;
-                break;
-            case ENotifyGeneric.End:
-                _hover = false;
-                break;
-        };
-    }
-
-    public override void Cursor_OnEvent(ImpPlayer player, ECursorEvent evnt)
-    {
-        base.Cursor_OnEvent(player, evnt);
-        if (evnt == ECursorEvent.Select_B)
-        {
-            owner?.Thumbnail_Select(this);
-            owner?.Thumbnail_Menu(this);
-            return;
-        }
-        if (evnt != ECursorEvent.Select_A) return;
-
-        double now = Raylib.GetTime();
-        bool dbl = now - _last_click < 0.35;
-        _last_click = now;
-        owner?.Thumbnail_Select(this);
-        if (dbl) owner?.Thumbnail_Open(this);
-    }
-    
-    // ---------------------------------------------------------------------------------------------------------
-    // Draw
-    // ---------------------------------------------------------------------------------------------------------
-    
-    public override void OnDraw2D(double dt, EDrawFlags flags)
-    {
-        base.OnDraw2D(dt, flags);
-        TDimensions2 dim = Dimensions_Get();
-        if (dim.size.X <= 0 || dim.size.Y <= 0) return;
-
-        Color bg = is_selected ? new Color(0, 72, 128, 255)
-            : _hover ? new Color(50, 50, 54, 255)
-            : new Color(22, 22, 22, 255);
-        Raylib.DrawRectangleV(dim.position, dim.size, bg);
-        if (_drop_hover)
-            Raylib.DrawRectangleLinesEx(new Rectangle(dim.position.X, dim.position.Y, dim.size.X, dim.size.Y), 2.5f,
-                new Color(90, 220, 140, 255));
-        else if (is_selected)
-            Raylib.DrawRectangleLinesEx(new Rectangle(dim.position.X, dim.position.Y, dim.size.X, dim.size.Y), 1.5f,
-                new Color(0, 156, 227, 255));
-
-        float pad = 4;
-        float preview = MathF.Max(24, dim.size.Y - 40);
-        Vector2 ppos = dim.position + new Vector2(pad, pad);
-        Vector2 psz = new(dim.size.X - pad * 2, preview);
-
-        DrawChecker(ppos, psz, 8);
-
-        Texture2D? tex = null;
-        if (is_folder) tex = A_Texture.THUMB_FOLDER?.texture;
-        else
-        {
-            tex = file?.Editor_GetThumbnail_Texture();
-            if (tex is not { Id: not 0 })
-                tex = A_Texture.THUMB_FILE?.texture;
-        }
-
-        if (tex is { Id: not 0, Width: > 0, Height: > 0 } t)
-        {
-            float scale = MathF.Min(psz.X / t.Width, psz.Y / t.Height);
-            float dw = t.Width * scale;
-            float dh = t.Height * scale;
-            Raylib.DrawTexturePro(t,
-                new Rectangle(0, 0, t.Width, t.Height),
-                new Rectangle(ppos.X + (psz.X - dw) * 0.5f, ppos.Y + (psz.Y - dh) * 0.5f, dw, dh),
-                Vector2.Zero, 0f, Color.White);
-        }
-
-        Raylib.DrawRectangleV(new Vector2(ppos.X, ppos.Y + psz.Y - 3), new Vector2(psz.X, 3), type_color);
-
-        float text_y = ppos.Y + psz.Y + 2;
-        float text_h = dim.position.Y + dim.size.Y - text_y - 2;
-        UI_Text.LIGHT.Draw(display_name ?? "", new Vector2(dim.position.X + 4, text_y),
-            new Vector2(dim.size.X - 8, text_h * 0.55f), 12, ETextWrap.None,
-            EUIPositionAlignment.Start, EUIPositionAlignment.Start);
-        UI_Text.MUTED.Draw(type_label ?? "", new Vector2(dim.position.X + 4, text_y + text_h * 0.5f),
-            new Vector2(dim.size.X - 8, text_h * 0.5f), 10, ETextWrap.None,
-            EUIPositionAlignment.Start, EUIPositionAlignment.Start);
-    }
-
-    static void DrawChecker(Vector2 pos, Vector2 sz, float cell)
-    {
-        int cols = Math.Max(1, (int)MathF.Ceiling(sz.X / cell));
-        int rows = Math.Max(1, (int)MathF.Ceiling(sz.Y / cell));
-        for (int y = 0; y < rows; y++)
-        for (int x = 0; x < cols; x++)
-        {
-            Color c = ((x + y) & 1) == 0 ? new Color(48, 48, 48, 255) : new Color(64, 64, 64, 255);
-            float dw = MathF.Min(cell, sz.X - x * cell);
-            float dh = MathF.Min(cell, sz.Y - y * cell);
-            if (dw <= 0 || dh <= 0) continue;
-            Raylib.DrawRectangleV(pos + new Vector2(x * cell, y * cell), new Vector2(dw, dh), c);
-        }
-    }
-
-    
 }

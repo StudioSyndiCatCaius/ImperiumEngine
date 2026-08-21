@@ -130,9 +130,9 @@ public class C2_Picker : Imp2D
         TDimensions2 dim = Dimensions_Get();
         if (dim.size.X <= 0 || dim.size.Y <= 0) return;
 
-        UiStyle_Box bg = _open ? UiStyle_Box.STYLE_BTN_PRESS
-            : _hover ? UiStyle_Box.STYLE_BTN_HOVER
-            : UiStyle_Box.STYLE_BKG_MID;
+        UI_Box bg = _open ? UI_Box.BtnPress
+            : _hover ? UI_Box.BtnHover
+            : UI_Box.BkgMid;
         bg.Draw(dim);
 
         float x = dim.position.X + 4;
@@ -285,7 +285,7 @@ class C2_PickerPopup : C2_Box
         _owner = owner;
         _all = options ?? new List<TPickerOption>();
         cursor_filter = ECursorFilter.Hit;
-        style = new UiStyle_Box { texture = null, tint = new Color(36, 36, 36, 255) };
+        style = new UI_Box { texture = null, tint = new Color(36, 36, 36, 255) };
         Rebuild();
     }
 
@@ -352,7 +352,7 @@ class C2_PickerPopup : C2_Box
         TDimensions2 dim = Dimensions_Get();
         Raylib.DrawRectangleLinesEx(new Rectangle(dim.position.X, dim.position.Y, dim.size.X, dim.size.Y), 1, new Color(0, 120, 215, 255));
 
-        UiStyle_Box.STYLE_BKG_DARK.Draw(new TDimensions2 { position = dim.position, size = new Vector2(dim.size.X, RowH) });
+        UI_Box.BkgDark.Draw(new TDimensions2 { position = dim.position, size = new Vector2(dim.size.X, RowH) });
         UI_Text ts = _filter.Length > 0 ? UI_Text.LIGHT : UI_Text.MUTED;
         ts.Draw(_filter.Length > 0 ? _filter + "|" : "Type to search",
             dim.position + new Vector2(6, 0), new Vector2(dim.size.X - 12, RowH),

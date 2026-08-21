@@ -237,6 +237,6 @@ public class UiStyle_ScrollBox : ImpAsset
 {
     public static UiStyle_ScrollBox DEFAULT = new();
 
-    [ImpVar] public UiStyle_Box scrollbar_bar = UiStyle_Box.STYLE_BTN_IDLE;
-    [ImpVar] public UiStyle_Box scrollbar_background = UiStyle_Box.STYLE_BKG_DARK;
+    [ImpVar] public UI_Box scrollbar_bar = UI_Box.BtnIdle;
+    [ImpVar] public UI_Box scrollbar_background = UI_Box.BkgDark;
 }

@@ -11,7 +11,7 @@ public class A_General : ImpAsset, I_General
     [ImpVar][Category("General")] public A_Texture icon;
     [ImpVar][Category("General")] public TText description;
     [ImpVar][Category("General")] public Color color;
-    [ImpVar][Category("General")] public TTagSet tags;
+    [ImpVar][Category("General")] public TTagSet tags = new();
     
     public virtual TText gTitle() { return title; }
     public virtual A_Texture gIcon() { return icon; }

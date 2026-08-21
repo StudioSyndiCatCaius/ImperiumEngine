@@ -33,13 +33,13 @@ public class Imp3D : ImpComp
     static R3D_cs.Mesh _line_mesh;
     static bool _line_mesh_ready;
 
-    public static void Draw3D_Line(Vector3 start, Vector3 end, float thickness, Color color)
+    public static TBounds3 Draw3D_Line(Vector3 start, Vector3 end, float thickness, Color color)
     {
         Vector3 delta = end - start;
         float len = delta.Length();
         if (len < 1e-6f)
         {
-            return;
+            return TBounds3.ZERO;
         }
         if (thickness < 0.001f)
         {
@@ -76,14 +76,239 @@ public class Imp3D : ImpComp
         mat.Albedo = alb;
         mat.Unlit = true;
         R3D.DrawMeshEx(_line_mesh, mat, mid, rot, new Vector3(thickness, len, thickness));
+        return new TBounds3
+        {
+            center = mid,
+            size = new Vector3(thickness, len, thickness),
+            rotation = ImpMath.Quat_2_Euler(rot),
+        };
     }
     
-    public static void Draw3D_Mesh(A_Mesh mesh, TTransform3 transform, bool cast_shadow = true)
+    public static TBounds3 Draw3D_Box(TTransform3 transform, Vector3 bounds, float thickness =0.4f, Color color = default)
     {
+        if (color.A == 0)
+        {
+            color = Color.White;
+        }
+        Quaternion rot = ImpMath.Euler_2_Quat(transform.rotation);
+        Vector3 h = new Vector3(
+            MathF.Abs(bounds.X * transform.scale.X) * 0.5f,
+            MathF.Abs(bounds.Y * transform.scale.Y) * 0.5f,
+            MathF.Abs(bounds.Z * transform.scale.Z) * 0.5f);
+        Vector3 c = transform.position;
+        Vector3 P(float x, float y, float z)
+        {
+            return c + Vector3.Transform(new Vector3(x, y, z), rot);
+        }
+        Vector3 p000 = P(-h.X, -h.Y, -h.Z);
+        Vector3 p001 = P(-h.X, -h.Y,  h.Z);
+        Vector3 p010 = P(-h.X,  h.Y, -h.Z);
+        Vector3 p011 = P(-h.X,  h.Y,  h.Z);
+        Vector3 p100 = P( h.X, -h.Y, -h.Z);
+        Vector3 p101 = P( h.X, -h.Y,  h.Z);
+        Vector3 p110 = P( h.X,  h.Y, -h.Z);
+        Vector3 p111 = P( h.X,  h.Y,  h.Z);
+        Draw3D_Line(p000, p001, thickness, color);
+        Draw3D_Line(p001, p101, thickness, color);
+        Draw3D_Line(p101, p100, thickness, color);
+        Draw3D_Line(p100, p000, thickness, color);
+        Draw3D_Line(p010, p011, thickness, color);
+        Draw3D_Line(p011, p111, thickness, color);
+        Draw3D_Line(p111, p110, thickness, color);
+        Draw3D_Line(p110, p010, thickness, color);
+        Draw3D_Line(p000, p010, thickness, color);
+        Draw3D_Line(p001, p011, thickness, color);
+        Draw3D_Line(p101, p111, thickness, color);
+        Draw3D_Line(p100, p110, thickness, color);
+        return new TBounds3
+        {
+            center = c,
+            size = h * 2f,
+            rotation = transform.rotation,
+        };
+    }
+    
+    public static TBounds3 Draw3D_Capsule(TTransform3 transform, float radius, float height, int slices = 16, Color color = default)
+    {
+        if (radius < 0.001f || height < 0.001f)
+        {
+            return TBounds3.ZERO;
+        }
+        if (color.A == 0)
+        {
+            color = Color.White;
+        }
+        if (slices < 4)
+        {
+            slices = 4;
+        }
+        Quaternion q = ImpMath.Euler_2_Quat(transform.rotation);
+        float rx = MathF.Abs(transform.scale.X) * radius;
+        float ry = MathF.Abs(transform.scale.Y) * radius;
+        float rz = MathF.Abs(transform.scale.Z) * radius;
+        float hy = MathF.Abs(transform.scale.Y) * height;
+        if (hy < ry * 2f)
+        {
+            hy = ry * 2f;
+        }
+        float thick = Math.Clamp(MathF.Min(rx, rz) * 0.03f, 0.01f, 0.08f);
+        Vector3 o = transform.position;
+        Vector3 top_c = new Vector3(0f, hy * 0.5f - ry, 0f);
+        Vector3 bot_c = new Vector3(0f, -hy * 0.5f + ry, 0f);
+        DrawWireCircle(o, q, top_c, new Vector3(rx, 0f, 0f), new Vector3(0f, 0f, rz), slices, thick, color);
+        DrawWireCircle(o, q, bot_c, new Vector3(rx, 0f, 0f), new Vector3(0f, 0f, rz), slices, thick, color);
+        DrawWireLine(o, q, bot_c + new Vector3(rx, 0f, 0f), top_c + new Vector3(rx, 0f, 0f), thick, color);
+        DrawWireLine(o, q, bot_c + new Vector3(-rx, 0f, 0f), top_c + new Vector3(-rx, 0f, 0f), thick, color);
+        DrawWireLine(o, q, bot_c + new Vector3(0f, 0f, rz), top_c + new Vector3(0f, 0f, rz), thick, color);
+        DrawWireLine(o, q, bot_c + new Vector3(0f, 0f, -rz), top_c + new Vector3(0f, 0f, -rz), thick, color);
+        int steps = slices / 2;
+        if (steps < 4)
+        {
+            steps = 4;
+        }
+        DrawWireHemi(o, q, top_c, rx, ry, rz, 1f, steps, thick, color);
+        DrawWireHemi(o, q, bot_c, rx, ry, rz, -1f, steps, thick, color);
+        return new TBounds3
+        {
+            center = o,
+            size = new Vector3(rx * 2f, hy, rz * 2f),
+            rotation = transform.rotation,
+        };
+    }
+    
+    public static TBounds3 Draw3D_Sphere(TTransform3 transform, float radius, int slices = 16, Color color = default)
+    {
+        if (radius < 0.001f)
+        {
+            return TBounds3.ZERO;
+        }
+        if (color.A == 0)
+        {
+            color = Color.White;
+        }
+        if (slices < 4)
+        {
+            slices = 4;
+        }
+        Quaternion q = ImpMath.Euler_2_Quat(transform.rotation);
+        Vector3 r = new Vector3(
+            MathF.Abs(transform.scale.X) * radius,
+            MathF.Abs(transform.scale.Y) * radius,
+            MathF.Abs(transform.scale.Z) * radius);
+        float thick = Math.Clamp(MathF.Min(r.X, MathF.Min(r.Y, r.Z)) * 0.03f, 0.01f, 0.08f);
+        Vector3 o = transform.position;
+        DrawWireCircle(o, q, Vector3.Zero, new Vector3(r.X, 0f, 0f), new Vector3(0f, r.Y, 0f), slices, thick, color);
+        DrawWireCircle(o, q, Vector3.Zero, new Vector3(r.X, 0f, 0f), new Vector3(0f, 0f, r.Z), slices, thick, color);
+        DrawWireCircle(o, q, Vector3.Zero, new Vector3(0f, r.Y, 0f), new Vector3(0f, 0f, r.Z), slices, thick, color);
+        return new TBounds3
+        {
+            center = o,
+            size = r * 2f,
+            rotation = transform.rotation,
+        };
+    }
+    
+    public static TBounds3 Draw3D_Arrow(TTransform3 transform, float length, float thickness=0.3f, Color color=default)
+    {
+        if (length < 0.001f)
+        {
+            return TBounds3.ZERO;
+        }
+        if (color.A == 0)
+        {
+            color = Color.White;
+        }
+        if (thickness < 0.001f)
+        {
+            thickness = 0.001f;
+        }
+        Quaternion q = ImpMath.Euler_2_Quat(transform.rotation);
+        float len = length * MathF.Abs(transform.scale.Z);
+        if (len < 0.001f)
+        {
+            return TBounds3.ZERO;
+        }
+        Vector3 o = transform.position;
+        Vector3 tip = new Vector3(0f, 0f, -len);
+        float head = len * 0.22f;
+        float head_w = len * 0.1f;
+        Vector3 hb = new Vector3(0f, 0f, -len + head);
+        DrawWireLine(o, q, Vector3.Zero, tip, thickness, color);
+        DrawWireLine(o, q, tip, hb + new Vector3(head_w, 0f, 0f), thickness, color);
+        DrawWireLine(o, q, tip, hb + new Vector3(-head_w, 0f, 0f), thickness, color);
+        DrawWireLine(o, q, tip, hb + new Vector3(0f, head_w, 0f), thickness, color);
+        DrawWireLine(o, q, tip, hb + new Vector3(0f, -head_w, 0f), thickness, color);
+        DrawWireLine(o, q, hb + new Vector3(head_w, 0f, 0f), hb + new Vector3(0f, head_w, 0f), thickness, color);
+        DrawWireLine(o, q, hb + new Vector3(0f, head_w, 0f), hb + new Vector3(-head_w, 0f, 0f), thickness, color);
+        DrawWireLine(o, q, hb + new Vector3(-head_w, 0f, 0f), hb + new Vector3(0f, -head_w, 0f), thickness, color);
+        DrawWireLine(o, q, hb + new Vector3(0f, -head_w, 0f), hb + new Vector3(head_w, 0f, 0f), thickness, color);
+        return new TBounds3
+        {
+            center = o + Vector3.Transform(new Vector3(0f, 0f, -len * 0.5f), q),
+            size = new Vector3(head_w * 2f, head_w * 2f, len),
+            rotation = transform.rotation,
+        };
+    }
+
+    static void DrawWireLine(Vector3 origin, Quaternion rot, Vector3 a, Vector3 b, float thickness, Color color)
+    {
+        Draw3D_Line(origin + Vector3.Transform(a, rot), origin + Vector3.Transform(b, rot), thickness, color);
+    }
+
+    static void DrawWireCircle(Vector3 origin, Quaternion rot, Vector3 center, Vector3 axis_a, Vector3 axis_b, int slices, float thickness, Color color)
+    {
+        Vector3 prev = default;
+        for (int i = 0; i <= slices; i++)
+        {
+            float t = (float)i / slices * MathF.PI * 2f;
+            Vector3 lp = center + axis_a * MathF.Cos(t) + axis_b * MathF.Sin(t);
+            Vector3 wp = origin + Vector3.Transform(lp, rot);
+            if (i > 0)
+            {
+                Draw3D_Line(prev, wp, thickness, color);
+            }
+            prev = wp;
+        }
+    }
+
+    static void DrawWireHemi(Vector3 origin, Quaternion rot, Vector3 center, float rx, float ry, float rz, float y_sign, int steps, float thickness, Color color)
+    {
+        Vector3[] rad =
+        {
+            new Vector3(rx, 0f, 0f),
+            new Vector3(-rx, 0f, 0f),
+            new Vector3(0f, 0f, rz),
+            new Vector3(0f, 0f, -rz),
+        };
+        for (int m = 0; m < 4; m++)
+        {
+            Vector3 prev = default;
+            for (int i = 0; i <= steps; i++)
+            {
+                float a = (float)i / steps * MathF.PI * 0.5f;
+                Vector3 lp = center + rad[m] * MathF.Cos(a) + new Vector3(0f, y_sign * ry * MathF.Sin(a), 0f);
+                Vector3 wp = origin + Vector3.Transform(lp, rot);
+                if (i > 0)
+                {
+                    Draw3D_Line(prev, wp, thickness, color);
+                }
+                prev = wp;
+            }
+        }
+    }
+    
+    public static TBounds3 Draw3D_Mesh(A_Mesh mesh, TTransform3 transform, bool cast_shadow = true)
+    {
+        if (mesh == null)
+        {
+            return TBounds3.ZERO;
+        }
         mesh.mesh.ShadowCastMode = ShadowCastMode.Disabled;
         R3D.DrawMeshEx(mesh.mesh,R3D.MATERIAL_BASE,transform.position,ImpMath.Euler_2_Quat(transform.rotation),transform.scale);
         mesh.mesh.ShadowCastMode = ShadowCastMode.OnAuto;
+        return mesh.Bounds_Get(transform);
     }
+
 
     // ---------------------------------------------------------------------------------------------------
     // Trace
@@ -309,7 +534,7 @@ public class Imp3D : ImpComp
     internal Vector3 _phys_scale = Vector3.One;
     
     // Cached every update, parent first, so children/parents can read world without a tree walk.
-    public TTransform3 cached_global_transform = new();
+    public TTransform3 global_transform = new();
     public TBounds3 cached_bounds;
     static uint _cache_epoch = 1;
     uint _e_cached;
@@ -332,17 +557,17 @@ public class Imp3D : ImpComp
         if (parent is Imp3D p)
         {
             p.Cache_Refresh();
-            world = WorldFromLocal(p.cached_global_transform, transform);
+            world = WorldFromLocal(p.global_transform, transform);
         }
         else
         {
             world = transform;
         }
         bool moved =
-            cached_global_transform.position != world.position
-            || cached_global_transform.rotation != world.rotation
-            || cached_global_transform.scale != world.scale;
-        cached_global_transform = world;
+            global_transform.position != world.position
+            || global_transform.rotation != world.rotation
+            || global_transform.scale != world.scale;
+        global_transform = world;
         _e_cached = _cache_epoch;
         if (force && moved)
         {
@@ -420,7 +645,7 @@ public class Imp3D : ImpComp
         else
         {
             p.Cache_Refresh();
-            transform = LocalFromWorld(p.cached_global_transform, value);
+            transform = LocalFromWorld(p.global_transform, value);
         }
         _phys_dirty = true;
         Cache_Dirty();
@@ -434,7 +659,7 @@ public class Imp3D : ImpComp
             return transform;
         }
         p.Cache_Refresh();
-        return WorldFromLocal(p.cached_global_transform, transform);
+        return WorldFromLocal(p.global_transform, transform);
     }
     [ScriptCall]
     public Vector3 Position_Get(bool world_space = false)
@@ -454,7 +679,7 @@ public class Imp3D : ImpComp
         }
 
         p.Cache_Refresh();
-        var parent_w = p.cached_global_transform;
+        var parent_w = p.global_transform;
         var q = ImpMath.Euler_2_Quat(parent_w.rotation);
         Vector3 inv_s = new(
             parent_w.scale.X != 0 ? 1f / parent_w.scale.X : 0,
@@ -483,7 +708,7 @@ public class Imp3D : ImpComp
         }
 
         p.Cache_Refresh();
-        var parent_q = ImpMath.Euler_2_Quat(p.cached_global_transform.rotation);
+        var parent_q = ImpMath.Euler_2_Quat(p.global_transform.rotation);
         transform.rotation = ImpMath.Quat_2_Euler(Quaternion.Inverse(parent_q) * ImpMath.Euler_2_Quat(rotation));
         _phys_dirty = true;
         Cache_Dirty();
@@ -507,7 +732,7 @@ public class Imp3D : ImpComp
         }
 
         p.Cache_Refresh();
-        var ps = p.cached_global_transform.scale;
+        var ps = p.global_transform.scale;
         transform.scale = new Vector3(
             ps.X != 0 ? scale.X / ps.X : 0,
             ps.Y != 0 ? scale.Y / ps.Y : 0,

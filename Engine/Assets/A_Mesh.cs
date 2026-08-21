@@ -81,13 +81,9 @@ public class A_Mesh : ImpAsset
         {
             return null;
         }
-        ImpComp dest = comp;
-        ImpScene dest_scene = _drop_view?.view_scene ?? dest?.scene;
+        ImpScene dest_scene = _drop_view?.view_scene ?? comp?.scene;
+        ImpComp dest = dest_scene?.root;
         if (dest == null || dest == _drop_ghost || _drop_ghost.IsAncestorOf(dest))
-        {
-            dest = dest_scene?.root;
-        }
-        if (dest == null)
         {
             SceneDrop_Exit(_drop_view, player);
             return null;

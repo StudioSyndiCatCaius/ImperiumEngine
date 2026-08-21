@@ -107,7 +107,7 @@ public class C2_TextEdit : Imp2D
         if (dim.size.X <= 0 || dim.size.Y <= 0) return;
 
         style ??= new UI_TextEdit();
-        style.style_background?.Draw(dim);
+        style.background?.Draw(dim);
 
         string shown = text ?? "";
         if (is_password && shown.Length > 0) shown = new string('•', shown.Length);
@@ -168,7 +168,7 @@ public class C2_TextEdit : Imp2D
 
 public class UI_TextEdit : ImpAsset
 {
-    [ImpVar] public UiStyle_Box style_background = UiStyle_Box.STYLE_BKG_MID;
+    [ImpVar] public UI_Box background = UI_Box.BkgMid;
     [ImpVar] public UI_Text text_style = UI_Text.LIGHT;
     [ImpVar] public UI_Text placeholder_style = UI_Text.MUTED;
 }

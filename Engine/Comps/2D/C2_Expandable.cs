@@ -93,9 +93,9 @@ public class C2_Expandable : Imp2D
         if (style != null)
         {
             bar.text_style = style.Name;
-            bar.style.style_unhovered = style.style_expand_bar;
-            bar.style.style_hovered = style.style_expand_bar;
-            bar.style.style_pressed = style.style_expand_bar;
+            bar.style.unhovered = style.expandBar;
+            bar.style.hovered = style.expandBar;
+            bar.style.pressed = style.expandBar;
         }
 
         bar.icon = is_expanded ? style?.icon_expand : style?.icon_collapse;
@@ -161,9 +161,9 @@ public class C2_Expandable : Imp2D
     public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
-        if (!is_expanded || style?.style_content_box == null) return;
+        if (!is_expanded || style?.contentBox == null) return;
         TDimensions2 dim = Dimensions_Get();
-        style.style_content_box.Draw(new TDimensions2
+        style.contentBox.Draw(new TDimensions2
         {
             position = dim.position + new Vector2(0, bar_height),
             size = new Vector2(dim.size.X, MathF.Max(0, dim.size.Y - bar_height)),
@@ -184,8 +184,8 @@ public class UiStyle_Expandable : ImpAsset
     
     [ImpVar] public A_Texture icon_collapse = A_Texture.ICO_ARROW_R;
     [ImpVar] public A_Texture icon_expand = A_Texture.ICO_ARROW_D;
-    [ImpVar] public UiStyle_Box style_expand_bar = UiStyle_Box.STYLE_BKG_MID;
-    [ImpVar] public UiStyle_Box style_content_box = UiStyle_Box.STYLE_BKG_DARK;
+    [ImpVar] public UI_Box expandBar = UI_Box.BkgMid;
+    [ImpVar] public UI_Box contentBox = UI_Box.BkgDark;
     [ImpVar] public UI_Text Name = UI_Text.LIGHT;
     
 }

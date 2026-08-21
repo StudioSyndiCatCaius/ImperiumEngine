@@ -438,7 +438,7 @@ public class ImpComp
         foreach (FieldInfo f in type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
         {
             if (f.IsInitOnly || f.IsLiteral) continue;
-            if (f.Name is "parent" or "children" or "input_owner" or "is_destroying" or "_scene" or "_game_owner" or "packed_from" or "cached_global_transform" or "cached_bounds" or "is_selected") continue;
+            if (f.Name is "parent" or "children" or "input_owner" or "is_destroying" or "_scene" or "_game_owner" or "packed_from" or "global_transform" or "cached_bounds" or "is_selected") continue;
             // Layout cache (Imp2D). Copying a stamp would let the clone answer with the
             // original's rect until the next epoch bump, so leave it at 0 and recompute.
             if (f.Name.StartsWith("_e_") || f.Name.StartsWith("_c_")) continue;

@@ -14,7 +14,7 @@ public class C2_SearchBar : C2_Box
 
     public C2_SearchBar()
     {
-        style = UiStyle_Box.STYLE_BKG_DARK;
+        style = UI_Box.BkgDark;
         cursor_filter = ECursorFilter.Hit;
         option_button = null;
         layout.orient_H = EUIViewportAlignment.Fill;
@@ -24,7 +24,7 @@ public class C2_SearchBar : C2_Box
             text_placeholder = placeholder,
             style = new UI_TextEdit
             {
-                style_background = new UiStyle_Box { tint = new Raylib_cs.Color(28, 28, 28, 255) },
+                background = new UI_Box { tint = new Raylib_cs.Color(28, 28, 28, 255) },
                 text_style = UI_Text.LIGHT,
                 placeholder_style = UI_Text.MUTED,
             },

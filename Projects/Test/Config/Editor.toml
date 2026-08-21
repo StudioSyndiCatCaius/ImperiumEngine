@@ -1,17 +1,12 @@
-saved_at = "2026-08-21T20:21:05.2938537Z"
+saved_at = "2026-08-21T23:20:26.9815253Z"
 
 [window]
 main_tab = "Scene"
 play_mode = "Standalone"
 inspector_tab = 0
 outliner_tab = 0
-file_browser_expanded = true
-file_browser_asset_expanded = true
-panel_width = 372
-browser_stretch = 0.5
-browser_asset_stretch = 0.5
-scene_tabs_stretch = 1
-asset_tabs_stretch = 1
+panel_width = 302
+browser_width = 244
 outliner_stretch = 0.410051554
 inspector_stretch = 0.589948416
 
@@ -21,49 +16,37 @@ active_asset = 0
 active_flow = 0
 
 [file_browser]
-current_dir = "{game}/Assets/Modes"
-dir_tab = 0
+current_dir = "{engine}/Textures/HDRI"
+dir_tab = 1
 search = ""
-show_source_files = true
+show_source_files = false
 show_file_extensions = false
 show_engine_content = true
-thumbnail_size = 80
+row_height = 22
 settings_open = true
-favorites_expanded = false
-sidebar_width = 220
-favorites = []
-expanded = ["{game}", "{game}/Scenes", "{game}/Scenes/cameras", "{game}/Assets", "{game}/Assets/Modes", "{game}/Assets/Dialoges", "{engine}", "{engine}/Meshes", "{engine}/Meshes/Character"]
-
-[file_browser_asset]
-current_dir = "{game}/Assets/Textures"
-dir_tab = 0
-search = ""
-show_source_files = true
-show_file_extensions = false
-show_engine_content = true
-thumbnail_size = 49.1999855
-settings_open = true
-favorites_expanded = false
-sidebar_width = 220
-favorites = []
-expanded = ["{game}", "{game}/Assets", "{game}/Assets/Textures", "{engine}"]
+expanded = ["{game}", "{game}/Assets", "{game}/Assets/Textures", "{game}/Assets/Modes", "{game}/Assets/Dialoges", "{game}/Scenes/actors", "{game}/Scenes/roots", "{game}/Scenes/cameras", "{game}/Scenes", "{engine}", "{engine}/Meshes", "{engine}/Meshes/Character", "{engine}/Textures", "{engine}/Textures/HDRI", "{engine}/Textures/UI"]
 
 [[open_scenes]]
 path = "{game}/Scenes/lvl_test.ImpScene"
-edit_mode = "Mode_3D"
+edit_mode = "Mode_2D"
 gizmo_mode = "Translate"
 gizmo_space = "Local"
 snap_translate = 0.25
 snap_translate_2d = 8
-cam3_position = [7.58117771, 4.7598443, 8.73280239]
-cam3_target = [-0.742940128, -4.05544138, -9.52133656]
+cam3_position = [-6.74940395, 3.93349957, 4.81212425]
+cam3_target = [2.15225315, 0.150784731, -1.26664019]
 cam3_fovy = 50
-cam2_position = [824.982361, 386.949615]
-cam2_zoom = 0.821515858
-selected = ["Character/C3_Mesh"]
-
-[[open_assets]]
-path = "{game}/Assets/Textures/po_F2_1.ImpAsset"
+cam2_position = [688.675354, 435.595001]
+cam2_zoom = 0.696199715
+selected = ["Panel"]
 
 [[open_flows]]
 path = "{game}/Assets/Dialoges/d_test.ImpFlow"
+
+[[folder_colors]]
+path = "{game}/Assets/Textures"
+color = "255,118,118,255"
+
+[[folder_colors]]
+path = "{game}/Scenes"
+color = "255,214,96,255"

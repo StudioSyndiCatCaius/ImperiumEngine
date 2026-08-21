@@ -55,8 +55,8 @@ public class C2_EnumOption : Imp2D
         {
             if (_list.children[i] is not C2_Button btn) continue;
             bool on = selected_enum != null && btn.name == selected_enum.ToString();
-            btn.style.style_unhovered = on ? UiStyle_Box.STYLE_BTN_PRESS : UiStyle_Box.STYLE_BTN_IDLE;
-            btn.style.style_hovered = on ? UiStyle_Box.STYLE_BTN_PRESS : UiStyle_Box.STYLE_BTN_HOVER;
+            btn.style.unhovered = on ? UI_Box.BtnPress : UI_Box.BtnIdle;
+            btn.style.hovered = on ? UI_Box.BtnPress : UI_Box.BtnHover;
         }
     }
 

@@ -65,6 +65,26 @@ public class Scene_Editor : ImpComp
         dropdown_width = 240,
     };
 
+    // splits the content row into the docked browser and everything else
+    public C2_List ui_body = new()
+    {
+        orentation = EUIOrentation.H,
+        is_scrollable = false,
+        layout = TLayout2.FULL
+    };
+
+    // One browser for the whole editor, docked left rather than repeated per tab, so every
+    // window is looking at the same folder.
+    public PNL_FileBrowser file_browser = new()
+    {
+        layout = new TLayout2
+        {
+            orient_V = EUIViewportAlignment.Fill,
+            size = new Vector2(280, 0),
+            size_min = new Vector2(180, 0),
+        },
+    };
+
     public C2_TabBox ui_main_tabs = new()
     {
         layout = new TLayout2
@@ -72,11 +92,11 @@ public class Scene_Editor : ImpComp
             orient_H = EUIViewportAlignment.Fill,
             orient_V = EUIViewportAlignment.Fill,
             size = new Vector2(0, 800),
-            size_min = new Vector2(0, 100),
+            size_min = new Vector2(300, 100),
         },
         tab_width = 200,
     };
-    
+
     //the Edit menu's own suboptions, kept so Undo/Redo can show what they would undo
     List<TMenuBarSubption> _edit_options;
 
@@ -218,9 +238,13 @@ public class Scene_Editor : ImpComp
         // FINALIZE & ASSEMBLY
         // ---------------------
         
+        ui_body.Child_Add(file_browser);
+        ui_body.Child_Add(new C2_Seperator { orentation = EUIOrentation.H });
+        ui_body.Child_Add(ui_main_tabs);
+
         ui_column.Child_Add(ui_menubar);
         ui_column.Child_Add(ui_main_buttons);
-        ui_column.Child_Add(ui_main_tabs);
+        ui_column.Child_Add(ui_body);
         ui_main.Child_Add(ui_column);
         Child_Add(ui_main);
 
@@ -331,11 +355,7 @@ public class Scene_Editor : ImpComp
 
     string Folder_ForCreate()
     {
-        if (ActiveWindow() is WND_Asset)
-        {
-            return mtab_asset.file_browser.CurrentDir;
-        }
-        return mtab_scene.file_browser.CurrentDir;
+        return file_browser.CurrentDir;
     }
     
     public void MOpt_Save()
@@ -406,11 +426,7 @@ public class Scene_Editor : ImpComp
             if (untitled.Count == 0) return;
             ImpAsset a = untitled[0];
             untitled.RemoveAt(0);
-            string folder = mtab_scene.file_browser.CurrentDir;
-            if (ActiveWindow() is WND_Asset)
-            {
-                folder = mtab_asset.file_browser.CurrentDir;
-            }
+            string folder = file_browser.CurrentDir;
             DLG_SaveFile.Run(a, path =>
             {
                 a.File_SaveTo(path);

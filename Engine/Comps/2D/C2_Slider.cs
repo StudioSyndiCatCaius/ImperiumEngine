@@ -161,7 +161,7 @@ public class C2_Slider : Imp2D
         if (dim.size.X <= 0 || dim.size.Y <= 0) return;
 
         style ??= UI_Slider.DEFAULT;
-        style.style_background?.Draw(dim);
+        style.background?.Draw(dim);
 
         if (!is_spinner && HasRange)
         {
@@ -173,7 +173,7 @@ public class C2_Slider : Imp2D
                 fill.position.Y = dim.position.Y + dim.size.Y - fill.size.Y;
             }
             else fill.size.X = dim.size.X * t;
-            style.style_fill?.Draw(fill);
+            style.fill?.Draw(fill);
         }
 
         if (accent_color.A > 0)
@@ -214,9 +214,9 @@ public class UI_Slider : ImpAsset
     // Class
     // =====================================================================================================
     [ImpVar] public TImage slider_image;
-    [ImpVar] public UiStyle_Box style_background = UiStyle_Box.STYLE_BKG_MID;
-    [ImpVar] public UiStyle_Box style_fill = UiStyle_Box.STYLE_BTN_HOVER;
-    [ImpVar] public UiStyle_Box style_slider_pressed = UiStyle_Box.STYLE_BTN_PRESS;
+    [ImpVar] public UI_Box background = UI_Box.BkgMid;
+    [ImpVar] public UI_Box fill = UI_Box.BtnHover;
+    [ImpVar] public UI_Box sliderPressed = UI_Box.BtnPress;
     [ImpVar] public UI_Text Text = UI_Text.LIGHT;
     
     // =====================================================================================================

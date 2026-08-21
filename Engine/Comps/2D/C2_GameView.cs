@@ -37,7 +37,7 @@ public class C2_GameView : C2_Box
         clip_children = false;
         is_visible = true;
         cursor_filter = ECursorFilter.Hit;
-        style = UiStyle_Box.STYLE_BKG_DARK;
+        style = UI_Box.BkgDark;
         Child_Add(viewport3D);
         Child_Add(viewport2D);
     }

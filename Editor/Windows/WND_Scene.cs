@@ -88,20 +88,10 @@ public class WND_Scene : EdWindow
 
     ImpScene _bound_scene;
     ImpComp _selected_comp;
-    public PNL_FileBrowser file_browser=new()
-    {
-        layout = new TLayout2
-        {
-            orient_H = EUIViewportAlignment.Fill,
-            orient_V = EUIViewportAlignment.Fill,
-            size_min = new(0, 200),
-        },
-    };
 
     public static WND_Scene active;
 
     C2_List list_panels;
-    C2_Expandable file_browser_wrap;
 
     public WND_Scene()
     {
@@ -110,16 +100,6 @@ public class WND_Scene : EdWindow
         layout.orient_H = EUIViewportAlignment.Fill;
         layout.orient_V = EUIViewportAlignment.Fill;
 
-        C2_List list_scene_file = new()
-        {
-            layout = new TLayout2
-            {
-                orient_H = EUIViewportAlignment.Fill,
-                orient_V = EUIViewportAlignment.Fill,
-            },
-            orentation = EUIOrentation.V,
-        };
-        
         C2_List list_main=new()
         {
             layout = new TLayout2
@@ -172,26 +152,7 @@ public class WND_Scene : EdWindow
         tab_inspectors.Child_Add(inspector_scene);
         tab_inspectors.selected_tab = 1;
         
-        file_browser_wrap = new()
-        {
-            name = "File Browser",
-            is_expanded = true,
-            bar_height = 22,
-            layout = new TLayout2
-            {
-                orient_H = EUIViewportAlignment.Fill,
-                orient_V = EUIViewportAlignment.Fill,
-                size_min = new(0, 22),
-            },
-            stretch_ratio = 0.5f,
-        };
-        file_browser_wrap.Child_Add(file_browser);
-
-        list_scene_file.Child_Add(tab_scenes);
-        list_scene_file.Child_Add(new C2_Seperator { orentation = EUIOrentation.V });
-        list_scene_file.Child_Add(file_browser_wrap);
-        
-        list_main.Child_Add(list_scene_file);
+        list_main.Child_Add(tab_scenes);
         list_main.Child_Add(new C2_Seperator { orentation = EUIOrentation.H });
         list_main.Child_Add(list_panels);
 
@@ -270,9 +231,12 @@ public class WND_Scene : EdWindow
         // are the game's keys — otherwise a game bound to Delete destroys real comps mid-play.
         if (!ImpPlayer.TargetGame_IsHost()) return;
         if (player.target_focus is C2_TextEdit te && te.is_focused) return;
+        // The browser docks outside this window now, but it still owns Delete/Ctrl+D whenever it
+        // holds the focus - otherwise deleting a file also deletes the selected comp.
+        PNL_FileBrowser browser = Scene_Editor.active?.file_browser;
         for (ImpComp n = player.target_focus; n != null; n = n.parent)
         {
-            if (n == file_browser)
+            if (n == browser)
             {
                 return;
             }
@@ -511,16 +475,10 @@ public class WND_Scene : EdWindow
         }
         data.inspector_tab = tab_inspectors.selected_tab;
         data.outliner_tab = tab_outliners.selected_tab;
-        data.file_browser_expanded = file_browser_wrap == null || file_browser_wrap.is_expanded;
         if (list_panels != null)
         {
             data.panel_width = list_panels.layout.size.X;
         }
-        if (file_browser_wrap != null)
-        {
-            data.browser_stretch = file_browser_wrap.stretch_ratio;
-        }
-        data.scene_tabs_stretch = tab_scenes.stretch_ratio;
         data.outliner_stretch = tab_outliners.stretch_ratio;
         data.inspector_stretch = tab_inspectors.stretch_ratio;
         data.active_scene = 0;
@@ -582,18 +540,6 @@ public class WND_Scene : EdWindow
         if (data.panel_width >= 180 && list_panels != null)
         {
             list_panels.layout.size = new Vector2(data.panel_width, list_panels.layout.size.Y);
-        }
-        if (file_browser_wrap != null)
-        {
-            file_browser_wrap.is_expanded = data.file_browser_expanded;
-            if (EdState.Stretch_IsWeight(data.browser_stretch))
-            {
-                file_browser_wrap.stretch_ratio = data.browser_stretch;
-            }
-        }
-        if (EdState.Stretch_IsWeight(data.scene_tabs_stretch))
-        {
-            tab_scenes.stretch_ratio = data.scene_tabs_stretch;
         }
         if (data.outliner_stretch > 0)
         {
@@ -917,7 +863,7 @@ public class WND_Scene : EdWindow
         ImpScene scene = ActiveEdScene()?.scene;
         if (scene == null) return;
 
-        string folder = file_browser.CurrentDir;
+        string folder = Scene_Editor.active?.file_browser.CurrentDir;
         DLG_SaveFile.Run(scene, path =>
         {
             scene.File_SaveTo(path);

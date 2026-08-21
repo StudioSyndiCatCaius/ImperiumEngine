@@ -35,7 +35,7 @@ public class Dialog_Confirm : ImpDialog
 
     public Dialog_Confirm()
     {
-        box.style = new UiStyle_Box { tint = new Color(42, 42, 42, 255) };
+        box.style = new UI_Box { tint = new Color(42, 42, 42, 255) };
         box.cursor_filter = ECursorFilter.Hit;
         box.layout = new TLayout2
         {

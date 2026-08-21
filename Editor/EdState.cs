@@ -120,8 +120,18 @@ public static class EdState
         editor.mtab_scene.State_Capture(data);
         editor.mtab_asset.State_Capture(data);
         editor.mtab_flow.State_Capture(data);
-        editor.mtab_scene.file_browser.State_Capture(data.browser);
-        editor.mtab_asset.file_browser.State_Capture(data.browser_asset);
+        editor.file_browser.State_Capture(data.browser);
+        data.browser_width = editor.file_browser.layout.size.X;
+
+        List<(string path, Raylib_cs.Color color)> colors = EdFolderColors.Capture();
+        for (int i = 0; i < colors.Count; i++)
+        {
+            data.folder_colors.Add(new TFolderColor
+            {
+                path = Path_Store(colors[i].path),
+                color = EdFolderColors.Color_Store(colors[i].color),
+            });
+        }
         return data;
     }
 
@@ -134,8 +144,23 @@ public static class EdState
         editor.mtab_scene.State_Apply(data);
         editor.mtab_asset.State_Apply(data);
         editor.mtab_flow.State_Apply(data);
-        editor.mtab_scene.file_browser.State_Apply(data.browser);
-        editor.mtab_asset.file_browser.State_Apply(data.browser_asset);
+
+        // Ahead of the browsers, so their first build already draws the folder colours.
+        List<(string, Raylib_cs.Color)> colors = new();
+        for (int i = 0; i < data.folder_colors.Count; i++)
+        {
+            string p = Path_Load(data.folder_colors[i].path);
+            Raylib_cs.Color c = EdFolderColors.Color_Load(data.folder_colors[i].color);
+            if (!string.IsNullOrEmpty(p) && c.A > 0) colors.Add((p, c));
+        }
+        EdFolderColors.Apply(colors);
+
+        if (data.browser_width >= 180)
+        {
+            editor.file_browser.layout.size = new System.Numerics.Vector2(
+                data.browser_width, editor.file_browser.layout.size.Y);
+        }
+        editor.file_browser.State_Apply(data.browser);
         SelectWindow(editor.ui_main_tabs, data.main_tab);
 
         EPlayMode mode = EPlayMode.PlayInEditor;
@@ -206,13 +231,8 @@ public static class EdState
             data.play_mode = window.GetString("play_mode", "PlayInEditor");
             data.inspector_tab = window.GetInt("inspector_tab", 1);
             data.outliner_tab = window.GetInt("outliner_tab");
-            data.file_browser_expanded = window.GetBool("file_browser_expanded", true);
-            data.file_browser_asset_expanded = window.GetBool("file_browser_asset_expanded", true);
             data.panel_width = window.GetFloat("panel_width", 300);
-            data.browser_stretch = window.GetFloat("browser_stretch", 0.5f);
-            data.browser_asset_stretch = window.GetFloat("browser_asset_stretch", 0.5f);
-            data.scene_tabs_stretch = window.GetFloat("scene_tabs_stretch", 1f);
-            data.asset_tabs_stretch = window.GetFloat("asset_tabs_stretch", 1f);
+            data.browser_width = window.GetFloat("browser_width", 280);
             data.outliner_stretch = window.GetFloat("outliner_stretch", 1f);
             data.inspector_stretch = window.GetFloat("inspector_stretch", 1.2f);
         }
@@ -265,15 +285,21 @@ public static class EdState
             }
         }
 
+        List<TomlTable> colors = root.GetArray("folder_colors");
+        for (int i = 0; i < colors.Count; i++)
+        {
+            string p = colors[i].GetString("path");
+            string c = colors[i].GetString("color");
+            if (!string.IsNullOrEmpty(p) && !string.IsNullOrEmpty(c))
+            {
+                data.folder_colors.Add(new TFolderColor { path = p, color = c });
+            }
+        }
+
         TomlTable browser = root.GetTable("file_browser");
         if (browser != null)
         {
             data.browser.FromTable(browser);
-        }
-        TomlTable browser_asset = root.GetTable("file_browser_asset");
-        if (browser_asset != null)
-        {
-            data.browser_asset.FromTable(browser_asset);
         }
         return data;
     }
@@ -288,13 +314,8 @@ public static class EdState
         window.Set("play_mode", data.play_mode ?? "PlayInEditor");
         window.Set("inspector_tab", data.inspector_tab);
         window.Set("outliner_tab", data.outliner_tab);
-        window.Set("file_browser_expanded", data.file_browser_expanded);
-        window.Set("file_browser_asset_expanded", data.file_browser_asset_expanded);
         window.Set("panel_width", data.panel_width);
-        window.Set("browser_stretch", data.browser_stretch);
-        window.Set("browser_asset_stretch", data.browser_asset_stretch);
-        window.Set("scene_tabs_stretch", data.scene_tabs_stretch);
-        window.Set("asset_tabs_stretch", data.asset_tabs_stretch);
+        window.Set("browser_width", data.browser_width);
         window.Set("outliner_stretch", data.outliner_stretch);
         window.Set("inspector_stretch", data.inspector_stretch);
 
@@ -333,8 +354,15 @@ public static class EdState
             t.Set("path", data.flows[i] ?? "");
         }
 
+        for (int i = 0; i < data.folder_colors.Count; i++)
+        {
+            TFolderColor c = data.folder_colors[i];
+            TomlTable t = doc.root.AddArrayTable("folder_colors");
+            t.Set("path", c.path ?? "");
+            t.Set("color", c.color ?? "");
+        }
+
         data.browser.ToTable(doc.root.EnsureTable("file_browser"));
-        data.browser_asset.ToTable(doc.root.EnsureTable("file_browser_asset"));
         return doc;
     }
 
@@ -439,13 +467,8 @@ public class EdStateData
     public string play_mode = "PlayInEditor";
     public int inspector_tab = 1;
     public int outliner_tab;
-    public bool file_browser_expanded = true;
-    public bool file_browser_asset_expanded = true;
     public float panel_width = 300;
-    public float browser_stretch = 0.5f;
-    public float browser_asset_stretch = 0.5f;
-    public float scene_tabs_stretch = 1f;
-    public float asset_tabs_stretch = 1f;
+    public float browser_width = 280;
     public float outliner_stretch = 1f;
     public float inspector_stretch = 1.2f;
     public int active_scene;
@@ -454,8 +477,15 @@ public class EdStateData
     public List<EdStateScene> scenes = new();
     public List<string> assets = new();
     public List<string> flows = new();
+    public List<TFolderColor> folder_colors = new();
     public EdStateBrowser browser = new();
-    public EdStateBrowser browser_asset = new();
+}
+
+/// <summary>One coloured content folder, as it is written to disk: a stored path and "r,g,b,a".</summary>
+public struct TFolderColor
+{
+    public string path;
+    public string color;
 }
 
 public class EdStateScene
@@ -482,11 +512,8 @@ public class EdStateBrowser
     public bool show_source_files = true;
     public bool show_file_extensions;
     public bool show_engine_content = true;
-    public float thumbnail_size = 80;
+    public float row_height = 22;
     public bool settings_open;
-    public bool favorites_expanded;
-    public float sidebar_width = 220;
-    public List<string> favorites = new();
     public List<string> expanded = new();
 
     public void FromTable(TomlTable t)
@@ -501,16 +528,8 @@ public class EdStateBrowser
         show_source_files = t.GetBool("show_source_files", true);
         show_file_extensions = t.GetBool("show_file_extensions");
         show_engine_content = t.GetBool("show_engine_content", true);
-        thumbnail_size = t.GetFloat("thumbnail_size", 80);
+        row_height = t.GetFloat("row_height", 22);
         settings_open = t.GetBool("settings_open");
-        favorites_expanded = t.GetBool("favorites_expanded");
-        sidebar_width = t.GetFloat("sidebar_width", 220);
-        favorites.Clear();
-        string[] favs = t.GetStrings("favorites", Array.Empty<string>());
-        for (int i = 0; i < favs.Length; i++)
-        {
-            favorites.Add(favs[i]);
-        }
         expanded.Clear();
         string[] exp = t.GetStrings("expanded", Array.Empty<string>());
         for (int i = 0; i < exp.Length; i++)
@@ -531,11 +550,8 @@ public class EdStateBrowser
         t.Set("show_source_files", show_source_files);
         t.Set("show_file_extensions", show_file_extensions);
         t.Set("show_engine_content", show_engine_content);
-        t.Set("thumbnail_size", thumbnail_size);
+        t.Set("row_height", row_height);
         t.Set("settings_open", settings_open);
-        t.Set("favorites_expanded", favorites_expanded);
-        t.Set("sidebar_width", sidebar_width);
-        t.Set("favorites", favorites.ToArray());
         t.Set("expanded", expanded.ToArray());
     }
 }

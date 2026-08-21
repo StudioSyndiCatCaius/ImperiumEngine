@@ -65,8 +65,8 @@ public abstract class C1_GameSystem : ImpComp
     // CLASS
     // ################################################################################################################
     
-    [ImpVar] [Category("Tags")] private TTagSet system_tags;
+    [ImpVar] [Category("Tags")] public TTagSet system_tags = new();
     //Systems that will be shutdown and blocked from starting while this one is active
-    [ImpVar] [Category("Tags")] private TTagSet blocked_systems;
+    [ImpVar] [Category("Tags")] public TTagSet blocked_systems = new();
     
 }

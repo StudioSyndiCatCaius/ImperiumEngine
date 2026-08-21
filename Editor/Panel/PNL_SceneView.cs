@@ -575,12 +575,7 @@ public class PNL_SceneView : C2_Box
             }
             if (_drop_asset != null)
             {
-                ImpComp dest = Drop_Pick(player);
-                if (dest == null)
-                {
-                    dest = scene?.root;
-                }
-                ImpComp spawned = _drop_asset.SceneDrop_DropOnComp(dest, player);
+                ImpComp spawned = _drop_asset.SceneDrop_DropOnComp(scene?.root, player);
                 if (spawned != null)
                 {
                     gizmo_data.Selection_Set(new[] { spawned });
@@ -1186,20 +1181,13 @@ public class PNL_SceneView : C2_Box
         {
             return null;
         }
-        ImpComp dest = Drop_Pick(player);
-        if (dest != null && (dest.IsPackedForeign || dest.IsOwned))
-        {
-            dest = ImpComp.OutlinerHost(dest);
-        }
-        if (dest != null && dest.IsInstanceRoot)
-        {
-            dest = dest.parent;
-        }
+        ImpComp dest = scene?.root;
         if (dest == null || dest == _drop_type_ghost || _drop_type_ghost.IsAncestorOf(dest))
         {
-            dest = scene?.root;
+            TypeDrop_Clear();
+            return null;
         }
-        if (dest == null)
+        if (dest.IsPackedForeign || dest.IsInstanceRoot)
         {
             TypeDrop_Clear();
             return null;

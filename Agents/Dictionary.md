@@ -28,7 +28,7 @@ Per-`ImpGame` Jolt world. `Foundation` + `JobSystemThreadPool` are process-wide 
 `cached_global_transform` + `cached_bounds` are filled parent-first each Update (before `OnUpdate`, then again after so children see mutations) and again at the start of 3D Draw. `Cache_Invalidate` bumps a phase epoch (same places as `Imp2D.Layout_Invalidate`). `Cache_Refresh` is a no-op if this node is already stamped this epoch.
 
 - `Transform_Get(true)` uses `parent.cached_global_transform` + live local (O(1), not a parent walk). Local `Transform_Get(false)` is still the `transform` field.
-- `Bounds_Get()` returns `cached_bounds`. Default `Bounds_Calc()` is the world AABB of visible Imp3D children's bounds. `C3_Mesh` / `C3_Camera` / `C3_Collider` override with their own volume (mesh AABB, boom mesh, collision shape). Empty leaf → `TBounds3.ZERO` (not pickable).
+- `Bounds_Get()` returns `cached_bounds`. Default `Bounds_Calc()` is the world AABB of visible Imp3D children's bounds. `C3_Mesh` / `C3_Camera` / `C3_Collider` override with their own volume (mesh AABB, boom mesh, collision shape). Empty leaf → `TBounds3.ZERO` (not pickable). `TBounds3.Merge` does the same union (skip empty; one box kept as-is; several → world AABB, rotation 0).
 - Editor click (`PNL_SceneView.PickAt` → `Imp3D.Select`) traces those bounds, then `OutlinerHost` so packed-foreign / owned kids are not viewport-selectable (instance root / C# host instead). Inspector Components tree is how you inspect those. A parent whose volume is only a child union is skipped when a descendant also hits, so clicking a user-added mesh in a group selects the mesh; clicking the gap around children selects the group. Marquee / gizmo outline / F-focus use `TBounds3.Corners`. `Comp3D_LocalBounds` / `Comp3D_WorldCorners` / `Pick_Comp3D` / `Pickable` are gone.
 - `Cache_Refresh(force)` after `OnUpdate` dirties children only when this node's world transform actually moved, then `Bounds_Calc` rebuilds the union.
 - Setters dirty the subtree then refresh this node. Read the cached fields after `Cache_Refresh`, or just call `Transform_Get` / `Bounds_Get`.
@@ -43,10 +43,26 @@ Runtime (not ImpVar): `velocity`, `is_grounded`.
 - `Phys_Launch(axis, scale, force_h, force_v)` — impulse; force flags replace that plane.
 - `Update_Physics` — gravity / zero downward when grounded.
 - `Update_Movement` — accel/decel toward wish * `A_MoveMode.speed`, air control + friction, then `rotate_with_movement` (UE Orient Rotation to Movement): face horizontal velocity, up = `-gravity`. `velocity_rotation_rate` is deg/s per euler axis (0 locks that axis). Default yaw 360. `CharacterVirtual` drives position only — facing stays on the Imp3D.
-- `C3_Character` consumes `_Move` (WASD, camera/self yaw, X=forward Z=right remapped to local `(Z, Y, -X)`) and `_Jump` (`Phys_Launch` up, `jump_speed` on `A_MoveMode`). Claims player 0 on `OnBegin`.
+- `C3_Character` is the default pawn body (capsule, mesh, skeleton, creature). It does **not** consume input. `_Move` / `_Jump` / `_Rotate` live on `C3_Camera`, which calls `ImpPlayer.pawn`.
 - Visual child meshes of a character must keep `physics_enabled = false` or they double-collide. `C3_Character.mesh` is a child `C3_Mesh` defaulting to `A_Mesh.SK_MANNEQUIN` (`Import` of `{engine}/Meshes/Character/Mannequin/sk_c_mannequin.glb`).
 
 `A_MoveMode` defaults: speed 5, accel/decel 20, jump 6, `rotate_with_movement` on, `velocity_rotation_rate` (0, 360, 0) deg/s. Gravity is `gravity_dir * 9.81 * gravity_scale` (curve unused). `PRESET_PAWN` / `ECollisionChannel.World` + `Pawn` added; body vs body still uses the two Jolt layers only.
+
+### C3_Camera / A_CameraConfig
+
+All lens / look / input flags live on `A_CameraConfig` (`Engine/Assets/A_CameraConfig.cs`, ext `ImpCameraConfig`). The comp holds `config` (inline unique by default) and `look_target`. Eye = pivot minus local forward (`-Z`) × `boom_distance`. `Camera_GetData` uses config fov / `ECameraViewMode` (ortho fovy = vertical world size).
+
+Runtime: if this is `ImpApp.view_target`, apply `starting_rotation` once. `look_target` aims the pivot at that node (yaw/pitch from Δ, converted to local if parented). Camera does **not** claim `input_owner` itself — the game mode / possess path assigns it. `_Rotate` (mouse + right stick) yaws/pitches `_aim` when no look target; `look_lerp` slerps toward it. Stick axes (|axis| ≤ 2) are analog (`180 * dt`). Pitch clamped ±89.9°. `enable_move`: `_Move` → `player.pawn.Phys_MoveByRot` (yaw only, remap `(Z, Y, -X)`); `_Jump` → `player.pawn.Phys_Launch` if grounded. Null pawn is a no-op.
+
+Builtins (filepath `builtin:A_CameraConfig.CAM_*`):
+
+| Preset | Lens | Boom | Start rot | Input |
+|---|---|---|---|---|
+| `CAM_THIRDPERSON` | persp 70 | 4 m | pitch -15 | move + look HV |
+| `CAM_FIRSTPERSON` | persp 90 | 0 | 0 | move + look HV |
+| `CAM_TOPDOWN` | ortho 18 m | 20 m | pitch -90 | move only |
+
+Do not assign a builtin as the default `config` field — share-mutates the preset. Pick it in the asset slot, or leave the inline unique.
 
 
 ## ImpComp (`Engine/ImpComp.cs`)
@@ -86,7 +102,7 @@ Scene-graph node. `Imp2D` / `Imp3D` inherit.
 - Owned children stay in the live `children` list (draw / update / physics) but **do not appear in the outliner**. `Detach` / `Reparent` refuse them. `Clone` overlays onto the copy’s ctor instances instead of adding a second set. JSON writes them under `owned` (field name) and merges back on load so editor reload does not double them. Private owned slots stay hidden in the inspector tree too.
 
 **Inspector Components tree**
-- Unreal-style: outliner picks the host (`OutlinerHost` walks past owned / packed-foreign). Inspector top `Components` tree lists the host + **public** owned slots + packed-foreign kids (and extras under those hidden nodes).
+- Unreal-style: outliner picks the host (`OutlinerHost` walks past owned / packed-foreign). Inspector pins a **Components** pane above the vars list (own scroll + splitter, not a category in the property scroller). It lists the host + **public** owned slots + packed-foreign kids (and extras under those hidden nodes). Hidden when the host has no owned/instance kids.
 - Click a row to inspect that comp’s ImpVars; gizmo follows; outliner stays on the host. Prefab instance children are the same path (hidden from outliner, yellow in the inspector tree). User-added siblings of the host still live in the outliner. Scene-view click / marquee never select packed-foreign or owned children — they promote to `OutlinerHost` (instance root, or the C# class that declared the field). Inspector Components is the only way to pick those kids.
 
 **Do not confuse with** `Imp2D._scene_root` — static per-frame flag for “this subtree is scene canvas content” (layout/pivot/rotation). That is **not** `ImpComp.scene`.
@@ -147,7 +163,7 @@ Ctor always creates a bound default root. Replacing root is how the editor boots
 
 `root` is **not** ImpVar. File_JSON special-cases ImpScene: `vars.root` is `{ _class, name, vars, children }` via `Comp_ToJson` / `Comp_FromJson`. Comp vars are ImpVar fields (skips `name` — stored at the node). Comp class from `ImpComp.Type_FromName`. ImpComp-typed ImpVar fields (object refs like `look_target`, or `ImpScene.starting_camera`) serialize as `{ "comp_path": "Name#occurrence/Name#occurrence/…" }` — a name+occurrence chain from the tree root, resolved back to the same node on load (deferred until the whole tree exists, so forward references across branches work). Root-relative, so a ref pointing outside the tree being written silently becomes `null`.
 
-**SceneDrop** — `Instantiate()` of this asset (packed instance, not a flattened copy). Ghost on `view.overlay`. Drop parents the instance root under a host-owned dest (`scene.root` if empty). Will not parent inside an instance capsule. Undo via `ImpUndo.Comp_Moved`. Selection after drop is `PNL_SceneView`.
+**SceneDrop** — `Instantiate()` of this asset (packed instance, not a flattened copy). Ghost on `view.overlay`. Viewport drop parents the instance under `scene.root` (not the mesh under the cursor — Ground would always win). Outliner drop of a `Type` still parents under that row. Undo via `ImpUndo.Comp_Moved`. Selection after drop is `PNL_SceneView`.
 
 Test asset: `Projects/Test/Content/Scenes/boxes_3.ImpScene` — root `Boxes3` (`ImpComp3D` group pivot) + `Box_A/B/C` (`C3_Mesh` / `GEO_CUBE`) at x = -2, 0, 2.
 
@@ -161,6 +177,19 @@ JSON-backed asset. Cache keyed by resolved full path. Builtins are `builtin:Type
 - `File_IsValid` — path exists on disk (or builtin). `File_CanWrite` — real disk path, not builtin / not untitled.
 - `File_Write` writes in place and binds `_loaded`. `File_SaveTo(path)` rekeys the cache then writes (Save As).
 - `SaveAllDirty` writes cached dirty assets that already `File_CanWrite`. Untitled ones need `DLG_SaveFile`.
+
+## TTag / TTagSet (`Engine/Structs/ST_Tags.cs`)
+
+UE GameplayTag / GameplayTagContainer. Hierarchical dotted names (`Weapon.Rifle.Assault`). Case-insensitive. `TTag.None` is empty.
+
+- `Matches` — this is parent-or-equal of the other (`Weapon.Rifle` matches `Weapon.Rifle.Assault`).
+- `TTagSet.HasTag` — hierarchical; `HasTagExact` is the set membership check.
+- JSON: `TTag` is a string, `TTagSet` is a sorted string array. Dict keys with a string ctor (`Dictionary<TTag,…>`) round-trip.
+- Inspector: `TTag` is a `C2_Picker` → `Dialog_TagPicker` (single). `TTagSet` is `C2_TagSetEdit` (Add/Clear + remove rows) → picker in multi-select.
+
+**`ImpTags`** — process tag table. `{game}/Config/Tags.TOML` (`tags = ["…"]`). Any constructed `TTag` is merged in-memory so loaded assets show up. Picker **Add** / create-row persists. `ImpConfig.LoadAll` calls `EnsureLoaded`.
+
+**`Dialog_TagPicker`** — tree of registered tags (parents are selectable). Search, None (single), checkboxes (multi), new-tag field, create-row when the query is a valid unused name. Confirm clones the set so undo does not share the live HashSet.
 
 ## Flow Graph (`C1_FlowPlayer` / `A_Flow` / `ImpFlowNode`)
 
@@ -255,11 +284,11 @@ Supported TOML values: bool / string / numbers / enum (name) / `Vector2-4` / `Co
 |---|---|
 | `SceneDrop_Enter/Exit/Update(view, …)` | Cursor enters / leaves / hovers the scene view while this asset is the grab payload. |
 | `SceneDrop_CompEnter/Exit(comp, …)` | Hovered **scene-content** comp changes (picked via viewport `Trace_*`, not the 2D widget). |
-| `SceneDrop_DropOnComp(comp, …)` | Release. Returns the spawned comp. `comp` is the picked scene node, or `scene.root` if empty. |
+| `SceneDrop_DropOnComp(comp, …)` | Release. Returns the spawned comp. Viewport drops parent under `scene.root`. |
 
 Default impls are empty. `ImpScene` instances the hierarchy. `A_Mesh` spawns a `C3_Mesh` on a 3D viewport. File-browser payload is a **path string** → `ImpAsset.Load`.
 
-`A_Mesh.GEO_CUBE` / `GEO_PLANE` set `filepath` to `builtin:A_Mesh.GEO_*` so they survive JSON.
+`A_Mesh.GEO_CUBE` / `GEO_PLANE` set `filepath` to `builtin:A_Mesh.GEO_*` so they survive JSON. `A_CameraConfig.CAM_THIRDPERSON` / `CAM_FIRSTPERSON` / `CAM_TOPDOWN` same (`builtin:A_CameraConfig.CAM_*`).
 
 ## File_JSON (`Engine/Files/File_JSON.cs`)
 
@@ -277,7 +306,7 @@ Editor outliner panel. Search bar + `C2_Tree`. Binds `scene` (or `root_comp` if 
 
 ## PNL_CommonComps (`Editor/Panel/PNL_CommonComps.cs`)
 
-"Comps" tab next to the Outliner (`WND_Scene.tab_outliners`). Inner 3D / 2D tabs are `EdCommonCompsCategory` lists (`root_type` = `Imp3D` / `Imp2D`). Each category collects concrete, non-hidden descendants with `[ImpClass(Common = true)]` (`C2_Tree.Class_IsCommon` — not inherited). Tiles (`EdCommonCompTile`) grab with payload `Type`. Drop on `PNL_SceneView` spawns a ghost at the cursor (switches 2D/3D mode to match) then parents under the pick / scene root. Drop on the outliner parents under that row. Double-click adds under the current selection (or root).
+"Comps" tab next to the Outliner (`WND_Scene.tab_outliners`). Inner 3D / 2D tabs are `EdCommonCompsCategory` lists (`root_type` = `Imp3D` / `Imp2D`). Each category collects concrete, non-hidden descendants with `[ImpClass(Common = true)]` (`C2_Tree.Class_IsCommon` — not inherited). Tiles (`EdCommonCompTile`) grab with payload `Type`. Drop on `PNL_SceneView` spawns a ghost at the cursor (switches 2D/3D mode to match) then parents under `scene.root`. Drop on the outliner parents under that row. Double-click adds under the scene root.
 
 ## ImpClass
 
@@ -504,7 +533,7 @@ Dumb display widgets. Each takes `view_scene` and/or `root` (root wins) plus opt
 - 2D: canvas fill + `SceneLayout_Set` / `SceneDraw_*` of 2D comps. `clear_background` / `draw_canvas` (default true) — Game view turns both off so 2D HUD composites over the 3D blit.
 - `draw_flags`: forwarded into `src.Draw` / `overlay.Draw`. Scene view sets `Editor`; Game view leaves `None` so play does not draw editor helpers.
 
-**3D debug draw** (`Imp3D.Draw3D_*`) must go through R3D (`DrawMeshEx`), not Raylib `DrawLine3D` / `BeginMode3D`. Viewport 3D is `R3D.BeginPro` → scene `Draw` → `R3D.End`; Raylib immediate 3D is discarded. `Draw3D_Line` is an unlit cylinder (`thickness` = world diameter). `C3_Camera` boom line + util mesh draw only with `EDrawFlags.Editor`; frustum (and orange boom) only with `Selected`. Zero-length lines (e.g. `boom_distance == 0`) are skipped.
+**3D debug draw** (`Imp3D.Draw3D_*`) must go through R3D (`DrawMeshEx`), not Raylib `DrawLine3D` / `BeginMode3D`. Viewport 3D is `R3D.BeginPro` → scene `Draw` → `R3D.End`; Raylib immediate 3D is discarded. All `Draw3D_*` primitives are **wireframe** (lines = unlit cylinders, `thickness` = world diameter) and return the drawn `TBounds3` (OBB; `ZERO` if skipped). `Draw3D_Box` = 12 edges (bounds = full size, centered). `Draw3D_Sphere` = 3 great circles. `Draw3D_Capsule` = equator rings + 4 sides + hemisphere meridians (`height` = total). `Draw3D_Arrow` = shaft + wire cone along local forward (-Z). Sphere/capsule line thickness is derived from radius. `Draw3D_Mesh` returns `A_Mesh.Bounds_Get`. `A == 0` color → white. `C3_Camera` boom line + util mesh draw only with `EDrawFlags.Editor`; frustum (and orange boom) only with `Selected`. Frustum uses config fov / view mode. Zero-length lines (e.g. `boom_distance == 0`) are skipped.
 
 No gizmos, selection, or camera-drag on the viewports.
 
@@ -549,7 +578,7 @@ Inspects `[ImpVar]` fields/properties on the selected object(s). Categories are 
 - `filter_property` (`Func<MemberInfo, bool>`) — if set, a top-level member is listed only when this returns true. Nested group / `Rows_ForObject` rebuilds pass `apply_filter: false` so a Config filter does not hide `TRef.path` etc.
 - `include_static` — also collect public static `[ImpVar]`s (`Members_GetStatic`). Off by default so instance inspectors stay instance-only.
 - Target may be a `Type` (`InspectType`): inspect that type's members instead of `System.Type`. `TPropertyBind.Member` binds statics via `GetValue(null)` / `SetValue(null, …)` and pulls revert defaults from `ImpConfig.Default_TryGet`.
-- Comp inspector: top **Components** tree (`Tree_Populate_Components`) for public owned slots + packed-foreign kids. `on_component_click` retargets vars / gizmo. Host is `ImpComp.OutlinerHost`. No reorder.
+- Comp inspector: pinned **Components** pane above the vars (`C2_Expandable` + `C2_Tree` + `C2_Seperator`). Independent scroll and splitter; stays visible while vars scroll. `Tree_Populate_Components` only when the outliner host changes — clicking a row is `Tree_SelectData` + property rebuild so the pane scroll does not jump to the top. `on_component_click` retargets vars / gizmo. Host is `ImpComp.OutlinerHost`. No reorder. Hidden when the host has no owned/instance kids. Scene / asset / config inspectors never show it.
 - `[ImpVar]` fields whose type is `ImpComp` (or a subclass — `C3_Camera.look_target`, `C1_Creature.creature_root`, …) use `C2_Picker`. Click opens `Dialog_CompPicker` on the inspected comp’s `scene` (the edited level, not editor chrome). Accepted types only; instance natives / packed-foreign rows are yellow (`C2_Tree.COLOR_INSTANCE`). Clear × sets null. These ImpVars are **object refs**, not owned natives — `OwnedFields` skips `[ImpVar]` ImpComp slots. Round-trips through save/reload via `File_JSON`'s `comp_path` scheme (see File_JSON section) — same mechanism whether the field lives on a comp in the tree or on the `ImpScene` asset itself.
 
 ## C2_TabBox (`Engine/Comps/2D/C2_TabBox.cs`)
@@ -566,6 +595,15 @@ Pages are every Imp2D child except `list_tabs`. `selected_tab` is the page index
 Live browsers register in `_browsers`. Any disk change (`Path_Delete` / `Path_Duplicate` / `Path_Rename` / `Path_MoveInto` / new folder/scene / import / save) calls `PNL_FileBrowser.Browsers_Notify(from, to)`. Every instance remaps its current dir and favorites (follow a move, walk up a delete), then `RefreshAll`. A second browser sitting in the same folder updates without a manual Refresh. Grid rebuild keeps the selection if that path still exists.
 
 `CursorGrab_Payload` from `EdFileThumbnail` / tree rows is a **filesystem path string**. Hover/drop go to `target_cursor` (the 2D widget, `PNL_SceneView` in the editor). Scene-content comps are **not** cursor targets — the panel picks them via viewport `Trace_*`.
+
+## C2_Tree / EdFileTree (`Engine/Comps/2D/C2_Tree.cs`, `Editor/Panel/PNL_FileBrowser.cs`)
+
+File browser is a folder+file tree (`EdFileTree : C2_Tree`), not a thumbnail grid.
+
+- **Do not rebuild rows on select.** Selection is draw-time (`IsSelected`). `Tree_SelectData` / `RightClickNode` only stamp `_selected_node`. Rebuilding from a click (cursor phase, after Update) stacked every row at the origin for one frame, and destroyed the row so double-click never fired.
+- **`RebuildRows` must layout immediately.** Expand/collapse still recreates rows. After `Child_Add`, call `C2_List.LayoutMainAxis` on the scroll children so this frame draws in place. `C2_ScrollBox.OnUpdate` is too late when the rebuild happened in the cursor phase.
+- **Double-click lives on `TreeNode.last_click`**, not the row widget. Open is `on_item_double_click` → `PNL_FileBrowser._Item_Open` → `File_For` → `ImpAsset.Editor_File_Open` / `Editor_OnOpenAsset`.
+- **`TTreeItemSection.icon_texture`** is a live GPU thumb (png source, `A_Texture` asset, etc. via `Editor_GetThumbnail_Texture`). Drawn instead of `icon` when `Id != 0`, untinted. Missing thumb still uses `A_Texture.THUMB_FILE` plus type colour `icon_tint`.
 
 ## Related
 

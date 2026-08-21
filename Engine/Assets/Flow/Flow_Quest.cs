@@ -20,7 +20,7 @@ public class Flow_Quest : A_Flow, I_General
     [ImpVar][Category("General")] public TText title;
     [ImpVar][Category("General")] public A_Texture icon;
     [ImpVar][Category("General")] public TText description;
-    [ImpVar][Category("General")] public TTagSet tags;
+    [ImpVar][Category("General")] public TTagSet tags = new();
     
     [ImpVar][Category("Quest")] public bool is_repeatable;
     

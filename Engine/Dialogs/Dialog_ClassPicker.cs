@@ -70,7 +70,7 @@ public class Dialog_ClassPicker : ImpDialog
 
     public Dialog_ClassPicker()
     {
-        box.style = new UiStyle_Box { tint = new Color(42, 42, 42, 255) };
+        box.style = new UI_Box { tint = new Color(42, 42, 42, 255) };
         box.cursor_filter = ECursorFilter.Hit;
         box.layout = new TLayout2
         {

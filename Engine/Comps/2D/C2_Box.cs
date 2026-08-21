@@ -8,7 +8,7 @@ namespace ImperiumEngine.Comps._2D;
 [ImpClass(Common = true)]
 public class C2_Box : Imp2D
 {
-    [ImpVar] public UiStyle_Box style=UiStyle_Box.STYLE_BKG_DARK;
+    [ImpVar] public UI_Box style=UI_Box.BkgDark;
     
     public override void OnDraw2D(double dt, EDrawFlags flags)
     {
@@ -18,50 +18,50 @@ public class C2_Box : Imp2D
     }
 }
 
-public class UiStyle_Box : ImpAsset
+public class UI_Box : ImpAsset
 {
-    public static UiStyle_Box STYLE_BKG_DARK = new()
+    public static UI_Box BkgDark = new()
     {
         tint = new Color(65, 65, 65, 255),
     };
     
-    public static UiStyle_Box STYLE_BKG_MID = new()
+    public static UI_Box BkgMid = new()
     {
         tint = new Color(100, 100, 100, 255),
     };
     
-    public static UiStyle_Box STYLE_BKG_LIGHT = new()
+    public static UI_Box BkgLight = new()
     {
         tint = new Color(200, 200, 200, 255),
     };
 
-    public static UiStyle_Box STYLE_BTN_IDLE = new()
+    public static UI_Box BtnIdle = new()
     {
         texture = A_Texture.BTN_A,
-        tint = new Color(200, 200, 200, 255),
+        tint = new Color(120, 120, 120, 255),
     };
-    public static UiStyle_Box STYLE_BTN_HOVER = new()
+    public static UI_Box BtnHover = new()
     {
         texture = A_Texture.BTN_A,
         tint = new Color(0, 120, 215, 255),
     };
-    public static UiStyle_Box STYLE_BTN_PRESS = new()
+    public static UI_Box BtnPress = new()
     {
         texture = A_Texture.BTN_A,
         tint = new Color(0, 84, 153, 255),
     };
     
-    public static UiStyle_Box STYLE_TAB_IDLE = new()
+    public static UI_Box TabIdle = new()
     {
         texture = A_Texture.TAB_A,
         tint = new Color(200, 200, 200, 255),
     };
-    public static UiStyle_Box STYLE_TAB_HOVER = new()
+    public static UI_Box TabHover = new()
     {
         texture = A_Texture.TAB_A,
         tint = new Color(0, 120, 215, 255),
     };
-    public static UiStyle_Box STYLE_TAB_PRESS = new()
+    public static UI_Box TabPress = new()
     {
         texture = A_Texture.TAB_A,
         tint = new Color(0, 84, 153, 255),

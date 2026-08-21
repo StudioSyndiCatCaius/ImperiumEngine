@@ -66,7 +66,7 @@ public class Dialog_CompPicker : ImpDialog
 
     public Dialog_CompPicker()
     {
-        box.style = new UiStyle_Box { tint = new Color(42, 42, 42, 255) };
+        box.style = new UI_Box { tint = new Color(42, 42, 42, 255) };
         box.cursor_filter = ECursorFilter.Hit;
         box.layout = new TLayout2
         {

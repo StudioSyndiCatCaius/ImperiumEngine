@@ -33,7 +33,7 @@ public class C3_Collider : Imp3D
     protected override TBounds3 Bounds_Calc()
     {
         Shape_Local(out Vector3 size, out Vector3 center);
-        TTransform3 t = cached_global_transform;
+        TTransform3 t = global_transform;
         Vector3 scl = new(
             MathF.Abs(t.scale.X),
             MathF.Abs(t.scale.Y),

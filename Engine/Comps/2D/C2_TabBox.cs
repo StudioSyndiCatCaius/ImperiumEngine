@@ -23,10 +23,10 @@ public class C2_TabBox : Imp2D
         spacing = 0,
     };
 
-    public UiStyle_Box style_background = UiStyle_Box.STYLE_BKG_DARK;
-    public UiStyle_Box style_tab_idle = UiStyle_Box.STYLE_TAB_IDLE;
-    public UiStyle_Box style_tab_hovered = UiStyle_Box.STYLE_TAB_HOVER;
-    public UiStyle_Box style_tab_selected = UiStyle_Box.STYLE_TAB_PRESS;
+    public UI_Box background = UI_Box.BkgDark;
+    public UI_Box tabIdle = UI_Box.TabIdle;
+    public UI_Box tabHovered = UI_Box.TabHover;
+    public UI_Box tabSelected = UI_Box.TabPress;
     public UI_Text Text = UI_Text.DEFAULT;
 
     int last_tab = -1;
@@ -80,9 +80,9 @@ public class C2_TabBox : Imp2D
             string title = TitleOf(i);
             if (btn.text != title) btn.text = title;
             bool sel = i == selected_tab;
-            btn.style.style_unhovered = sel ? style_tab_selected : style_tab_idle;
-            btn.style.style_hovered = style_tab_hovered;
-            btn.style.style_pressed = style_tab_selected;
+            btn.style.unhovered = sel ? tabSelected : tabIdle;
+            btn.style.hovered = tabHovered;
+            btn.style.pressed = tabSelected;
         }
 
         TDimensions2 dim = Dimensions_Get();
@@ -121,7 +121,7 @@ public class C2_TabBox : Imp2D
     public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
-        style_background?.Draw(Dimensions_Get());
+        background?.Draw(Dimensions_Get());
     }
 
     void RebuildTabs(int count)
@@ -146,9 +146,9 @@ public class C2_TabBox : Imp2D
                 },
                 style = new UI_Button
                 {
-                    style_unhovered = style_tab_idle,
-                    style_hovered = style_tab_hovered,
-                    style_pressed = style_tab_selected,
+                    unhovered = tabIdle,
+                    hovered = tabHovered,
+                    pressed = tabSelected,
                 },
                 text_style = Text,
             };
@@ -170,9 +170,9 @@ public class C2_TabBox : Imp2D
                     },
                     style = new UI_Button
                     {
-                        style_unhovered = style_tab_idle,
-                        style_hovered = style_tab_hovered,
-                        style_pressed = style_tab_selected,
+                        unhovered = tabIdle,
+                        hovered = tabHovered,
+                        pressed = tabSelected,
                     },
                     text_style = Text,
                 };

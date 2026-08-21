@@ -187,7 +187,7 @@ public class C2_AssetSlot : Imp2D
     public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         TDimensions2 dim = Dimensions_Get();
-        UiStyle_Box.STYLE_BKG_MID.Draw(new TDimensions2 { position = dim.position, size = new Vector2(dim.size.X, HeadH) });
+        UI_Box.BkgMid.Draw(new TDimensions2 { position = dim.position, size = new Vector2(dim.size.X, HeadH) });
         if (CanExpand)
         {
             float cx = dim.position.X + 8;

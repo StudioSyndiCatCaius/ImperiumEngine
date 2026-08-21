@@ -19,9 +19,9 @@ public class C2_Dropdown : Imp2D
     [ImpVar] public List<TDropdownOption> options = new();
     public string placeholder_text = "";
 
-    public UiStyle_Box style_idle = UiStyle_Box.STYLE_BKG_MID;
-    public UiStyle_Box style_hover = UiStyle_Box.STYLE_BTN_HOVER;
-    public UiStyle_Box style_open = UiStyle_Box.STYLE_BTN_PRESS;
+    public UI_Box idle = UI_Box.BkgMid;
+    public UI_Box hover = UI_Box.BtnHover;
+    public UI_Box open = UI_Box.BtnPress;
     public UI_Text Text = UI_Text.LIGHT;
 
     public Action<C2_Dropdown> on_dropdown_open;
@@ -61,7 +61,7 @@ public class C2_Dropdown : Imp2D
         TDimensions2 dim = Dimensions_Get();
         if (dim.size.X <= 0 || dim.size.Y <= 0) return;
 
-        UiStyle_Box bg = _open ? style_open : (_hover ? style_hover : style_idle);
+        UI_Box bg = _open ? open : (_hover ? hover : idle);
         bg?.Draw(dim);
 
         float pad = 6;

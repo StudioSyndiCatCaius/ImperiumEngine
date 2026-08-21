@@ -62,7 +62,7 @@ public class ImpDialog
         _shade = new C2_DialogShade
         {
             layout = TLayout2.FULL,
-            style = new UiStyle_Box { tint = new Color(0, 0, 0, 150) },
+            style = new UI_Box { tint = new Color(0, 0, 0, 150) },
             cursor_filter = ECursorFilter.Hit,
             on_click = Dismiss,
         };

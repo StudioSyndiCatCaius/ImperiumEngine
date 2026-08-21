@@ -13,20 +13,28 @@ public struct TTreeItem
     public TTreeItem[] children;
     public object data;
     public bool is_disabled;
+    //Washed faintly across the whole row. Left at alpha 0 the row draws with the tree's own colours.
+    public Color row_tint;
 }
 
 public struct TTreeItemSection
 {
     public string text;
     public A_Texture icon;
+    //Stands in for icon while the node is expanded. Null keeps icon either way.
+    public A_Texture icon_expanded;
+    //Live GPU texture (png preview, etc). When set, drawn instead of icon.
+    public Texture2D? icon_texture;
     public Color color;
+    //Multiplied into the icon. Alpha 0 leaves it white. Ignored for icon_texture.
+    public Color icon_tint;
 }
 
 public enum ETreeDrop { Before, After, Child }
 
 public class C2_Tree : Imp2D
 {
-    public UiStyle_Box style_box = UiStyle_Box.STYLE_BKG_DARK;
+    public UI_Box box = UI_Box.BkgDark;
     public UI_Text Text = UI_Text.LIGHT;
     public UI_Text TextSelected = UI_Text.LIGHT;
     public Color color_row = new(40, 40, 40, 0);
@@ -72,7 +80,7 @@ public class C2_Tree : Imp2D
         _scroll = new C2_ScrollBox
         {
             orentation = EUIOrentation.V,
-            style = style_box,
+            style = box,
             layout = new TLayout2
                 {
                     orient_H = EUIViewportAlignment.Fill,
@@ -87,7 +95,7 @@ public class C2_Tree : Imp2D
         base.OnUpdate(dt);
         EnsureScroll();
         if (!children.Contains(_scroll)) Child_Add(_scroll);
-        _scroll.style = style_box;
+        _scroll.style = box;
 
         if (on_background_right_click != null
             && ImpPlayer.Key_IsPressed(EInputKey.Mouse_Right)
@@ -102,7 +110,7 @@ public class C2_Tree : Imp2D
     public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
-        if (style_box != null) style_box.Draw(Dimensions_Get());
+        if (box != null) box.Draw(Dimensions_Get());
     }
 
     public void Tree_Clear()
@@ -194,20 +202,44 @@ public class C2_Tree : Imp2D
             _selected_node = null;
             selected_data = null;
             selected_item = default;
-            RebuildRows();
             return;
         }
         TreeNode found = null;
         void Walk(TreeNode n)
         {
             if (found != null) return;
-            if (Equals(n.item.data, data) || (n.item.data is TDirectory a && data is TDirectory b && PathsEqual(a.path, b.path)))
-                found = n;
+            if (DataEquals(n.item.data, data)) found = n;
             for (int i = 0; i < n.children.Count; i++) Walk(n.children[i]);
         }
         for (int i = 0; i < _roots.Count; i++) Walk(_roots[i]);
         if (found != null) SelectNode(found, false);
-        RebuildRows();
+    }
+
+    /// <summary>
+    /// Where the row carrying this data currently sits on screen. False when nothing holds it, or
+    /// when it is scrolled out of view - only expanded nodes have a row at all.
+    /// </summary>
+    public bool Row_Rect(object data, out TDimensions2 dim)
+    {
+        dim = default;
+        if (data == null || _scroll == null) return false;
+        List<ImpComp> rows = _scroll.children;
+        for (int i = 0; i < rows.Count; i++)
+        {
+            if (rows[i] is not C2_TreeRow row || !DataEquals(row.Data, data)) continue;
+            dim = row.Dimensions_Get();
+            return dim.size.X > 0 && dim.size.Y > 0;
+        }
+        return false;
+    }
+
+    // Tree data is mostly path structs, and two TDirectory/TFile values naming the same place are
+    // the same node even when the strings differ in casing or separators.
+    static bool DataEquals(object a, object b)
+    {
+        if (a is TDirectory da && b is TDirectory db) return PathsEqual(da.path, db.path);
+        if (a is TFile fa && b is TFile fb) return PathsEqual(fa.path, fb.path);
+        return Equals(a, b);
     }
 
     public void Tree_Populate_FromComp(ImpComp comp)
@@ -570,6 +602,19 @@ public class C2_Tree : Imp2D
             };
             _scroll.Child_Add(row);
         }
+
+        // Cursor / expand can rebuild after Update has already laid the scroll box out.
+        // Place the new rows now so this frame does not draw them stacked at the origin.
+        TDimensions2 sdim = _scroll.Dimensions_Get();
+        _scroll.content_length = C2_List.LayoutMainAxis(
+            _scroll.children, false, sdim.size.Y, _scroll.spacing, _scroll.scroll);
+        float max_scroll = MathF.Max(0, _scroll.content_length - sdim.size.Y);
+        if (_scroll.scroll > max_scroll)
+        {
+            _scroll.scroll = max_scroll;
+            _scroll.content_length = C2_List.LayoutMainAxis(
+                _scroll.children, false, sdim.size.Y, _scroll.spacing, _scroll.scroll);
+        }
     }
 
     internal void ToggleExpand(TreeNode node)
@@ -606,7 +651,6 @@ public class C2_Tree : Imp2D
         selected_item = node.item;
         selected_data = node.item.data;
         on_item_right_click?.Invoke(node.item);
-        RebuildRows();
     }
 
     internal bool IsSelected(TreeNode node) => _selected_node == node || (node != null && _selected_node != null && node.key == _selected_node.key);
@@ -664,6 +708,7 @@ public class C2_Tree : Imp2D
         public string key;
         public TreeNode parent;
         public List<TreeNode> children = new();
+        public double last_click = -999;
     }
 }
 [ImpClass(Hidden = true)]
@@ -673,7 +718,6 @@ class C2_TreeRow : Imp2D
     readonly C2_Tree.TreeNode _node;
     readonly int _depth;
     bool _hover;
-    double _last_click;
 
     public C2_TreeRow(C2_Tree tree, C2_Tree.TreeNode node, int depth)
     {
@@ -684,6 +728,8 @@ class C2_TreeRow : Imp2D
         option_button = null;
     }
 
+    internal object Data => _node.item.data;
+
     public override void OnDraw2D(double dt, EDrawFlags flags)
     {
         base.OnDraw2D(dt, flags);
@@ -691,10 +737,16 @@ class C2_TreeRow : Imp2D
         if (dim.size.X <= 0 || dim.size.Y <= 0) return;
 
         bool disabled = _node.item.is_disabled;
-        Color bg = !disabled && _tree.IsSelected(_node)
+        bool selected = !disabled && _tree.IsSelected(_node);
+        Color bg = selected
             ? _tree.color_row_selected
             : (_hover && !disabled ? _tree.color_row_hover : _tree.color_row);
         if (bg.A > 0) Raylib.DrawRectangleV(dim.position, dim.size, bg);
+
+        // Folder colour washes under everything but the selection, which has to stay readable.
+        Color wash = _node.item.row_tint;
+        if (wash.A > 0 && !selected)
+            Raylib.DrawRectangleV(dim.position, dim.size, new Color(wash.R, wash.G, wash.B, (byte)30));
 
         if (_tree.drop_node == _node)
         {
@@ -751,18 +803,43 @@ class C2_TreeRow : Imp2D
             for (int i = 0; i < sections.Length; i++)
             {
                 TTreeItemSection s = sections[i];
-                if (s.icon != null)
+                Texture2D tex = default;
+                bool have_tex = false;
+                Color ic = Color.White;
+                if (s.icon_texture.HasValue && s.icon_texture.Value.Id != 0)
                 {
-                    Texture2D tex = s.icon.texture;
-                    if (tex.Id != 0)
+                    tex = s.icon_texture.Value;
+                    have_tex = true;
+                }
+                else
+                {
+                    A_Texture ico = s.icon;
+                    if (_node.expanded && s.icon_expanded != null)
                     {
-                        float sz = _tree.icon_size;
-                        Raylib.DrawTexturePro(tex,
-                            new Rectangle(0, 0, tex.Width, tex.Height),
-                            new Rectangle(x, mid_y - sz * 0.5f, sz, sz),
-                            Vector2.Zero, 0f, disabled ? new Color(255, 255, 255, 90) : Color.White);
-                        x += sz + 4;
+                        ico = s.icon_expanded;
                     }
+                    if (ico != null && ico.texture.Id != 0)
+                    {
+                        tex = ico.texture;
+                        have_tex = true;
+                        if (s.icon_tint.A > 0)
+                        {
+                            ic = s.icon_tint;
+                        }
+                    }
+                }
+                if (have_tex)
+                {
+                    float sz = _tree.icon_size;
+                    if (disabled)
+                    {
+                        ic = new Color(ic.R, ic.G, ic.B, (byte)90);
+                    }
+                    Raylib.DrawTexturePro(tex,
+                        new Rectangle(0, 0, tex.Width, tex.Height),
+                        new Rectangle(x, mid_y - sz * 0.5f, sz, sz),
+                        Vector2.Zero, 0f, ic);
+                    x += sz + 4;
                 }
                 if (!string.IsNullOrEmpty(s.text))
                 {
@@ -818,10 +895,13 @@ class C2_TreeRow : Imp2D
         }
 
         double now = Raylib.GetTime();
-        bool dbl = now - _last_click < 0.35;
-        _last_click = now;
+        bool dbl = now - _node.last_click < 0.35;
+        _node.last_click = now;
         _tree.SelectNode(_node, true);
-        if (dbl) _tree.OpenNode(_node);
+        if (dbl)
+        {
+            _tree.OpenNode(_node);
+        }
     }
 
     public override bool CursorGrab_IsEnabled(ImpPlayer player)

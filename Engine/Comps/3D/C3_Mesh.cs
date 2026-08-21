@@ -34,7 +34,7 @@ public class C3_Mesh : Imp3D
     {
         if (mesh != null && mesh.mesh.VertexCount > 0)
         {
-            return mesh.Bounds_Get(cached_global_transform);
+            return mesh.Bounds_Get(global_transform);
         }
         return base.Bounds_Calc();
     }

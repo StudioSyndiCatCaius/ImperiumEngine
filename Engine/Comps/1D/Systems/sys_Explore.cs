@@ -12,17 +12,42 @@ public class sys_Explore : C1_GameSystem
     //system activated on Pause Input
     [ImpVar][Category("States")] public TClass<C1_GameSystem> system_pause;
 
+    public sys_Explore()
+    {
+        system_tags=new TTagSet("System.Explore");
+    }
+    
     public override void OnBegin()
     {
         base.OnBegin();
         
     }
 
+    public override void Input_Update(ImpPlayer player, TLabel iaction, double dt, Vector3 axis)
+    {
+        base.Input_Update(player, iaction, dt, axis);
+        if (ImpApp.view_target != null)
+        {
+            ImpApp.view_target.Input_Update(player, iaction, dt, axis);
+        }
+    }
+
     public override void Input_Pressed(ImpPlayer player, TLabel iaction, Vector3 axis)
     {
+        if (ImpApp.view_target != null)
+        {
+            ImpApp.view_target.Input_Pressed(player, iaction, axis);
+        }
         if (iaction == "_Pause")
         {
-            
+            C1_GameSystem.Activate(system_pause);
+        }
+    }
+    public override void Input_Released(ImpPlayer player, TLabel iaction, Vector3 axis)
+    {
+        if (ImpApp.view_target != null)
+        {
+            ImpApp.view_target.Input_Released(player, iaction, axis);
         }
     }
 }

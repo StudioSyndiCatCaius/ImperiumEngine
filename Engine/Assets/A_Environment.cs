@@ -18,10 +18,10 @@ public class A_Environment : ImpAsset
     // light left to a comp meant any number of scenes could quietly fight over the sunlight.
     [Category("Sun")][ImpVar] public bool sun_enabled=true;
     [Category("Sun")][ImpVar] public Color sun_color=new Color(255, 244, 228, 255);
-    [Category("Sun")][ImpVar] public float sun_intensity=1.35f;
+    [Category("Sun")][ImpVar] public float sun_intensity=0.5f;
     //euler degrees; the direction light travels, same convention as a comp's rotation
     [Category("Sun")][ImpVar] public Vector3 sun_rotation=new Vector3(-45f, -35f, 0f);
-    [Category("Sun")][ImpVar] public float sun_specular=1.15f;
+    [Category("Sun")][ImpVar] public float sun_specular=1.0f;
     [Category("Sun")][ImpVar] public bool sun_cast_shadows=true;
 
     // Equirectangular .hdr panorama used as the background, and optionally as the light
@@ -30,7 +30,7 @@ public class A_Environment : ImpAsset
     [Category("Sky")][ImpVar] public A_TextureHDR sky_texture;
     //let the panorama light the scene too (image-based lighting), not just sit behind it
     [Category("Sky")][ImpVar] public bool sky_lights_scene=true;
-    [Category("Sky")][ImpVar] public float sky_energy=1.15f;
+    [Category("Sky")][ImpVar] public float sky_energy=0.5f;
     [Category("Sky")][ImpVar] public float sky_blur=0.0f;
     //degrees about Y, for turning the panorama to put its sun where the scene's sun is
     [Category("Sky")][ImpVar] public float sky_rotation=0.0f;

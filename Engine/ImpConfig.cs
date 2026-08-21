@@ -106,6 +106,7 @@ public static class ImpConfig
         {
             Load(_categories[i]);
         }
+        ImpTags.EnsureLoaded();
     }
 
     public static void SaveAll()

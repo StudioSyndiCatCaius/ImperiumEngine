@@ -358,6 +358,11 @@ public class File_JSON : ImpFile
         if (key_type == typeof(string)) return s;
         if (key_type.IsEnum) return Enum.Parse(key_type, s, true);
         if (key_type.IsPrimitive) return Convert.ChangeType(s, key_type, CultureInfo.InvariantCulture);
+        ConstructorInfo? key_ctor = key_type.GetConstructor(new[] { typeof(string) });
+        if (key_ctor != null)
+        {
+            return key_ctor.Invoke(new object[] { s });
+        }
         return s;
     }
 
@@ -397,6 +402,17 @@ public class File_JSON : ImpFile
                 };
                 visiting.Remove(asset);
                 return inline;
+        }
+
+        if (value is TTagSet tag_set)
+        {
+            var tags_arr = new JsonArray();
+            List<TTag> tags = tag_set.Sorted();
+            for (int i = 0; i < tags.Count; i++)
+            {
+                tags_arr.Add(tags[i].TagName);
+            }
+            return tags_arr;
         }
 
         if (value is IDictionary dict)
@@ -549,6 +565,23 @@ public class File_JSON : ImpFile
             for (int i = 0; i < aarr.Count; i++)
                 a.SetValue(FromJson(aarr[i], eT, path_context), i);
             return a;
+        }
+
+        if (type == typeof(TTagSet))
+        {
+            TTagSet set = new();
+            if (node is JsonArray tarr)
+            {
+                foreach (JsonNode? item in tarr)
+                {
+                    object? tag = FromJson(item, typeof(TTag), path_context);
+                    if (tag is TTag t)
+                    {
+                        set.AddTag(t);
+                    }
+                }
+            }
+            return set;
         }
 
         if (node.GetValueKind() == JsonValueKind.String)

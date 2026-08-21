@@ -45,11 +45,11 @@ public class C2_Button : Imp2D
 
         if (is_pressed)
         {
-            style.style_pressed.Draw(dim);
+            style.pressed.Draw(dim);
             is_pressed = false;
         }
-        else if (is_hovered) style.style_hovered.Draw(dim);
-        else style.style_unhovered.Draw(dim);
+        else if (is_hovered) style.hovered.Draw(dim);
+        else style.unhovered.Draw(dim);
 
         bool has_icon = icon != null;
         bool has_text = !string.IsNullOrEmpty(text);
@@ -223,9 +223,9 @@ public enum EButtonLayout
 
 public class UI_Button : ImpAsset
 {
-    [ImpVar] public UiStyle_Box style_unhovered = UiStyle_Box.STYLE_BTN_IDLE;
-    [ImpVar] public UiStyle_Box style_hovered = UiStyle_Box.STYLE_BTN_HOVER;
-    [ImpVar] public UiStyle_Box style_pressed = UiStyle_Box.STYLE_BTN_PRESS;
+    [ImpVar] public UI_Box unhovered = UI_Box.BtnIdle;
+    [ImpVar] public UI_Box hovered = UI_Box.BtnHover;
+    [ImpVar] public UI_Box pressed = UI_Box.BtnPress;
 
     public static UI_Button DEFAULT = new();
 }

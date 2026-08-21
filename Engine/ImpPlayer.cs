@@ -71,6 +71,8 @@ public class ImpPlayer
             {
                 [EInputKey.Mouse_MoveX]=new TInputKey() { axis_scale = new Vector3(0,1,0)},
                 [EInputKey.Mouse_MoveY]=new TInputKey() { axis_scale = new Vector3(1,0,0)},
+                [EInputKey.Pad_RightStickX]=new TInputKey() { deadzone = DEADZONE_MOVEMENT, axis_scale = new Vector3(0,1,0)},
+                [EInputKey.Pad_RightStickY]=new TInputKey() { deadzone = DEADZONE_MOVEMENT, axis_scale = new Vector3(1,0,0)},
             }
         },
         ["_Aim"] = new TInputAction() { keys = { [EInputKey.Mouse_Right]=new () } },

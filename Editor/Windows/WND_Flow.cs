@@ -274,15 +274,7 @@ public class WND_Flow : EdWindow
 
     static string SaveFolder()
     {
-        if (Scene_Editor.active != null)
-        {
-            if (Scene_Editor.active.mtab_asset != null)
-            {
-                return Scene_Editor.active.mtab_asset.file_browser.CurrentDir;
-            }
-            return Scene_Editor.active.mtab_scene.file_browser.CurrentDir;
-        }
-        return "";
+        return Scene_Editor.active?.file_browser.CurrentDir ?? "";
     }
 
     static bool SameAsset(ImpAsset a, ImpAsset b)

@@ -71,7 +71,7 @@ public class C2_ColorPicker : Imp2D
         base.OnDraw2D(dt, flags);
         TDimensions2 dim = Dimensions_Get();
         if (dim.size.X <= 0 || dim.size.Y <= 0) return;
-        UiStyle_Box bg = _open ? UiStyle_Box.STYLE_BTN_PRESS : _hover ? UiStyle_Box.STYLE_BTN_HOVER : UiStyle_Box.STYLE_BKG_MID;
+        UI_Box bg = _open ? UI_Box.BtnPress : _hover ? UI_Box.BtnHover : UI_Box.BkgMid;
         bg.Draw(dim);
         var sw = new Rectangle(dim.position.X + 2, dim.position.Y + 2, MathF.Max(0, dim.size.X - 4), MathF.Max(0, dim.size.Y - 4));
         if (color.A < 255)
@@ -141,7 +141,7 @@ class C2_ColorPickerPanel : C2_Box
     {
         _owner = owner;
         cursor_filter = ECursorFilter.Hit;
-        style = new UiStyle_Box { texture = null, tint = new Color(40, 40, 42, 255) };
+        style = new UI_Box { texture = null, tint = new Color(40, 40, 42, 255) };
     }
 
     public override void OnUpdate(double dt)
