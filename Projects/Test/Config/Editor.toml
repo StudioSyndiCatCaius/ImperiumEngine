@@ -1,7 +1,7 @@
-saved_at = "2026-08-16T03:04:50.9790670Z"
+saved_at = "2026-08-19T00:31:17.3608703Z"
 
 [window]
-main_tab = "Scene"
+main_tab = "Flow"
 inspector_tab = 0
 outliner_tab = 0
 file_browser_expanded = true
@@ -17,10 +17,11 @@ inspector_stretch = 1.20000005
 [tabs]
 active_scene = 0
 active_asset = 0
+active_flow = 0
 
 [file_browser]
-current_dir = "{engine}/Meshes/Character"
-dir_tab = 1
+current_dir = "{game}/Assets/Dialoges"
+dir_tab = 0
 search = ""
 show_source_files = true
 show_file_extensions = false
@@ -30,7 +31,7 @@ settings_open = true
 favorites_expanded = false
 sidebar_width = 220
 favorites = []
-expanded = ["{game}", "{game}/Scenes", "{game}/Scenes/cameras", "{game}/Assets", "{game}/Assets/Modes", "{engine}", "{engine}/Meshes", "{engine}/Meshes/Character"]
+expanded = ["{game}", "{game}/Scenes", "{game}/Scenes/cameras", "{game}/Assets", "{game}/Assets/Modes", "{game}/Assets/Dialoges", "{engine}", "{engine}/Meshes", "{engine}/Meshes/Character"]
 
 [file_browser_asset]
 current_dir = "{game}/Assets/Textures"
@@ -53,12 +54,15 @@ gizmo_mode = "Translate"
 gizmo_space = "Local"
 snap_translate = 0.25
 snap_translate_2d = 8
-cam3_position = [6.26214218, 4.07715654, 9.04621506]
-cam3_target = [4.27845287, -0.868408203, -1.0585537]
+cam3_position = [-5.77537584, 3.17131352, 1.07459509]
+cam3_target = [-0.324331373, 1.52685082, 2.87411451]
 cam3_fovy = 50
 cam2_position = [960, 540]
 cam2_zoom = 0.5
-selected = ["Ground/Character"]
+selected = ["Ground"]
 
 [[open_assets]]
 path = "{game}/Assets/Textures/po_F2_1.ImpAsset"
+
+[[open_flows]]
+path = "{game}/Assets/Dialoges/d_test.ImpFlow"

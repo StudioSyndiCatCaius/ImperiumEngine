@@ -1,4 +1,5 @@
 ﻿using ImperiumEngine.Assets.General;
+using ImperiumEngine.Enums;
 using ImperiumEngine.Structs;
 
 namespace ImperiumEngine.Comps._1D;
@@ -10,6 +11,7 @@ public class C1_Creature : ImpComp
     
     private List<C1_Ability> _abilities;
     public A_CreatureConfig config;
+    public AG_Faction faction;
 
 
     public override void OnBegin()
@@ -148,6 +150,17 @@ public class C1_Creature : ImpComp
         return config.leveling.TryGetValue(level, out float xp) ? xp : 0f;
     }
     
+    // ---------------------------------------------------------------------------------
+    // Faction
+    // ---------------------------------------------------------------------------------
+    public EFactionAffinity Faction_GetAffinityTo(C1_Creature other)
+    {
+        if (faction != null && other.faction != null)
+        {
+            return faction.faction_affinity[other.faction.faction_tag];
+        }
+        return EFactionAffinity.Neutral;
+    }
 }
 
 

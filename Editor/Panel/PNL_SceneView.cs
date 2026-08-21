@@ -240,9 +240,13 @@ public class PNL_SceneView : C2_Box
             }
         }
 
-        // Camera / gizmo / marquee only run on the Scene tab. Game and Script leave
-        // any in-progress drag so switching mid-look does not leave a hog behind.
-        if (tabs_view != null && tabs_view.selected_tab != 0)
+        // Camera / gizmo / marquee only run while this viewport is the frontmost
+        // surface. Local is_visible stays true when the Scene *main* tab is hidden
+        // (C2_TabBox only flips the window), and the last layout rect still covers
+        // Flow / Asset — polling that rect would steal hog and clicks.
+        bool inner_other = tabs_view != null && tabs_view.selected_tab != 0;
+        bool hidden_tab = !IsVisibleInTree();
+        if (inner_other || hidden_tab)
         {
             if (ImpPlayer.players.Count > 0)
             {
@@ -259,6 +263,21 @@ public class PNL_SceneView : C2_Box
                         script_player.input_hog = null;
                     }
                 }
+                if (hidden_tab)
+                {
+                    if (_drop_asset != null)
+                    {
+                        Drop_Bind(null, script_player);
+                    }
+                    if (script_player.input_hog == this)
+                    {
+                        script_player.input_hog = null;
+                    }
+                    if (script_player.target_focus == this)
+                    {
+                        script_player.target_focus = null;
+                    }
+                }
             }
             return;
         }
@@ -268,26 +287,6 @@ public class PNL_SceneView : C2_Box
             return;
         }
         ImpPlayer player = ImpPlayer.players[0];
-        if (!is_visible)
-        {
-            if (drag != ECaptureDrag.None)
-            {
-                EndDrag(player);
-            }
-            if (marquee)
-            {
-                marquee = false;
-                if (player.input_hog == this)
-                {
-                    player.input_hog = null;
-                }
-            }
-            if (_drop_asset != null)
-            {
-                Drop_Bind(null, player);
-            }
-            return;
-        }
 
         if (player.target_focus is C2_TextEdit te && te.is_focused && ImpPlayer.Target_IsLive(te))
         {

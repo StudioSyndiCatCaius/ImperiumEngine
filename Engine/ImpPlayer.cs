@@ -190,6 +190,19 @@ public class ImpPlayer
         return root.IsAncestorOf(c);
     }
 
+    // Hog / focus also require the widget to be on a visible tab. Hidden tab pages
+    // stay in the tree (Update still runs, e.g. PIE) so Target_IsLive alone is not
+    // enough — a hidden Scene viewport would otherwise steal keys and clicks from
+    // Flow / Asset and anything else sharing that screen rect.
+    public static bool Target_CanOwnInput(ImpComp c)
+    {
+        if (!Target_IsLive(c))
+        {
+            return false;
+        }
+        return c.IsVisibleInTree();
+    }
+
     // Dialog / input_hog swallows Key_Is* for every comp outside that subtree.
     // Queries from outside Update (cursor phase, etc.) stay raw so hit-testing still works.
     public static bool Key_Allowed(byte player = 0)
@@ -634,11 +647,12 @@ public class ImpPlayer
         // Dialogs reuse their panel by Detaching it before the overlay is Destroyed.
         // If hog / focus was a widget inside that panel, it is no longer under
         // ImpScene.current and would swallow Key_Is* / camera forever.
-        if (input_hog != null && !Target_IsLive(input_hog))
+        // Hidden tab pages stay in the tree, so visibility is part of this too.
+        if (input_hog != null && !Target_CanOwnInput(input_hog))
         {
             input_hog = null;
         }
-        if (target_focus != null && !Target_IsLive(target_focus))
+        if (target_focus != null && !Target_CanOwnInput(target_focus))
         {
             target_focus = null;
         }

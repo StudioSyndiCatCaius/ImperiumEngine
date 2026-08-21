@@ -8,7 +8,7 @@ public class A_Game : ImpAsset , I_General
     public static A_Game GAME_TEST = new()
     {
         title = new("Test Game"),
-        gamepath = "D:\\PROJECTS\\ImperiumEngine\\ImperiumEngine\\Projects\\Test\\Test.ImpGame",
+        gamepath = "Projects/Test/Test.ImpGame",
     };
     public static A_Game game = GAME_TEST;
 
@@ -32,6 +32,15 @@ public class A_Game : ImpAsset , I_General
         if (string.IsNullOrWhiteSpace(p) || ImpAsset.Path_IsBuiltin(p))
         {
             return "";
+        }
+        if (!Path.IsPathRooted(p))
+        {
+            string engine_dir = Path.GetDirectoryName(ImpFile.ContentDir_Engine());
+            string root = Path.GetDirectoryName(engine_dir);
+            if (!string.IsNullOrEmpty(root))
+            {
+                p = Path.GetFullPath(Path.Combine(root, p));
+            }
         }
         if (Directory.Exists(p))
         {

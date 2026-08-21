@@ -118,6 +118,7 @@ public static class EdState
         data.main_tab = WindowName(editor.ui_main_tabs);
         editor.mtab_scene.State_Capture(data);
         editor.mtab_asset.State_Capture(data);
+        editor.mtab_flow.State_Capture(data);
         editor.mtab_scene.file_browser.State_Capture(data.browser);
         editor.mtab_asset.file_browser.State_Capture(data.browser_asset);
         return data;
@@ -131,6 +132,7 @@ public static class EdState
         }
         editor.mtab_scene.State_Apply(data);
         editor.mtab_asset.State_Apply(data);
+        editor.mtab_flow.State_Apply(data);
         editor.mtab_scene.file_browser.State_Apply(data.browser);
         editor.mtab_asset.file_browser.State_Apply(data.browser_asset);
         SelectWindow(editor.ui_main_tabs, data.main_tab);
@@ -202,6 +204,7 @@ public static class EdState
         {
             data.active_scene = tabs.GetInt("active_scene");
             data.active_asset = tabs.GetInt("active_asset");
+            data.active_flow = tabs.GetInt("active_flow");
         }
 
         List<TomlTable> scenes = root.GetArray("open_scenes");
@@ -231,6 +234,16 @@ public static class EdState
             if (!string.IsNullOrEmpty(p))
             {
                 data.assets.Add(p);
+            }
+        }
+
+        List<TomlTable> flows = root.GetArray("open_flows");
+        for (int i = 0; i < flows.Count; i++)
+        {
+            string p = flows[i].GetString("path");
+            if (!string.IsNullOrEmpty(p))
+            {
+                data.flows.Add(p);
             }
         }
 
@@ -269,6 +282,7 @@ public static class EdState
         TomlTable tabs = doc.root.EnsureTable("tabs");
         tabs.Set("active_scene", data.active_scene);
         tabs.Set("active_asset", data.active_asset);
+        tabs.Set("active_flow", data.active_flow);
 
         for (int i = 0; i < data.scenes.Count; i++)
         {
@@ -292,6 +306,12 @@ public static class EdState
         {
             TomlTable t = doc.root.AddArrayTable("open_assets");
             t.Set("path", data.assets[i] ?? "");
+        }
+
+        for (int i = 0; i < data.flows.Count; i++)
+        {
+            TomlTable t = doc.root.AddArrayTable("open_flows");
+            t.Set("path", data.flows[i] ?? "");
         }
 
         data.browser.ToTable(doc.root.EnsureTable("file_browser"));
@@ -410,8 +430,10 @@ public class EdStateData
     public float inspector_stretch = 1.2f;
     public int active_scene;
     public int active_asset;
+    public int active_flow;
     public List<EdStateScene> scenes = new();
     public List<string> assets = new();
+    public List<string> flows = new();
     public EdStateBrowser browser = new();
     public EdStateBrowser browser_asset = new();
 }

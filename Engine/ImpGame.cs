@@ -1,3 +1,4 @@
+using ImperiumEngine.Assets.Flow;
 using ImperiumEngine.Comps._1D;
 using ImperiumEngine.Structs;
 
@@ -203,6 +204,47 @@ public class ImpGame
     }
 
     public void SaveGame_Write_ToSlot(int slot)
+    {
+        
+    }
+    
+    // ------------------------------------------
+    // Quest
+    // ------------------------------------------
+    public EQuestState Quest_GetState(Flow_Quest quest)
+    {
+        return EQuestState.Unstarted;
+    }
+    
+    public bool Quest_CanStart(Flow_Quest quest)
+    {
+        return false;
+    }
+    
+    public bool Quest_Start(Flow_Quest quest)
+    {
+        if (Quest_CanStart(quest))
+        {
+            return true;
+        }
+        return false;
+    }
+    
+    public bool Quest_Stop(Flow_Quest quest)
+    {
+        if (Quest_GetState(quest)==EQuestState.Active)
+        {
+            return true;
+        }
+        return false;
+    }
+
+    public void Quest_HasTags(Flow_Quest quest, TTagSet tags)
+    {
+        
+    }
+    
+    public void Quest_SetTags(Flow_Quest quest, TTagSet tags, bool tags_active)
     {
         
     }

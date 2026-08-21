@@ -334,6 +334,21 @@ public class File_JSON : ImpFile
             return arr;
         }
 
+        if (value is ImpFlowNode flow_node)
+        {
+            if (!visiting.Add(flow_node)) return null;
+            var fn_obj = new JsonObject();
+            fn_obj["_class"] = flow_node.GetType().Name;
+            foreach (FieldInfo f in PublicFields(flow_node.GetType()))
+            {
+                if (f.Name == "_owner" || f.Name == "_player" || f.Name == "on_exit") continue;
+                if (IsHandleType(f.FieldType) || typeof(ImpComp).IsAssignableFrom(f.FieldType)) continue;
+                fn_obj[f.Name] = ToJson(f.GetValue(flow_node), visiting);
+            }
+            visiting.Remove(flow_node);
+            return fn_obj;
+        }
+
         if (type.IsValueType || type.IsClass)
         {
             FieldInfo[] fields = PublicFields(type);
@@ -455,6 +470,28 @@ public class File_JSON : ImpFile
         {
             ConstructorInfo? ctor = type.GetConstructor(new[] { typeof(string) });
             if (ctor != null) return ctor.Invoke(new object[] { node.GetValue<string>() });
+        }
+
+        if (typeof(ImpFlowNode).IsAssignableFrom(type) && node is JsonObject fn_obj)
+        {
+            Type inst_type = type;
+            string? named = fn_obj["_class"]?.GetValue<string>();
+            if (!string.IsNullOrEmpty(named))
+            {
+                Type? found = ImpFlowNode.Type_FromName(named);
+                if (found != null && type.IsAssignableFrom(found)) inst_type = found;
+            }
+            if (inst_type.IsAbstract)
+            {
+                return null;
+            }
+            object? created = Activator.CreateInstance(inst_type);
+            if (created is not ImpFlowNode inst)
+            {
+                return null;
+            }
+            ApplyFields(inst, fn_obj, path_context);
+            return inst;
         }
 
         object boxed = Activator.CreateInstance(type)!;

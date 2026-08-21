@@ -143,6 +143,37 @@ JSON-backed asset. Cache keyed by resolved full path. Builtins are `builtin:Type
 - `File_Write` writes in place and binds `_loaded`. `File_SaveTo(path)` rekeys the cache then writes (Save As).
 - `SaveAllDirty` writes cached dirty assets that already `File_CanWrite`. Untitled ones need `DLG_SaveFile`.
 
+## Flow Graph (`C1_FlowPlayer` / `A_Flow` / `ImpFlowNode`)
+
+Data-driven async events. Assets: `Flow_Dialogue`, `Flow_Quest` (`A_Flow` is abstract, not Hidden). File ext `ImpFlow`. Graph lives on `A_Flow.Flow` (`TFlowData`: `nodes` + `connections` by node guid). `A_Flow` ctor always seeds a `Node_C_Start` at (80, 80). `ImpFlowNode.position` is graph layout (public field, saved with the node).
+
+**Play**
+- `C1_FlowPlayer.flow` is the template. `Start()` clones it (`A_Flow.Clone` deep-copies nodes, keeps node guids so wires still match) into `_flow_instance`.
+- Finds the first `Node_C_Start`, `Node_Enter`s it. Start immediately `TriggerOutput(0)`.
+- `ImpFlowNode.TriggerOutput(pin, connections)` fires `on_exit` (player drops the node from `nodes_active`) then follows wires from that output pin. `connections == -1` = every wire on that pin; `>= 0` = that wire index only.
+- Instant nodes chain nested inside `Node_Enter`. Waiting nodes stay in `nodes_active` until they `TriggerOutput` themselves. Player has no node-type APIs besides finding `Node_C_Start`.
+- Stops when `nodes_active` is empty **or** `Node_C_Finish.OnNode_Enter` calls `Stop()` (kills remaining branches). `OnBegin` auto-`Start`s if `flow` is set; `OnEnd` `Stop`s. `OnUpdate` ticks active `OnNode_Update`.
+- Step cap 4096 against cycles. `Node_C_ToHub` jumps to the `Node_C_Hub` with the same `hub` string (no wire).
+
+**Nodes**
+| Class | Kind | Runtime |
+|---|---|---|
+| `Node_C_Start` / `Node_C_Finish` / `Node_C_Hub` / `Node_C_ToHub` | Common (`universal_node`) | Start/Hub fire out immediately. Finish stops the player. |
+| `Node_D_Line` / `Node_D_Choice` / `Node_D_ChoiceHUB` | Dialogue | Line waits. HUB gathers every `Node_D_Choice` on its output, `sys_Choice.Run(texts, on_select)` (UI later). `Select(i)` `TriggerOutput`s that choice wire; the Choice node immediately continues its branch. |
+| `Node_Q_AwaitSignal` / `Node_Q_Dialogue` / `Node_Q_SceneTransit` | Quest | Wait until the node itself `TriggerOutput`s. |
+
+JSON writes each `ImpFlowNode` with `_class` (File_JSON special case). Runtime fields `_owner`, `_player`, `on_exit` are not saved. `ScriptNode` still subclasses `ImpFlowNode` (Pulse); `Node_IsEditorAddable` is false so Pulse nodes stay out of the Flow palette. `ImpFlowNode.Nodes_Addable(flow)` is the editor menu (filters `Node_CanUseInFlow`).
+
+**Editor** (`WND_Flow` / `PNL_FlowGraph`)
+- Main **Flow** tab. Open-flow subtabs (`C2_TabBox`), one `PNL_FlowGraph` per `A_Flow`. Opening a `Flow_Dialogue` / `Flow_Quest` (New Asset, file browser, session restore) goes here, not `WND_Asset`.
+- Layout: left `C2_Inspector` (selected node, or the flow asset if none), center `C2_GraphEdit`, right searchable node tree (grouped Common / Dialogue / Quest).
+- Add nodes: RMB empty canvas (searchable popup), drag a palette row onto the graph (`C2_GraphEdit.on_drop`), or double-click a palette row (places in view). Dropping a wire on empty opens the same add menu and auto-wires.
+- Exec inputs fan in: many wires may enter the same input pin (a node can be reached from many others). Runtime already followed every incoming `TFlowConnection`; the editor used to replace the previous wire.
+- One `Node_C_Start` — adding another focuses the existing one. Deleting the last Start immediately re-adds it.
+- Save / Save As / Save All / dirty `*` tab names match `WND_Asset`. Session: `[[open_flows]]` + `tabs.active_flow`.
+
+`C2_GraphEdit.on_drop(graph_pos, payload)` fires on grab-drop (empty canvas or a `C2_GraphNode` forwards). Palette rows set `item_drag_payload` to the node `Type`.
+
 ## Editor Save (`Scene_Editor` / `EdWindow` / `DLG_SaveFile`)
 
 File menu + toolbar + hotkeys. `C2_MenuBar` fires the File entries:
@@ -170,15 +201,16 @@ Loaded at the end of `Scene_Editor` ctor (`EdState.Load`). Written every 2s whil
 | Section | What |
 |---|---|
 | `[window]` | Main tab name, inspector/outliner tab, scene + asset file-browser expanded/stretch (`file_browser_expanded`, `file_browser_asset_expanded`, `browser_stretch` + `scene_tabs_stretch`, `browser_asset_stretch` + `asset_tabs_stretch`), splitter sizes (`panel_width`, sidebar) |
-| `[tabs]` | Active scene tab index, active asset tab index |
+| `[tabs]` | Active scene tab index, active asset tab index, active flow tab index |
 | `[[open_scenes]]` | Saved scenes only (`File_CanWrite`). Camera 3D/2D, edit/gizmo/snap, selected comp name-paths |
 | `[[open_assets]]` | Open asset file paths |
+| `[[open_flows]]` | Open flow file paths (`A_Flow`, `File_CanWrite`) |
 | `[file_browser]` | Scene window `PNL_FileBrowser`: current dir, Game/Engine tab, search, show flags, thumbnail size, favorites, expanded folders |
 | `[file_browser_asset]` | Asset window `PNL_FileBrowser`, same keys. Independent of the scene browser. |
 
 Untitled tabs are not persisted (no path). Missing `Editor.TOML` keeps the default preview scene. Saved scenes replace that preview.
 
-`A_Game.GetRootDir()` uses `gamepath` first and ignores `builtin:` filepath. `Builtins_All` must not stamp `GAME_TEST.filepath` — that made `ContentDir_Game()` fall back to `{cwd}/Content` (the engine content copy). Result: Game tab listed Fonts/Icons, and `{game}/Scenes/…` restore missed project scenes.
+`A_Game.GAME_TEST.gamepath` is repo-relative (`Projects/Test/Test.ImpGame`). `GetRootDir()` roots an unrooted `gamepath` against the parent of `Engine/` (`ContentDir_Engine()` → up two). It uses `gamepath` first and ignores `builtin:` filepath. `Builtins_All` must not stamp `GAME_TEST.filepath` — that made `ContentDir_Game()` fall back to `{cwd}/Content` (the engine content copy). Result: Game tab listed Fonts/Icons, and `{game}/Scenes/…` restore missed project scenes.
 
 `File_TOML` (`Engine/Files/File_TOML.cs`) is a small tables / array-of-tables reader-writer used by `EdState` and `ImpConfig`. Not a full TOML 1.0 impl.
 
@@ -236,7 +268,9 @@ Editor outliner panel. Search bar + `C2_Tree`. Binds `scene` (or `root_comp` if 
 
 Scene viewport tab (`C2_Box`, `cursor_filter = Hit`). Owns `scene`, `undo`, `edit_mode`, `gizmo_data`, `C2_Viewport3D` + `C2_Viewport2D` (both `Pass` so clicks land on the panel), 2D/3D gizmos, camera nav, marquee/selection, asset drop, and the mode/gizmo/space/snap toolbar. `WND_Scene` still hosts the tab box, selection/inspector bind, and dup/delete hotkeys.
 
-Inner `tabs_view` pages: **Scene** (`view_root` — toolbar + 3D/2D viewports), **Game** (`PNL_GameView`), **Script** (`PNL_ScriptGraph`). Camera / gizmo / marquee only run on Scene. Play binds PIE into Game and selects that tab.
+Inner `tabs_view` pages: **Scene** (`view_root` — toolbar + 3D/2D viewports), **Game** (`PNL_GameView`), **Script** (`PNL_ScriptGraph`). Camera / gizmo / marquee only run while this panel is **visible in the tree** (the Scene main tab, inner Scene page). Local `is_visible` stays true when Flow/Asset is selected — the last layout rect still covers that area, so polling `Cursor_IsInDimensions` without `IsVisibleInTree()` would hog clicks and keys. Switching away drops hog / drag / leftover `target_focus`.
+
+Play binds PIE into Game and selects that tab.
 
 ## PNL_GameView (`Editor/Panel/PNL_GameView.cs`)
 
@@ -258,7 +292,7 @@ Generic Godot-like graph canvas. **No scripting types in here** — Pulse / anim
 
 `C2_GraphEdit` owns `scroll_offset` + `zoom`, `connections` (`TGraphLink`: from node/slot → to node/slot), grid, snap. Children that are `C2_GraphNode` are placed each frame: `transform.position = (graph_position - scroll) * zoom`, `layout.size = graph_size * zoom`.
 
-`C2_GraphNode`: `title`, `graph_position` / `graph_size` (graph space), `title_color`, `slots` (`TGraphSlot`: left/right enable, type int, color, name). `Slot_Set(index, …)` grows the list. Same `type` required to connect. One wire per input (new connect replaces). Outputs fan out.
+`C2_GraphNode`: `title`, `graph_position` / `graph_size` (graph space), `title_color`, `slots` (`TGraphSlot`: left/right enable, type int, color, name). `Slot_Set(index, …)` grows the list. Same `type` required to connect. Data inputs are one wire (new connect replaces) unless `TGraphSlot.allow_multi_in`. Exec / Flow pins set that so many nodes can enter the same input. Outputs fan out.
 
 Unconnected **value** inputs (`TGraphSlot.edit_left`) host an inspector-style widget (`C2_TextEdit` / slider / checkbox / dropdown / vector / color) as a child of the node. Layout is `transform.position` (same as other Imp2D chrome) via `SlotEdits_Layout`, called from the graph's place-nodes pass so it lines up with the pin. Clicking the widget selects the node but does not drag it. The widget hides while that input is wired. Pin text fields set `C2_TextEdit.hog_input = false` so they type without swallowing graph input; Delete / Ctrl+A stay on the field while it is focused. `TGraphSlot.value` is the live default; `on_slot_value` notifies the host. `C2_GraphEdit.IsInputConnected` / `C2_GraphNode.SlotEdits_Rebuild` / `SlotEdit_Hit`.
 
@@ -271,7 +305,7 @@ Input (Godot-ish):
 - RMB on a wire deletes it. Delete/Backspace: selected nodes (and their wires) or a selected wire
 - Ctrl+A select all
 
-`Connect` / `Disconnect` / `CanConnect` are the API. `on_connection` / `on_disconnection` fire after the list changes. `on_context_empty(screen)` — RMB on empty canvas (replaces RMB-pan when set). `on_connect_drop(screen, node, slot, from_out)` — released a wire on empty. `on_node_removed` before Destroy. `TGraphSlot.data_left/right` optional `Type` for host graphs. `C2_GraphNode.user_data` is host payload.
+`Connect` / `Disconnect` / `CanConnect` are the API. `on_connection` / `on_disconnection` fire after the list changes. `on_context_empty(screen)` — RMB on empty canvas (replaces RMB-pan when set). `on_connect_drop(screen, node, slot, from_out)` — released a wire on empty. `on_node_removed` before Destroy. `on_drop(graph_pos, payload)` — grab-drop onto the canvas (nodes forward to the graph). `TGraphSlot.data_left/right` optional `Type` for host graphs. `C2_GraphNode.user_data` is host payload.
 
 Node chrome uses `{engine}/Textures/Graph/` (UE GraphEditor brushes, MIT). `C2_GraphEdit.style` is `UI_Graph`. `C2_GraphNode.chrome` = Regular (body + title spill/gloss + shadow) or Var (compact get/set). Pins/wires still drawn in code. Missing textures fall back to a tinted rect.
 
@@ -474,7 +508,7 @@ Cursor / grab / focus no longer use `Cursor_OnEnter` / `CursorGrab_Begin` / etc.
 
 `target_focus` is the last clicked Imp2D (`target_cursor as Imp2D` on mouse press, unless `input_hog`). ImpPlayer fires Begin/End when it changes (`last_focus_target`). Editor `Scene_Editor.OnDraw2DForeground` prints targets top-right. `EdFileThumbnail` selection follows focus: click/grab selects, focus End deselects (`Thumbnail_Select(null)`).
 
-`ImpPlayer.Target_IsLive(comp)` — `comp` is `ImpScene.current.root` or a descendant. Update_Input clears `input_hog` / `target_focus` that fail this (detached dialog widgets), and clears `target_game` when that session is gone.
+`ImpPlayer.Target_IsLive(comp)` — `comp` is `ImpScene.current.root` or a descendant. `Target_CanOwnInput` also requires `IsVisibleInTree()`: hidden tab pages stay in the tree (`Update` still runs) and must not keep hog / focus. Update_Input clears `input_hog` / `target_focus` that fail `Target_CanOwnInput` (detached dialog widgets **or** a hidden Scene/Flow/Asset page), and clears `target_game` when that session is gone.
 
 `C2_GameView` uses `_Notify_AsFocusTarget` Begin/End as the click-in / click-out edge for `ImpPlayer.target_game` — see **ImpGame / Play-in-Editor → Input target game**.
 

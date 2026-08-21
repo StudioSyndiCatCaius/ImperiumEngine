@@ -343,6 +343,8 @@ public class ScriptNode : ImpFlowNode
     //         SN_Func per [PulseCall], SN_Event per [PulseOverride], SN_VarGet / SN_VarSet per [ImpVar].
     public bool is_available = false;
 
+    public override bool Node_IsEditorAddable() { return false; }
+
     // Type the member was reflected off (TPulseNode.target_type), and the member itself.
     public Type context = typeof(object);
     public string member = "";

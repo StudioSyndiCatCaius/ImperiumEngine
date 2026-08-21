@@ -468,6 +468,10 @@ public class PNL_ScriptGraph : EdPanel
             TGraphSlot s = node.slots[index];
             s.data_left = type_left;
             s.data_right = type_right;
+            if (enable_left && type_left == null)
+            {
+                s.allow_multi_in = true;
+            }
             if (enable_left && Pulse.CanEditDefault(type_left))
             {
                 s.edit_left = true;

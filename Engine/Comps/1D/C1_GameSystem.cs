@@ -2,6 +2,7 @@
 
 namespace ImperiumEngine.Comps._1D;
 
+// a game system is a singleton that handles certain events and game state code. they can run asmot liek an evetn with a Activate & callbac on finish
 public abstract class C1_GameSystem : ImpComp
 {
     // ################################################################################################################

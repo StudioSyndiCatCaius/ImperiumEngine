@@ -193,12 +193,17 @@ public class Scene_Editor : ImpComp
             if (asset is ImpScene scene)
             {
                 mtab_scene.Scene_Add(scene);
-                ui_main_tabs.selected_tab = 0;
+                SelectMainWindow(mtab_scene);
+            }
+            else if (asset is A_Flow flow)
+            {
+                mtab_flow.Flow_Add(flow);
+                SelectMainWindow(mtab_flow);
             }
             else
             {
                 mtab_asset.Asset_Add(asset);
-                ui_main_tabs.selected_tab = 1;
+                SelectMainWindow(mtab_asset);
             }
         };
 
@@ -345,6 +350,13 @@ public class Scene_Editor : ImpComp
                 Consider(ed.asset);
             }
         }
+        for (int i = 0; i < mtab_flow.tab_flows.children.Count; i++)
+        {
+            if (mtab_flow.tab_flows.children[i] is PNL_FlowGraph ed && ed.flow != null)
+            {
+                Consider(ed.flow);
+            }
+        }
         foreach (ImpAsset a in ImpAsset.Loaded_GetAll())
         {
             Consider(a);
@@ -383,6 +395,28 @@ public class Scene_Editor : ImpComp
             page++;
         }
         return null;
+    }
+
+    void SelectMainWindow(EdWindow window)
+    {
+        if (window == null)
+        {
+            return;
+        }
+        int page = 0;
+        for (int i = 0; i < ui_main_tabs.children.Count; i++)
+        {
+            if (ui_main_tabs.children[i] == ui_main_tabs.list_tabs)
+            {
+                continue;
+            }
+            if (ui_main_tabs.children[i] == window)
+            {
+                ui_main_tabs.selected_tab = page;
+                return;
+            }
+            page++;
+        }
     }
     
     public void MOpt_Play()

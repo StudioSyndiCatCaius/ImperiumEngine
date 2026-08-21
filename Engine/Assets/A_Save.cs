@@ -1,18 +1,21 @@
-﻿using ImperiumEngine.Comps._1D;
+﻿using ImperiumEngine.Assets.Flow;
+using ImperiumEngine.Comps._1D;
 using ImperiumEngine.Structs;
 
 namespace ImperiumEngine;
 
 public class A_Save : ImpAsset
 {
-    public Dictionary<TLabel,A_CreatureConfig> creatures=new()
+    [ImpVar] public Dictionary<TLabel,A_CreatureConfig> creatures=new()
     {
         ["_"]=new()
     };
-    public Dictionary<TLabel,A_SquadConfig> squads=new()
+    [ImpVar] public Dictionary<TLabel,A_SquadConfig> squads=new()
     {
         ["_"]=new()
     };
+    
+    [ImpVar] public Dictionary<Flow_Quest,TQuestState> quest_data=new();
 }
 
 public class Save_Game : A_Save

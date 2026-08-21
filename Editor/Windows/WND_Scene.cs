@@ -269,7 +269,7 @@ public class WND_Scene : EdWindow
     {
         if (ImpPlayer.players.Count == 0) return;
         ImpPlayer player = ImpPlayer.players[0];
-        if (!is_visible) return;
+        if (!IsVisibleInTree()) return;
         // Delete / Ctrl+D act on the authored scene's selection. While the game holds input these
         // are the game's keys — otherwise a game bound to Delete destroys real comps mid-play.
         if (!ImpPlayer.TargetGame_IsHost()) return;

@@ -29,6 +29,9 @@ public class TGraphSlot
     public bool edit_left;
     public object value;
     public Imp2D edit;
+    // Exec pins: many wires may enter the same input. Data pins leave this false
+    // so a new connect still replaces the previous source.
+    public bool allow_multi_in;
 }
 
 public class TGraphLink
@@ -62,6 +65,7 @@ public class C2_GraphEdit : Imp2D
     public Action<Vector2> on_context_empty;
     public Action<Vector2, C2_GraphNode, int, bool> on_connect_drop;
     public Action<C2_GraphNode> on_node_removed;
+    public Action<Vector2, object> on_drop;
 
     public TGraphLink selected_link;
     public TGraphLink hovered_link;
@@ -145,17 +149,21 @@ public class C2_GraphEdit : Imp2D
         {
             return false;
         }
-        for (int i = connections.Count - 1; i >= 0; i--)
+        TGraphSlot dest = to.slots[to_slot];
+        if (!dest.allow_multi_in)
         {
-            TGraphLink old = connections[i];
-            if (old.to == to && old.to_slot == to_slot)
+            for (int i = connections.Count - 1; i >= 0; i--)
             {
-                connections.RemoveAt(i);
-                if (selected_link == old)
+                TGraphLink old = connections[i];
+                if (old.to == to && old.to_slot == to_slot)
                 {
-                    selected_link = null;
+                    connections.RemoveAt(i);
+                    if (selected_link == old)
+                    {
+                        selected_link = null;
+                    }
+                    on_disconnection?.Invoke(old);
                 }
-                on_disconnection?.Invoke(old);
             }
         }
         TGraphLink link = new()
@@ -1001,6 +1009,30 @@ public class C2_GraphEdit : Imp2D
         }
     }
 
+    public void Drop_Receive(ImpPlayer player, object payload)
+    {
+        if (payload == null || on_drop == null || player == null)
+        {
+            return;
+        }
+        on_drop.Invoke(ScreenToGraph(player.cursor.position), payload);
+    }
+
+    public override void _Notify_OnGrabDrop(ImpPlayer player, ENotifyGrabTarget notify, ImpComp other, double dt)
+    {
+        base._Notify_OnGrabDrop(player, notify, other, dt);
+        if (notify != ENotifyGrabTarget.Drop_AsInstigator)
+        {
+            return;
+        }
+        object payload = null;
+        if (other != null)
+        {
+            payload = other.CursorGrab_Payload();
+        }
+        Drop_Receive(player, payload);
+    }
+
     public List<C2_GraphNode> Nodes_Get()
     {
         List<C2_GraphNode> list = new();
@@ -1151,6 +1183,26 @@ public class C2_GraphNode : Imp2D
         layout.orient_H = EUIViewportAlignment.Start;
         layout.orient_V = EUIViewportAlignment.Start;
         layout.size = graph_size;
+    }
+
+    public override void _Notify_OnGrabDrop(ImpPlayer player, ENotifyGrabTarget notify, ImpComp other, double dt)
+    {
+        base._Notify_OnGrabDrop(player, notify, other, dt);
+        if (notify != ENotifyGrabTarget.Drop_AsInstigator)
+        {
+            return;
+        }
+        C2_GraphEdit graph = parent as C2_GraphEdit;
+        if (graph == null)
+        {
+            return;
+        }
+        object payload = null;
+        if (other != null)
+        {
+            payload = other.CursorGrab_Payload();
+        }
+        graph.Drop_Receive(player, payload);
     }
 
     public Vector2 GraphSize()
