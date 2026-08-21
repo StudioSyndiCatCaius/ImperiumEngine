@@ -77,21 +77,43 @@ public class TGizmoData
 
     public Action on_selection_changed;
 
+    void Selection_UnstampAll()
+    {
+        for (int i = 0; i < selected_comps.Count; i++)
+        {
+            ImpComp c = selected_comps[i];
+            if (c != null)
+            {
+                c.is_selected = false;
+            }
+        }
+    }
+
     public void Selection_Clear()
     {
-        if (selected_comps.Count == 0) return;
+        if (selected_comps.Count == 0)
+        {
+            return;
+        }
+        Selection_UnstampAll();
         selected_comps.Clear();
         on_selection_changed?.Invoke();
     }
 
     public void Selection_Set(IEnumerable<ImpComp> comps)
     {
+        Selection_UnstampAll();
         selected_comps.Clear();
         if (comps != null)
         {
-            foreach (var c in comps)
+            foreach (ImpComp c in comps)
             {
-                if (c != null && !selected_comps.Contains(c)) selected_comps.Add(c);
+                if (c == null || selected_comps.Contains(c))
+                {
+                    continue;
+                }
+                selected_comps.Add(c);
+                c.is_selected = true;
             }
         }
         on_selection_changed?.Invoke();
@@ -99,22 +121,43 @@ public class TGizmoData
 
     public void Selection_Add(IEnumerable<ImpComp> comps)
     {
-        if (comps == null) return;
-        bool changed = false;
-        foreach (var c in comps)
+        if (comps == null)
         {
-            if (c == null || selected_comps.Contains(c)) continue;
+            return;
+        }
+        bool changed = false;
+        foreach (ImpComp c in comps)
+        {
+            if (c == null || selected_comps.Contains(c))
+            {
+                continue;
+            }
             selected_comps.Add(c);
+            c.is_selected = true;
             changed = true;
         }
-        if (changed) on_selection_changed?.Invoke();
+        if (changed)
+        {
+            on_selection_changed?.Invoke();
+        }
     }
 
     public void Selection_Toggle(ImpComp comp)
     {
-        if (comp == null) return;
-        if (selected_comps.Contains(comp)) selected_comps.Remove(comp);
-        else selected_comps.Add(comp);
+        if (comp == null)
+        {
+            return;
+        }
+        if (selected_comps.Contains(comp))
+        {
+            selected_comps.Remove(comp);
+            comp.is_selected = false;
+        }
+        else
+        {
+            selected_comps.Add(comp);
+            comp.is_selected = true;
+        }
         on_selection_changed?.Invoke();
     }
 

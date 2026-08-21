@@ -196,10 +196,6 @@ public class WND_Scene : EdWindow
         list_main.Child_Add(list_panels);
 
         ImpScene preview = new();
-        preview.sky_texture = new TRef<A_TextureHDR>(new A_TextureHDR
-        {
-            source_file = ImpFile.GetOrCreate(ImpFile.Path_Resolve("{engine}/Textures/HDRI/sky_1.hdr")),
-        });
 
         preview.root.name = preview.GetName();
 

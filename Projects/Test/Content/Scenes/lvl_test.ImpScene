@@ -4,6 +4,9 @@
     "root_type": {
       "class_name": "ImpComp"
     },
+    "starting_camera": {
+      "comp_path": "Camera#0"
+    },
     "script_override": null,
     "script_builtin": {
       "_class": "A_Script",
@@ -250,61 +253,9 @@
       "X": 1920,
       "Y": 1080
     },
-    "ambient_color": {
-      "R": 88,
-      "G": 98,
-      "B": 116,
-      "A": 255
+    "environment": {
+      "path": "builtin:A_Environment.ENVI_DAY"
     },
-    "ambient_intensity": 0.5,
-    "sun_enabled": true,
-    "sun_color": {
-      "R": 255,
-      "G": 244,
-      "B": 228,
-      "A": 255
-    },
-    "sun_intensity": 0.5,
-    "sun_rotation": {
-      "X": -45,
-      "Y": -35,
-      "Z": 0
-    },
-    "sun_specular": 1.15,
-    "sun_cast_shadows": true,
-    "sky_texture": {
-      "path": null
-    },
-    "sky_lights_scene": true,
-    "sky_energy": 0.5,
-    "sky_blur": 0,
-    "sky_rotation": 0,
-    "fog_mode": "Disabled",
-    "fog_color": {
-      "R": 150,
-      "G": 160,
-      "B": 175,
-      "A": 255
-    },
-    "fog_start": 1,
-    "fog_end": 50,
-    "fog_density": 0.05,
-    "fog_sky_affect": 0.5,
-    "tonemap_mode": "Filmic",
-    "tonemap_exposure": 1.08,
-    "tonemap_white": 1,
-    "bloom_mode": "Mix",
-    "bloom_intensity": 0.08,
-    "bloom_levels": 0.55,
-    "bloom_threshold": 0.35,
-    "bloom_soft_threshold": 0.5,
-    "bloom_filter_radius": 1,
-    "ssao_enabled": true,
-    "ssao_radius": 1.85,
-    "ssao_intensity": 2.45,
-    "ssao_power": 1.85,
-    "ssao_bias": 0.022,
-    "ssao_samples": 8,
     "source_file": null,
     "source_index": 0,
     "root": {
@@ -382,211 +333,7 @@
               }
             }
           },
-          "children": [
-            {
-              "_class": "C3_Character",
-              "name": "Character",
-              "vars": {
-                "shape": "Capsule",
-                "extents": {
-                  "X": 0.4,
-                  "Y": 1.8,
-                  "Z": 0.4
-                },
-                "transform": {
-                  "position": {
-                    "X": 0.10226778,
-                    "Y": 0.0200001,
-                    "Z": 0.0240381
-                  },
-                  "rotation": {
-                    "X": 0,
-                    "Y": 0,
-                    "Z": 0
-                  },
-                  "scale": {
-                    "X": 0.025,
-                    "Y": 1,
-                    "Z": 0.025
-                  }
-                },
-                "physics_enabled": true,
-                "movement_enabled": true,
-                "move_mode": {
-                  "_class": "A_MoveMode",
-                  "vars": {
-                    "speed": 5,
-                    "acceleration": 20,
-                    "deceleration": 20,
-                    "jump_speed": 6,
-                    "air_control": 1,
-                    "air_friction": 0.1,
-                    "gravity_enabled": true,
-                    "gravity_dir": {
-                      "X": 0,
-                      "Y": -1,
-                      "Z": 0
-                    },
-                    "gravity_accel_curve": null,
-                    "gravity_scale": 1,
-                    "rotate_with_movement": true,
-                    "velocity_rotation_rate": {
-                      "X": 0,
-                      "Y": 360,
-                      "Z": 0
-                    },
-                    "forward_adjust_rotation": false,
-                    "source_file": null,
-                    "source_index": 0
-                  }
-                },
-                "is_visible": true,
-                "is_locked": false,
-                "children_editable": true,
-                "popup_config": null,
-                "script_override": null,
-                "script_builtin": {
-                  "_class": "A_Script",
-                  "vars": {
-                    "parent_type": {
-                      "class_name": "C3_Character"
-                    },
-                    "nodes": [],
-                    "connections": [],
-                    "vars": [],
-                    "source_file": null,
-                    "source_index": 0
-                  }
-                }
-              },
-              "children": [
-                {
-                  "_class": "C3_Mesh",
-                  "name": "C3_Mesh",
-                  "vars": {
-                    "mesh": {
-                      "path": "builtin:A_Mesh.SK_MANNEQUIN"
-                    },
-                    "materials": null,
-                    "cast_shadows": true,
-                    "transform": {
-                      "position": {
-                        "X": 0,
-                        "Y": 0,
-                        "Z": 0
-                      },
-                      "rotation": {
-                        "X": 0,
-                        "Y": 0,
-                        "Z": 0
-                      },
-                      "scale": {
-                        "X": 1,
-                        "Y": 1,
-                        "Z": 1
-                      }
-                    },
-                    "physics_enabled": false,
-                    "movement_enabled": false,
-                    "move_mode": null,
-                    "is_visible": true,
-                    "is_locked": false,
-                    "children_editable": true,
-                    "popup_config": null,
-                    "script_override": null,
-                    "script_builtin": {
-                      "_class": "A_Script",
-                      "vars": {
-                        "parent_type": {
-                          "class_name": "C3_Mesh"
-                        },
-                        "nodes": [],
-                        "connections": [],
-                        "vars": [],
-                        "source_file": null,
-                        "source_index": 0
-                      }
-                    }
-                  },
-                  "children": []
-                },
-                {
-                  "_class": "C3_Skeleton",
-                  "name": "C3_Skeleton",
-                  "vars": {
-                    "skeleton": null,
-                    "bound_meshes": null,
-                    "anim_graph": null,
-                    "transform": {
-                      "position": {
-                        "X": 0,
-                        "Y": 0,
-                        "Z": 0
-                      },
-                      "rotation": {
-                        "X": 0,
-                        "Y": 0,
-                        "Z": 0
-                      },
-                      "scale": {
-                        "X": 1,
-                        "Y": 1,
-                        "Z": 1
-                      }
-                    },
-                    "physics_enabled": false,
-                    "movement_enabled": false,
-                    "move_mode": null,
-                    "is_visible": true,
-                    "is_locked": false,
-                    "children_editable": true,
-                    "popup_config": null,
-                    "script_override": null,
-                    "script_builtin": {
-                      "_class": "A_Script",
-                      "vars": {
-                        "parent_type": {
-                          "class_name": "C3_Skeleton"
-                        },
-                        "nodes": [],
-                        "connections": [],
-                        "vars": [],
-                        "source_file": null,
-                        "source_index": 0
-                      }
-                    }
-                  },
-                  "children": []
-                },
-                {
-                  "_class": "C1_Creature",
-                  "name": "C1_Creature",
-                  "vars": {
-                    "auto_abilities": null,
-                    "is_visible": true,
-                    "is_locked": false,
-                    "children_editable": true,
-                    "popup_config": null,
-                    "script_override": null,
-                    "script_builtin": {
-                      "_class": "A_Script",
-                      "vars": {
-                        "parent_type": {
-                          "class_name": "C1_Creature"
-                        },
-                        "nodes": [],
-                        "connections": [],
-                        "vars": [],
-                        "source_file": null,
-                        "source_index": 0
-                      }
-                    }
-                  },
-                  "children": []
-                }
-              ]
-            }
-          ]
+          "children": []
         },
         {
           "_class": "C3_Mesh",
@@ -684,6 +431,7 @@
             },
             "normalize_pivot": true,
             "cursor_filter": "Pass",
+            "option_button": null,
             "is_visible": true,
             "is_locked": false,
             "children_editable": true,
@@ -756,6 +504,7 @@
             },
             "normalize_pivot": true,
             "cursor_filter": "Pass",
+            "option_button": null,
             "is_visible": true,
             "is_locked": false,
             "children_editable": true,
@@ -766,6 +515,262 @@
               "vars": {
                 "parent_type": {
                   "class_name": "C2_Text"
+                },
+                "nodes": [],
+                "connections": [],
+                "vars": [],
+                "source_file": null,
+                "source_index": 0
+              }
+            }
+          },
+          "children": []
+        },
+        {
+          "_class": "C3_Character",
+          "name": "Character",
+          "vars": {
+            "shape": "Capsule",
+            "extents": {
+              "X": 0.4,
+              "Y": 1.8,
+              "Z": 0.4
+            },
+            "transform": {
+              "position": {
+                "X": 4.090711,
+                "Y": 0.020247936,
+                "Z": 0.961524
+              },
+              "rotation": {
+                "X": 0,
+                "Y": 0,
+                "Z": 0
+              },
+              "scale": {
+                "X": 1,
+                "Y": 1,
+                "Z": 1
+              }
+            },
+            "physics_enabled": true,
+            "movement_enabled": true,
+            "move_mode": {
+              "_class": "A_MoveMode",
+              "vars": {
+                "speed": 5,
+                "acceleration": 20,
+                "deceleration": 20,
+                "jump_speed": 6,
+                "air_control": 1,
+                "air_friction": 0.1,
+                "gravity_enabled": true,
+                "gravity_dir": {
+                  "X": 0,
+                  "Y": -1,
+                  "Z": 0
+                },
+                "gravity_accel_curve": null,
+                "gravity_scale": 1,
+                "rotate_with_movement": true,
+                "velocity_rotation_rate": {
+                  "X": 0,
+                  "Y": 360,
+                  "Z": 0
+                },
+                "forward_adjust_rotation": false,
+                "source_file": null,
+                "source_index": 0
+              }
+            },
+            "is_visible": true,
+            "is_locked": false,
+            "children_editable": true,
+            "popup_config": null,
+            "script_override": null,
+            "script_builtin": {
+              "_class": "A_Script",
+              "vars": {
+                "parent_type": {
+                  "class_name": "C3_Character"
+                },
+                "nodes": [],
+                "connections": [],
+                "vars": [],
+                "source_file": null,
+                "source_index": 0
+              }
+            }
+          },
+          "children": [],
+          "owned": {
+            "mesh": {
+              "_class": "C3_Mesh",
+              "name": "C3_Mesh",
+              "vars": {
+                "mesh": {
+                  "path": "builtin:A_Mesh.SK_MANNEQUIN"
+                },
+                "materials": null,
+                "cast_shadows": true,
+                "transform": {
+                  "position": {
+                    "X": 0,
+                    "Y": 0,
+                    "Z": 0
+                  },
+                  "rotation": {
+                    "X": 0,
+                    "Y": 180,
+                    "Z": 0
+                  },
+                  "scale": {
+                    "X": 1,
+                    "Y": 1,
+                    "Z": 1
+                  }
+                },
+                "physics_enabled": false,
+                "movement_enabled": false,
+                "move_mode": null,
+                "is_visible": true,
+                "is_locked": false,
+                "children_editable": true,
+                "popup_config": null,
+                "script_override": null,
+                "script_builtin": {
+                  "_class": "A_Script",
+                  "vars": {
+                    "parent_type": {
+                      "class_name": "C3_Mesh"
+                    },
+                    "nodes": [],
+                    "connections": [],
+                    "vars": [],
+                    "source_file": null,
+                    "source_index": 0
+                  }
+                }
+              },
+              "children": []
+            },
+            "skeleton": {
+              "_class": "C3_Skeleton",
+              "name": "C3_Skeleton",
+              "vars": {
+                "skeleton": null,
+                "bound_meshes": null,
+                "anim_graph": null,
+                "transform": {
+                  "position": {
+                    "X": 0,
+                    "Y": 0,
+                    "Z": 0
+                  },
+                  "rotation": {
+                    "X": 0,
+                    "Y": 0,
+                    "Z": 0
+                  },
+                  "scale": {
+                    "X": 1,
+                    "Y": 1,
+                    "Z": 1
+                  }
+                },
+                "physics_enabled": false,
+                "movement_enabled": false,
+                "move_mode": null,
+                "is_visible": true,
+                "is_locked": false,
+                "children_editable": true,
+                "popup_config": null,
+                "script_override": null,
+                "script_builtin": {
+                  "_class": "A_Script",
+                  "vars": {
+                    "parent_type": {
+                      "class_name": "C3_Skeleton"
+                    },
+                    "nodes": [],
+                    "connections": [],
+                    "vars": [],
+                    "source_file": null,
+                    "source_index": 0
+                  }
+                }
+              },
+              "children": []
+            },
+            "creature": {
+              "_class": "C1_Creature",
+              "name": "C1_Creature",
+              "vars": {
+                "creature_root": null,
+                "auto_abilities": null,
+                "is_visible": true,
+                "is_locked": false,
+                "children_editable": true,
+                "popup_config": null,
+                "script_override": null,
+                "script_builtin": {
+                  "_class": "A_Script",
+                  "vars": {
+                    "parent_type": {
+                      "class_name": "C1_Creature"
+                    },
+                    "nodes": [],
+                    "connections": [],
+                    "vars": [],
+                    "source_file": null,
+                    "source_index": 0
+                  }
+                }
+              },
+              "children": []
+            }
+          }
+        },
+        {
+          "_class": "C3_Camera",
+          "name": "Camera",
+          "vars": {
+            "fov": 60,
+            "aspect_ratio": 0,
+            "boom_distance": 2.8500008583068848,
+            "look_target": null,
+            "look_lerp": 0.5,
+            "look_speed": 1,
+            "transform": {
+              "position": {
+                "X": 3.5979486,
+                "Y": 2,
+                "Z": 8.140724
+              },
+              "rotation": {
+                "X": -18.890982,
+                "Y": -40.293568,
+                "Z": -9.02379E-07
+              },
+              "scale": {
+                "X": 1,
+                "Y": 1,
+                "Z": 1
+              }
+            },
+            "physics_enabled": false,
+            "movement_enabled": false,
+            "move_mode": null,
+            "is_visible": true,
+            "is_locked": false,
+            "children_editable": true,
+            "popup_config": null,
+            "script_override": null,
+            "script_builtin": {
+              "_class": "A_Script",
+              "vars": {
+                "parent_type": {
+                  "class_name": "C3_Camera"
                 },
                 "nodes": [],
                 "connections": [],

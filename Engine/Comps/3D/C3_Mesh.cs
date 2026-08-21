@@ -30,6 +30,15 @@ public class C3_Mesh : Imp3D
         R3D.DrawMeshEx(mesh.mesh, R3D.GetDefaultMaterial(), t.position, rot, t.scale);
     }
 
+    protected override TBounds3 Bounds_Calc()
+    {
+        if (mesh != null && mesh.mesh.VertexCount > 0)
+        {
+            return mesh.Bounds_Get(cached_global_transform);
+        }
+        return base.Bounds_Calc();
+    }
+
     public override Shape Phys_MakeShape(Vector3 world_scale)
     {
         Vector3 s = new(

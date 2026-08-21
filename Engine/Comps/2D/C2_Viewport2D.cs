@@ -15,6 +15,8 @@ public class C2_Viewport2D : Imp2D
     public ImpComp? root;
     public ImpComp? overlay;
     public bool transpose_traces = true;
+    // Editor scene view sets Editor (G toggle). Game / standalone leave None.
+    public EDrawFlags draw_flags;
     // Game view composites this over a 3D blit — skip the opaque canvas chrome.
     public bool clear_background = true;
     public bool draw_canvas = true;
@@ -106,8 +108,8 @@ public class C2_Viewport2D : Imp2D
             {
                 Imp2D.SceneLayout_Set(hud, CanvasSize());
                 Imp2D.SceneDraw_Begin(camera, new Vector2(w, h));
-                hud.Draw(dt, EDrawFlags.Editor, 1);
-                overlay?.Draw(dt, EDrawFlags.Editor, 1);
+                hud.Draw(dt, draw_flags, 1);
+                overlay?.Draw(dt, draw_flags, 1);
                 Imp2D.SceneDraw_End();
             }
             Imp2D.Clip_Pop();
@@ -162,8 +164,8 @@ public class C2_Viewport2D : Imp2D
         {
             Imp2D.SceneLayout_Set(src, canvas);
             Imp2D.SceneDraw_Begin(camera, view);
-            src.Draw(dt, EDrawFlags.Editor, 1);
-            overlay?.Draw(dt, EDrawFlags.Editor, 1);
+            src.Draw(dt, draw_flags, 1);
+            overlay?.Draw(dt, draw_flags, 1);
             Imp2D.SceneDraw_End();
         }
         Raylib.EndTextureMode();

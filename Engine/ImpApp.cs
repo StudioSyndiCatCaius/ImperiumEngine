@@ -21,15 +21,18 @@ public class ImpApp
     
     
     public static ImpApp app;
-    
-    
-// Setup camera
-    public Camera3D camera = new Camera3D() {
+
+    public static Imp3D view_target;
+
+    // Setup camera
+    public Camera3D default_camera = new Camera3D() {
         Position = new Vector3(0, 2, 2),
         Target = Vector3.Zero,
         Up = new Vector3(0, 1, 0),
         FovY = 60
     };
+
+    public Camera3D camera = new();
     // #################################################################################
     // Class
     // #################################################################################
@@ -43,8 +46,8 @@ public class ImpApp
         on_pre_init?.Invoke();
         ImpConfig.LoadAll();
         
-        Raylib.SetConfigFlags(ConfigFlags.Msaa4xHint | ConfigFlags.HighDpiWindow);
-        Raylib.InitWindow(1280, 720, "Imperium");
+        Raylib.SetConfigFlags(ConfigFlags.Msaa4xHint | ConfigFlags.HighDpiWindow | ConfigFlags.ResizableWindow | ConfigFlags.MaximizedWindow );
+        Raylib.InitWindow(1600, 900, "Imperium");
         
         Raylib.SetTargetFPS(60);
         Raylib.SetExitKey(KeyboardKey.Null);
@@ -56,6 +59,7 @@ public class ImpApp
         on_post_init?.Invoke();
         ImpGame.EnsureHost();
         
+        Imp3D.RefreshGraphics();
         while (!Raylib.WindowShouldClose())
         {
             // ----- BEGIN ------------------------------------------------------------------------------------
@@ -68,25 +72,51 @@ public class ImpApp
             // Each phase starts on a fresh layout epoch: the previous phase may have moved
             // things around through paths the setters cannot see (direct size/transform writes).
             Imp2D.Layout_Invalidate();
+            Imp3D.Cache_Invalidate();
             ImpProfiler.Phase_Begin(ImpProfiler.EPhase.Input);
             foreach (var p in ImpPlayer.players)
                 p.Update_Input(dt);
 
             // ----- UPDATE (layout) --------------------------------------------------------------------------
             Imp2D.Layout_Invalidate();
+            Imp3D.Cache_Invalidate();
             ImpProfiler.Phase_Begin(ImpProfiler.EPhase.Update);
             ImpScene.current.Update(dt);
 
+            if (view_target != null)
+            {
+                camera = R3D.CameraToRL(view_target.Camera_GetData());
+            }
+            else
+            {
+                camera = default_camera;
+            }
+
             // ----- CURSOR (after layout so hit rects match drawn widgets) ------------------------------------
             Imp2D.Layout_Invalidate();
+            Imp3D.Cache_Invalidate();
             ImpProfiler.Phase_Begin(ImpProfiler.EPhase.Cursor);
             foreach (var p in ImpPlayer.players)
                 p.Update_Cursor(dt);
 
             // ----- DRAW ------------------------------------------------------------------------------------
             Imp2D.Layout_Invalidate();
+            Imp3D.Cache_Invalidate();
             ImpProfiler.Phase_Begin(ImpProfiler.EPhase.Draw3D);
-            R3D.Begin(camera);
+            // Standalone (and any host whose scene is running) draws 3D to the window.
+            // PIE still renders through C2_Viewport3D, which applies its own environment.
+            if (ImpScene.current.is_running)
+            {
+                ImpScene.current.ApplyRenderState();
+            }
+            if (view_target != null && view_target.Camera_IsValid())
+            {
+                R3D.BeginEx(view_target.Camera_GetData());
+            }
+            else
+            {
+                R3D.Begin(camera);
+            }
             ImpScene.current.Draw(dt,0); //3D
             R3D.End();
 

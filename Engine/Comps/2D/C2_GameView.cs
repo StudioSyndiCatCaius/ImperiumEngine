@@ -1,6 +1,7 @@
 using System.Numerics;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Structs;
+using R3D_cs;
 using Raylib_cs;
 
 namespace ImperiumEngine.Comps._2D;
@@ -48,6 +49,7 @@ public class C2_GameView : C2_Box
         viewport3D.view_scene = s;
         viewport2D.view_scene = s;
         viewport3D.camera = cam3;
+        Camera_Sync();
         if (ImpPlayer.players.Count > 0)
         {
             player = ImpPlayer.players[0];
@@ -75,6 +77,19 @@ public class C2_GameView : C2_Box
         player = null;
         viewport3D.view_scene = null;
         viewport2D.view_scene = null;
+        viewport3D.view_camera = null;
+    }
+
+    void Camera_Sync()
+    {
+        ImpScene s = view_game?.scene;
+        if (s != null && s.starting_camera != null && s.starting_camera.Camera_IsValid())
+        {
+            viewport3D.view_camera = s.starting_camera;
+            viewport3D.camera = R3D.CameraToRL(s.starting_camera.Camera_GetData());
+            return;
+        }
+        viewport3D.view_camera = null;
     }
 
     // Click in / click out. ImpPlayer sets target_focus to the deepest Hit comp under the cursor,
@@ -143,6 +158,7 @@ public class C2_GameView : C2_Box
 
         ImpGame prev = ImpGame.Bind(view_game);
         s.Update(dt);
+        Camera_Sync();
         ImpGame.Bind(prev);
     }
 

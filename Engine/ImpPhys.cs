@@ -183,7 +183,7 @@ public class ImpPhys
         e.is_character = comp.movement_enabled;
         e.body = BodyID.Invalid;
 
-        Quaternion rot = ImpMath.EulerToQuat(world.rotation);
+        Quaternion rot = ImpMath.Euler_2_Quat(world.rotation);
 
         if (e.is_character)
         {
@@ -291,7 +291,7 @@ public class ImpPhys
                 continue;
             }
             TTransform3 world = comp.Transform_Get(true);
-            Quaternion rot = ImpMath.EulerToQuat(world.rotation);
+            Quaternion rot = ImpMath.Euler_2_Quat(world.rotation);
 
             Vector3 ds = world.scale - e.scale;
             if (ds.LengthSquared() > 1e-6f)

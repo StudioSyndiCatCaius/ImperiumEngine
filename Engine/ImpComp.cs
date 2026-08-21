@@ -14,8 +14,9 @@ namespace ImperiumEngine;
 [Flags]
 public enum EDrawFlags
 {
-    Editor, // what to draw when in editor view (Toggle in editor with "G")
-    Selected, //what to draw when selected in editor
+    None = 0,
+    Editor = 1 << 0, // helpers in the editor viewport (toggle with G)
+    Selected = 1 << 1, // extra overlays when this specific comp is selected
 }
 
 public class ImpComp
@@ -65,6 +66,8 @@ public class ImpComp
     public string name; //should probably be a TLabel later?
 
     [Category("Component")][ImpVar] public bool is_visible=true;
+    // Editor selection stamp. Not ImpVar. TGizmoData sets this; Draw ORs EDrawFlags.Selected.
+    public bool is_selected;
     [Category("Component")][ImpVar] public bool is_locked=false;
     [Category("Component")][ImpVar] public bool children_editable=true;
     [Category("Component")][ImpVar] public A_PopupConfig popup_config=null;
@@ -172,6 +175,10 @@ public class ImpComp
                 continue;
             }
             if (!typeof(ImpComp).IsAssignableFrom(f.FieldType))
+            {
+                continue;
+            }
+            if (f.GetCustomAttribute<ImpVarAttribute>() != null)
             {
                 continue;
             }
@@ -304,6 +311,7 @@ public class ImpComp
             child.scene = scene;
             child.game_owner = game_owner;
             Imp2D.Layout_Invalidate();
+            Imp3D.Cache_Invalidate();
             return;
         }
         child.Detach();
@@ -312,6 +320,7 @@ public class ImpComp
         child.scene = scene;
         child.game_owner = game_owner;
         Imp2D.Layout_Invalidate();
+        Imp3D.Cache_Invalidate();
     }
 
     public void Child_Insert(int index, ImpComp child)
@@ -333,6 +342,7 @@ public class ImpComp
         child.scene = scene;
         child.game_owner = game_owner;
         Imp2D.Layout_Invalidate();
+        Imp3D.Cache_Invalidate();
     }
 
     public void Detach()
@@ -344,6 +354,7 @@ public class ImpComp
         scene = null;
         game_owner = null;
         Imp2D.Layout_Invalidate();
+        Imp3D.Cache_Invalidate();
     }
 
     public void Reparent(ImpComp new_parent, int index = -1)
@@ -415,6 +426,7 @@ public class ImpComp
         game_owner = null;
         is_visible = false;
         Imp2D.Layout_Invalidate();
+        Imp3D.Cache_Invalidate();
     }
 
     static readonly Dictionary<Type, FieldInfo[]> _clone_fields = new();
@@ -426,7 +438,7 @@ public class ImpComp
         foreach (FieldInfo f in type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
         {
             if (f.IsInitOnly || f.IsLiteral) continue;
-            if (f.Name is "parent" or "children" or "input_owner" or "is_destroying" or "_scene" or "_game_owner" or "packed_from") continue;
+            if (f.Name is "parent" or "children" or "input_owner" or "is_destroying" or "_scene" or "_game_owner" or "packed_from" or "cached_global_transform" or "cached_bounds" or "is_selected") continue;
             // Layout cache (Imp2D). Copying a stamp would let the clone answer with the
             // original's rect until the next epoch bump, so leave it at 0 and recompute.
             if (f.Name.StartsWith("_e_") || f.Name.StartsWith("_c_")) continue;
@@ -443,9 +455,78 @@ public class ImpComp
         Owned_Bind();
         copy.Owned_Bind();
         Clone_Into(copy, skip_self);
+        CompRefs_Remap(this, copy, skip_self);
         if (skip_self == null && (copy.packed.Get() != null || !string.IsNullOrEmpty(copy.packed.path)))
             ImpScene.BindPackedTree(copy, copy);
         return copy;
+    }
+
+    // ImpComp ImpVars (look_target, …) copy as the original objects. After the tree exists,
+    // retarget any ref that pointed at a node in `src` onto the matching node in `dst`.
+    static void CompRefs_Remap(ImpComp src, ImpComp dst, ImpScene skip_self)
+    {
+        if (src == null || dst == null)
+        {
+            return;
+        }
+        Dictionary<ImpComp, ImpComp> map = new(ReferenceEqualityComparer.Instance);
+        void WalkMap(ImpComp a, ImpComp b)
+        {
+            if (a == null || b == null)
+            {
+                return;
+            }
+            map[a] = b;
+            int bi = 0;
+            for (int i = 0; i < a.children.Count; i++)
+            {
+                ImpComp ak = a.children[i];
+                if (skip_self != null && ImpScene.IsSelfInstance(ak, skip_self))
+                {
+                    continue;
+                }
+                if (bi >= b.children.Count)
+                {
+                    break;
+                }
+                WalkMap(ak, b.children[bi]);
+                bi++;
+            }
+        }
+        WalkMap(src, dst);
+        void WalkApply(ImpComp n)
+        {
+            if (n == null)
+            {
+                return;
+            }
+            FieldInfo[] fields = n.GetType().GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            for (int i = 0; i < fields.Length; i++)
+            {
+                FieldInfo f = fields[i];
+                if (!f.IsDefined(typeof(ImpVarAttribute), true))
+                {
+                    continue;
+                }
+                if (!typeof(ImpComp).IsAssignableFrom(f.FieldType))
+                {
+                    continue;
+                }
+                if (f.GetValue(n) is not ImpComp cur)
+                {
+                    continue;
+                }
+                if (map.TryGetValue(cur, out ImpComp mapped))
+                {
+                    f.SetValue(n, mapped);
+                }
+            }
+            for (int i = 0; i < n.children.Count; i++)
+            {
+                WalkApply(n.children[i]);
+            }
+        }
+        WalkApply(dst);
     }
 
     void Clone_Into(ImpComp copy, ImpScene skip_self)
@@ -553,7 +634,16 @@ public class ImpComp
             // Direct field writes (C2_List size/position) are visible to later children
             // because Dimensions_Get reads those fields; a per-comp epoch wipe was
             // destroying the cache (~2 bumps x every comp) and made Fill rects jitter.
+            Imp3D self3d = this as Imp3D;
+            if (self3d != null)
+            {
+                self3d.Cache_Refresh();
+            }
             if (is_runtime) OnUpdate(dt);
+            if (self3d != null)
+            {
+                self3d.Cache_Refresh(true);
+            }
             if (ImpProfiler.enabled) ImpProfiler.comp_count++;
 
             int n = children.Count;
@@ -595,20 +685,27 @@ public class ImpComp
                     break;
             }
         }
-        
-        
     }
     
     public void Draw(double dt, EDrawFlags flags, int state)
     {
         if (is_visible)
         {
+            EDrawFlags local = flags;
+            if (is_selected)
+            {
+                local |= EDrawFlags.Selected;
+            }
             if (state == 0)
             {
                 // Diagnostic-only: attributes a comp's own draw cost (not its children's) to
                 // its type, so an expensive OnDraw* can be spotted without a profiler attach.
+                if (this is Imp3D draw3d)
+                {
+                    draw3d.Cache_Refresh();
+                }
                 double t0 = ImpProfiler.enabled ? ImpProfiler.Now_Ms : 0;
-                OnDraw3D(dt, flags);
+                OnDraw3D(dt, local);
                 if (ImpProfiler.enabled) ImpProfiler.DrawType_Add(GetType(), ImpProfiler.Now_Ms - t0);
             }
 
@@ -623,7 +720,7 @@ public class ImpComp
             {
                 bool turned = Imp2D.Rotate_Push(self_dim);
                 double t0 = ImpProfiler.enabled ? ImpProfiler.Now_Ms : 0;
-                OnDraw2D(dt, flags);
+                OnDraw2D(dt, local);
                 if (ImpProfiler.enabled) ImpProfiler.DrawType_Add(GetType(), ImpProfiler.Now_Ms - t0);
                 Imp2D.Rotate_Pop(turned);
             }
@@ -646,7 +743,7 @@ public class ImpComp
             {
                 bool turned = Imp2D.Rotate_Push(self_dim);
                 double t0 = ImpProfiler.enabled ? ImpProfiler.Now_Ms : 0;
-                OnDraw2DForeground(dt, flags);
+                OnDraw2DForeground(dt, local);
                 if (ImpProfiler.enabled) ImpProfiler.DrawType_Add(GetType(), ImpProfiler.Now_Ms - t0);
                 Imp2D.Rotate_Pop(turned);
             }

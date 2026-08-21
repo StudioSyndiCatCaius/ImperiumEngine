@@ -28,9 +28,18 @@ public struct TRef<T> : I_Property where T : ImpAsset
 
     public T? Get()
     {
-        if (loaded != null) return loaded;
-        if (string.IsNullOrEmpty(path)) return null;
-        loaded = ImpAsset.Load<T>(path);
+        // Path is the authority for file / builtin refs. Re-resolve every call so an inspector
+        // path change (or JSON writing only `path`) cannot leave `loaded` pointing at the old asset.
+        // Empty path keeps `loaded` so an inline unique (C2_AssetSlot clone) still works.
+        if (!string.IsNullOrEmpty(path))
+        {
+            T resolved = ImpAsset.Load<T>(path);
+            if (resolved != null)
+            {
+                loaded = resolved;
+            }
+            return loaded;
+        }
         return loaded;
     }
 
@@ -38,34 +47,24 @@ public struct TRef<T> : I_Property where T : ImpAsset
 
     public void Inspector_Rebuild(C2_InspectorProperty ui)
     {
-        C2_Picker picker = new()
+        C2_AssetSlot slot = new()
         {
-            placeholder = "None",
-            text_get = () =>
+            name = ui.name,
+            label = ui.label,
+            asset_type = typeof(T),
+            value_get = () =>
             {
                 TRef<T> r = ui.Value_Get() is TRef<T> x ? x : default;
-                return ImpAsset.Name_ForPath(r.path);
+                return r.Get();
             },
-            tint_get = () => ImpAsset.Color_ForType(typeof(T)),
-            on_cleared = () => ui.Value_Set(new TRef<T>("")),
-            drop_accepts = path => ImpAsset.Load(path) is T,
-            on_dropped = path =>
+            value_set = a =>
             {
-                if (ImpAsset.Load(path) is T)
-                {
-                    ui.Value_Set(new TRef<T>(path));
-                }
+                T asset = a as T;
+                ui.Value_Set(new TRef<T>(asset));
             },
-            on_open = () =>
-            {
-                TRef<T> r = ui.Value_Get() is TRef<T> x ? x : default;
-                Dialog_AssetPicker.Run(typeof(T),
-                    path => ui.Value_Set(new TRef<T>(path ?? "")),
-                    current_path: r.path,
-                    title: "Select " + C2_Tree.Class_DisplayName(typeof(T)));
-            },
+            rows_build = ui.Depth_CanNest ? ui.Rows_ForObject : null,
         };
-        ui.Editor_Set(picker);
+        ui.Editor_SetFull(slot);
     }
 }
 

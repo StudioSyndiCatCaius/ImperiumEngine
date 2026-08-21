@@ -24,6 +24,7 @@ app.Run(() =>
 {
     if (Scene_Editor.active != null)
     {
+        Scene_Editor.active.Standalone_Stop();
         EdState.Save(Scene_Editor.active);
     }
 });

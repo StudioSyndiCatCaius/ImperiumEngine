@@ -1,5 +1,6 @@
 using System.Numerics;
 using ImperiumEngine.Structs;
+using ImperiumEngine;
 using JoltPhysicsSharp;
 using R3D_cs;
 using Raylib_cs;
@@ -27,6 +28,23 @@ public class C3_Collider : Imp3D
     public C3_Collider()
     {
         physics_enabled = true;
+    }
+
+    protected override TBounds3 Bounds_Calc()
+    {
+        Shape_Local(out Vector3 size, out Vector3 center);
+        TTransform3 t = cached_global_transform;
+        Vector3 scl = new(
+            MathF.Abs(t.scale.X),
+            MathF.Abs(t.scale.Y),
+            MathF.Abs(t.scale.Z));
+        Quaternion q = ImpMath.Euler_2_Quat(t.rotation);
+        return new TBounds3
+        {
+            center = t.position + Vector3.Transform(center * t.scale, q),
+            size = size * scl,
+            rotation = t.rotation,
+        };
     }
 
     // Local AABB of the collision volume (unscaled). Capsule + movement sits on its feet.
@@ -82,7 +100,7 @@ public class C3_Collider : Imp3D
     public override void OnDraw3D(double dt, EDrawFlags flags)
     {
         base.OnDraw3D(dt, flags);
-        if (game_owner != null && game_owner != ImpGame.Get(ImpGame.ID_HOST))
+        if (!flags.HasFlag(EDrawFlags.Editor))
         {
             return;
         }

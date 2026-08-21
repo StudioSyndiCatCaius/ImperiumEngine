@@ -53,16 +53,55 @@ public struct TBounds3
     public Vector3 size;
     public Vector3 rotation;
 
+    public bool IsEmpty
+    {
+        get
+        {
+            return MathF.Abs(size.X) + MathF.Abs(size.Y) + MathF.Abs(size.Z) <= 1e-8f;
+        }
+    }
+
     public bool IsPointInside(Vector3 point)
     {
         Vector3 d = point - center;
         if (MathF.Abs(rotation.X) > 1e-4f || MathF.Abs(rotation.Y) > 1e-4f || MathF.Abs(rotation.Z) > 1e-4f)
-            d = Vector3.Transform(d, Quaternion.Inverse(ImpMath.EulerToQuat(rotation)));
+        {
+            d = Vector3.Transform(d, Quaternion.Inverse(ImpMath.Euler_2_Quat(rotation)));
+        }
         Vector3 h = new(MathF.Abs(size.X) * 0.5f, MathF.Abs(size.Y) * 0.5f, MathF.Abs(size.Z) * 0.5f);
         return d.X >= -h.X && d.Y >= -h.Y && d.Z >= -h.Z
             && d.X < h.X && d.Y < h.Y && d.Z < h.Z;
     }
+
+    public void Corners(Span<Vector3> corners)
+    {
+        if (corners.Length < 8)
+        {
+            return;
+        }
+        Vector3 h = new(
+            MathF.Abs(size.X) * 0.5f,
+            MathF.Abs(size.Y) * 0.5f,
+            MathF.Abs(size.Z) * 0.5f);
+        Quaternion q = ImpMath.Euler_2_Quat(rotation);
+        Vector3 x = Vector3.Transform(new Vector3(h.X, 0f, 0f), q);
+        Vector3 y = Vector3.Transform(new Vector3(0f, h.Y, 0f), q);
+        Vector3 z = Vector3.Transform(new Vector3(0f, 0f, h.Z), q);
+        corners[0] = center - x - y - z;
+        corners[1] = center + x - y - z;
+        corners[2] = center - x + y - z;
+        corners[3] = center + x + y - z;
+        corners[4] = center - x - y + z;
+        corners[5] = center + x - y + z;
+        corners[6] = center - x + y + z;
+        corners[7] = center + x + y + z;
+    }
     
+    // ------------------------------------------------
+    // STATIC
+    // ------------------------------------------------
+
+    public static TBounds3 ZERO = new() { center = Vector3.Zero, size = Vector3.Zero, rotation = Vector3.Zero, };
 }
 
 

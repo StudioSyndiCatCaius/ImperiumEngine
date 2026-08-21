@@ -116,6 +116,7 @@ public static class EdState
     {
         EdStateData data = new();
         data.main_tab = WindowName(editor.ui_main_tabs);
+        data.play_mode = editor.play_mode.ToString();
         editor.mtab_scene.State_Capture(data);
         editor.mtab_asset.State_Capture(data);
         editor.mtab_flow.State_Capture(data);
@@ -136,6 +137,22 @@ public static class EdState
         editor.mtab_scene.file_browser.State_Apply(data.browser);
         editor.mtab_asset.file_browser.State_Apply(data.browser_asset);
         SelectWindow(editor.ui_main_tabs, data.main_tab);
+
+        EPlayMode mode = EPlayMode.PlayInEditor;
+        if (string.Equals(data.play_mode, "Standalone", StringComparison.OrdinalIgnoreCase))
+        {
+            mode = EPlayMode.Standalone;
+        }
+        editor.play_mode = mode;
+        if (editor.drop_play_mode != null)
+        {
+            int idx = 0;
+            if (mode == EPlayMode.Standalone)
+            {
+                idx = 1;
+            }
+            editor.drop_play_mode.Option_SetQuiet(idx);
+        }
     }
 
     static string WindowName(C2_TabBox tabs)
@@ -186,6 +203,7 @@ public static class EdState
         if (window != null)
         {
             data.main_tab = window.GetString("main_tab");
+            data.play_mode = window.GetString("play_mode", "PlayInEditor");
             data.inspector_tab = window.GetInt("inspector_tab", 1);
             data.outliner_tab = window.GetInt("outliner_tab");
             data.file_browser_expanded = window.GetBool("file_browser_expanded", true);
@@ -267,6 +285,7 @@ public static class EdState
 
         TomlTable window = doc.root.EnsureTable("window");
         window.Set("main_tab", data.main_tab ?? "");
+        window.Set("play_mode", data.play_mode ?? "PlayInEditor");
         window.Set("inspector_tab", data.inspector_tab);
         window.Set("outliner_tab", data.outliner_tab);
         window.Set("file_browser_expanded", data.file_browser_expanded);
@@ -417,6 +436,7 @@ public static class EdState
 public class EdStateData
 {
     public string main_tab = "Scene";
+    public string play_mode = "PlayInEditor";
     public int inspector_tab = 1;
     public int outliner_tab;
     public bool file_browser_expanded = true;

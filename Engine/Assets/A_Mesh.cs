@@ -107,9 +107,35 @@ public class A_Mesh : ImpAsset
         _drop_view = null;
         return spawned;
     }
+    
+    // -------------------------------------------------
+    // Bounds
+    // -------------------------------------------------
+    public TBounds3 Bounds_Get(TTransform3 transform)
+    {
+        if (mesh.VertexCount <= 0)
+        {
+            return TBounds3.ZERO;
+        }
+        Vector3 min = mesh.Aabb.Min;
+        Vector3 max = mesh.Aabb.Max;
+        Vector3 local_center = (min + max) * 0.5f;
+        Vector3 local_size = max - min;
+        Vector3 scl = new(
+            MathF.Abs(transform.scale.X),
+            MathF.Abs(transform.scale.Y),
+            MathF.Abs(transform.scale.Z));
+        Quaternion q = ImpMath.Euler_2_Quat(transform.rotation);
+        return new TBounds3
+        {
+            center = transform.position + Vector3.Transform(local_center * transform.scale, q),
+            size = local_size * scl,
+            rotation = transform.rotation,
+        };
+    }
 
     // ################################################################################################################
-    // Class
+    // Statics
     // ################################################################################################################
     
     static A_Mesh? _geo_cube;
@@ -127,4 +153,6 @@ public class A_Mesh : ImpAsset
     };
     
     public static A_Mesh SK_MANNEQUIN=Import<A_Mesh>("{engine}/Meshes/Character/Mannequin/sk_c_mannequin.glb");
+    
+    public static A_Mesh UTIL_CAMERA=Import<A_Mesh>("{engine}/Meshes/Util/sm_edtior_util_camera.glb");
 }

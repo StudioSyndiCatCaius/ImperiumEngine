@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Numerics;
 using System.Reflection;
 using System.Text;
+using ImperiumEngine.Dialogs;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Interfaces;
 using ImperiumEngine.Structs;
@@ -1315,6 +1316,48 @@ public class C2_InspectorProperty : Imp2D
         if (t == typeof(Vector2)) return Editor_Vector(2);
         if (t == typeof(Vector3)) return Editor_Vector(3);
         if (t == typeof(Vector4)) return Editor_Vector(4);
+        if (typeof(ImpComp).IsAssignableFrom(t))
+        {
+            C2_Picker picker = new()
+            {
+                placeholder = "None",
+                text_get = () =>
+                {
+                    ImpComp c = Value_Get() as ImpComp;
+                    if (c == null)
+                    {
+                        return "";
+                    }
+                    if (!string.IsNullOrEmpty(c.name))
+                    {
+                        return c.name;
+                    }
+                    return C2_Tree.Class_DisplayName(c.GetType());
+                },
+                tint_get = () =>
+                {
+                    ImpComp c = Value_Get() as ImpComp;
+                    Color packed = C2_Tree.Comp_Tint(c);
+                    if (packed.A > 0)
+                    {
+                        return packed;
+                    }
+                    return ImpAsset.Color_ForType(c != null ? c.GetType() : t);
+                },
+                icon = C2_Tree.Class_Icon(t),
+                on_cleared = () => Value_Set(null),
+                on_open = () =>
+                {
+                    ImpComp cur = Value_Get() as ImpComp;
+                    Dialog_CompPicker.Run(t,
+                        picked => Value_Set(picked),
+                        scene: Scene_OfRow(),
+                        current: cur,
+                        title: "Select " + C2_Tree.Class_DisplayName(t));
+                },
+            };
+            return picker;
+        }
         if (typeof(ImpAsset).IsAssignableFrom(t))
         {
             return new C2_Text
@@ -1347,6 +1390,30 @@ public class C2_InspectorProperty : Imp2D
             else Value_Set(new Vector4(v.Value_Get(0), v.Value_Get(1), v.Value_Get(2), v.Value_Get(3)));
         };
         return vec;
+    }
+
+    ImpScene Scene_OfRow()
+    {
+        if (owner != null)
+        {
+            for (int i = 0; i < owner.selected_objects.Count; i++)
+            {
+                object o = owner.selected_objects[i];
+                if (o is ImpComp c && c.scene != null)
+                {
+                    return c.scene;
+                }
+                if (o is ImpScene s)
+                {
+                    return s;
+                }
+            }
+        }
+        if (Value_Get() is ImpComp cur && cur.scene != null)
+        {
+            return cur.scene;
+        }
+        return ImpScene.current;
     }
 
     static bool Type_IsNumeric(Type t) =>

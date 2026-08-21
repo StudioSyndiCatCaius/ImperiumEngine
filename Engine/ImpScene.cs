@@ -2,6 +2,7 @@
 using ImperiumEngine.Assets;
 using ImperiumEngine.Comps;
 using ImperiumEngine.Comps._2D;
+using ImperiumEngine.Comps._3D;
 using ImperiumEngine.Script;
 using ImperiumEngine.Structs;
 using R3D_cs;
@@ -64,10 +65,11 @@ public class ImpScene : ImpAsset
     
     private bool was_running;
     
-    
-    // #################################################################################
+    // ##############################################################################################
+    // ##############################################################################################
     // Class
-    // #################################################################################
+    // ##############################################################################################
+    // ##############################################################################################
     
     ImpGame _game;
     public ImpGame game
@@ -148,6 +150,7 @@ public class ImpScene : ImpAsset
     string sky_loaded_path = "";
     
     [ImpVar] public TClass<ImpComp> root_type = new TClass<ImpComp>(typeof(ImpComp));
+    [ImpVar] public C3_Camera starting_camera;
 
     [Category("Imp")][ImpVar] public A_Script script_override;
     [ImpVar(Hidden = true)] public A_Script script_builtin = new A_Script();
@@ -175,159 +178,162 @@ public class ImpScene : ImpAsset
     [ImpVar] public Color background_color=new Color(26, 30, 36, 255);
     [Category("Canvas")][ImpVar] public Vector2 canvas_size=new(1920, 1080);
 
-    [Category("Ambient")][ImpVar] public Color ambient_color=new Color(88, 98, 116, 255);
-    [Category("Ambient")][ImpVar] public float ambient_intensity=0.22f;
+    // Lighting, sky, fog, tonemap, bloom and SSAO settings live on the environment asset so they
+    // can be authored once and shared between scenes instead of duplicated on each one.
+    [Category("Environment")][ImpVar] public TRef<A_Environment> environment = new(A_Environment.ENVI_DAY);
 
-    // THE SUN. A scene gets exactly one directional light and this is it - which is why
-    // C3_Light offers only Point and Spot. R3D's light registry is global, so a directional
-    // light left to a comp meant any number of scenes could quietly fight over the sunlight.
-    [Category("Sun")][ImpVar] public bool sun_enabled=true;
-    [Category("Sun")][ImpVar] public Color sun_color=new Color(255, 244, 228, 255);
-    [Category("Sun")][ImpVar] public float sun_intensity=1.35f;
-    //euler degrees; the direction light travels, same convention as a comp's rotation
-    [Category("Sun")][ImpVar] public Vector3 sun_rotation=new Vector3(-45f, -35f, 0f);
-    [Category("Sun")][ImpVar] public float sun_specular=1.15f;
-    [Category("Sun")][ImpVar] public bool sun_cast_shadows=true;
-
-    // Equirectangular .hdr panorama used as the background, and optionally as the light
-    // probe. Loaded as a cubemap rather than through A_TextureHDR's own resource, because a
-    // sky is a cubemap to R3D and a flat Texture2D is no use for one.
-    [Category("Sky")][ImpVar] public TRef<A_TextureHDR> sky_texture;
-    //let the panorama light the scene too (image-based lighting), not just sit behind it
-    [Category("Sky")][ImpVar] public bool sky_lights_scene=true;
-    [Category("Sky")][ImpVar] public float sky_energy=1.15f;
-    [Category("Sky")][ImpVar] public float sky_blur=0.0f;
-    //degrees about Y, for turning the panorama to put its sun where the scene's sun is
-    [Category("Sky")][ImpVar] public float sky_rotation=0.0f;
-
-    // Distance fog. Defaults mirror R3D's own (disabled, 1..50, density 0.05) so switching a
-    // mode on is the only edit needed to see something sensible.
-    [Category("Fog")][ImpVar] public EFogMode fog_mode=EFogMode.Disabled;
-    [Category("Fog")][ImpVar] public Color fog_color=new Color(150, 160, 175, 255);
-    [Category("Fog")][ImpVar] public float fog_start=1.0f;    //Linear only
-    [Category("Fog")][ImpVar] public float fog_end=50.0f;     //Linear only
-    [Category("Fog")][ImpVar] public float fog_density=0.05f; //Exp / Exp2 only
-    //how much the fog tints the sky as well as the geometry in front of it
-    [Category("Fog")][ImpVar] public float fog_sky_affect=0.5f;
-
-    // Tonemapping. Filmic rather than R3D's Linear default, which is what the editor has
-    // always drawn with - this only makes it editable instead of hardcoded.
-    [Category("Tonemap")][ImpVar] public ETonemapMode tonemap_mode=ETonemapMode.Filmic;
-    [Category("Tonemap")][ImpVar] public float tonemap_exposure=1.08f;
-    [Category("Tonemap")][ImpVar] public float tonemap_white=1.0f;
-
-    // Bloom. Mode and intensity match what was hardcoded / left at R3D's default before, so
-    // exposing these does not change how an existing scene looks.
-    [Category("Bloom")][ImpVar] public EBloomMode bloom_mode=EBloomMode.Mix;
-    [Category("Bloom")][ImpVar] public float bloom_intensity=0.08f;
-    [Category("Bloom")][ImpVar] public float bloom_levels=0.55f;
-    [Category("Bloom")][ImpVar] public float bloom_threshold=0.35f;
-    [Category("Bloom")][ImpVar] public float bloom_soft_threshold=0.5f;
-    [Category("Bloom")][ImpVar] public float bloom_filter_radius=1.0f;
-
-    // Screen-space ambient occlusion. Grounds geometry by darkening the creases contact
-    // between surfaces makes, which flat ambient light alone cannot express.
-    [Category("SSAO")] [ImpVar] public bool ssao_enabled=true;
-    [Category("SSAO")] [ImpVar] public float ssao_radius=1.85f;   //world-space sampling radius
-    [Category("SSAO")] [ImpVar] public float ssao_intensity=2.45f; //occlusion strength
-    [Category("SSAO")] [ImpVar] public float ssao_power=1.85f;    //falloff sharpness
-    [Category("SSAO")] [ImpVar] public float ssao_bias=0.022f;    //keeps surfaces from occluding themselves
-    [Category("SSAO")] [ImpVar] public int ssao_samples=8;
-    
     
     public void ApplyRenderState()
     {
+        A_Environment e = environment.Get();
+        if (e == null)
+        {
+            e = A_Environment.ENVI_DAY;
+        }
+
         string hdr_path = "";
-        A_TextureHDR? sky = sky_texture.Get();
-        if (sky?.source_file != null && !string.IsNullOrEmpty(sky.source_file.filepath))
+        A_TextureHDR sky = e.sky_texture;
+        if (sky != null && sky.source_file != null && !string.IsNullOrEmpty(sky.source_file.filepath))
+        {
             hdr_path = ImpFile.Path_Resolve(sky.source_file.filepath);
-        else if (!string.IsNullOrEmpty(sky_texture.path))
-            hdr_path = ImpFile.Path_Resolve(sky_texture.path);
+        }
 
         if (!string.Equals(hdr_path, sky_loaded_path, StringComparison.OrdinalIgnoreCase))
         {
-            if (sky_cubemap.Size > 0) R3D.UnloadCubemap(sky_cubemap);
-            if (sky_ambient.Irradiance != 0) R3D.UnloadAmbientMap(sky_ambient);
+            if (sky_cubemap.Size > 0)
+            {
+                R3D.UnloadCubemap(sky_cubemap);
+            }
+            if (sky_ambient.Irradiance != 0)
+            {
+                R3D.UnloadAmbientMap(sky_ambient);
+            }
             sky_cubemap = default;
             sky_ambient = default;
-            sky_loaded_path = hdr_path ?? "";
-
+            sky_loaded_path = hdr_path;
             if (!string.IsNullOrEmpty(hdr_path) && File.Exists(hdr_path))
             {
                 sky_cubemap = R3D.LoadCubemap(hdr_path, R3D_cs.CubemapLayout.Panorama);
                 if (sky_cubemap.Size > 0)
+                {
                     sky_ambient = R3D.GenAmbientMap(sky_cubemap, AmbientFlags.Illumination | AmbientFlags.Reflection);
+                }
             }
         }
 
-        Environment env = R3D.GetEnvironmentEx();
-        env.Background.Color = background_color;
-        env.Background.Energy = sky_energy;
-        env.Background.SkyBlur = sky_blur;
-        env.Background.Sky = sky_cubemap;
-        env.Background.Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, sky_rotation * (MathF.PI / 180f));
-        env.Ambient.Color = ambient_color;
-        env.Ambient.Energy = ambient_intensity;
-        env.Ambient.Map = sky_lights_scene ? sky_ambient : default;
-        env.Fog.Mode = fog_mode switch
+        AmbientMap ambient_map = default;
+        if (e.sky_lights_scene)
         {
-            EFogMode.Linear => Fog.Linear,
-            EFogMode.Exp => Fog.Exp,
-            EFogMode.Exp2 => Fog.EXP2,
-            _ => Fog.Disabled,
-        };
-        env.Fog.Color = fog_color;
-        env.Fog.Start = fog_start;
-        env.Fog.End = fog_end;
-        env.Fog.Density = fog_density;
-        env.Fog.SkyAffect = fog_sky_affect;
-        env.Tonemap.Mode = tonemap_mode switch
+            ambient_map = sky_ambient;
+        }
+        Quaternion sky_rot = Quaternion.CreateFromAxisAngle(Vector3.UnitY, e.sky_rotation * (MathF.PI / 180f));
+
+        // Mutate R3D's live environment by ref. Copying GetEnvironmentEx then SetEnvironmentEx(struct)
+        // does not reliably push nested Background/Fog/Bloom/SSAO fields through.
+        R3D.SetEnvironmentEx((ref Environment env) =>
         {
-            ETonemapMode.Reinhard => Tonemap.Reinhard,
-            ETonemapMode.Filmic => Tonemap.Filmic,
-            ETonemapMode.Aces => Tonemap.Aces,
-            ETonemapMode.Agx => Tonemap.Agx,
-            _ => Tonemap.Linear,
-        };
-        env.Tonemap.Exposure = tonemap_exposure;
-        env.Tonemap.White = tonemap_white;
-        env.Bloom.Mode = bloom_mode switch
-        {
-            EBloomMode.Mix => Bloom.Mix,
-            EBloomMode.Additive => Bloom.Additive,
-            EBloomMode.Screen => Bloom.Screen,
-            _ => Bloom.Disabled,
-        };
-        env.Bloom.Intensity = bloom_intensity;
-        env.Bloom.Levels = bloom_levels;
-        env.Bloom.Threshold = bloom_threshold;
-        env.Bloom.SoftThreshold = bloom_soft_threshold;
-        env.Bloom.FilterRadius = bloom_filter_radius;
-        env.Ssao.Enabled = ssao_enabled;
-        env.Ssao.Radius = ssao_radius;
-        env.Ssao.Intensity = ssao_intensity;
-        env.Ssao.Power = ssao_power;
-        env.Ssao.Bias = ssao_bias;
-        env.Ssao.SampleCount = ssao_samples;
-        R3D.SetEnvironmentEx(env);
+            env.Background.Color = background_color;
+            env.Background.Energy = e.sky_energy;
+            env.Background.SkyBlur = e.sky_blur;
+            env.Background.Sky = sky_cubemap;
+            env.Background.Rotation = sky_rot;
+            env.Ambient.Color = e.ambient_color;
+            env.Ambient.Energy = e.ambient_intensity;
+            env.Ambient.Map = ambient_map;
+            env.Fog.Mode = Fog.Disabled;
+            if (e.fog_mode == EFogMode.Linear)
+            {
+                env.Fog.Mode = Fog.Linear;
+            }
+            else if (e.fog_mode == EFogMode.Exp)
+            {
+                env.Fog.Mode = Fog.Exp;
+            }
+            else if (e.fog_mode == EFogMode.Exp2)
+            {
+                env.Fog.Mode = Fog.EXP2;
+            }
+            env.Fog.Color = e.fog_color;
+            env.Fog.Start = e.fog_start;
+            env.Fog.End = e.fog_end;
+            env.Fog.Density = e.fog_density;
+            env.Fog.SkyAffect = e.fog_sky_affect;
+            env.Tonemap.Mode = Tonemap.Linear;
+            if (e.tonemap_mode == ETonemapMode.Reinhard)
+            {
+                env.Tonemap.Mode = Tonemap.Reinhard;
+            }
+            else if (e.tonemap_mode == ETonemapMode.Filmic)
+            {
+                env.Tonemap.Mode = Tonemap.Filmic;
+            }
+            else if (e.tonemap_mode == ETonemapMode.Aces)
+            {
+                env.Tonemap.Mode = Tonemap.Aces;
+            }
+            else if (e.tonemap_mode == ETonemapMode.Agx)
+            {
+                env.Tonemap.Mode = Tonemap.Agx;
+            }
+            env.Tonemap.Exposure = e.tonemap_exposure;
+            env.Tonemap.White = e.tonemap_white;
+            env.Bloom.Mode = Bloom.Disabled;
+            if (e.bloom_mode == EBloomMode.Mix)
+            {
+                env.Bloom.Mode = Bloom.Mix;
+            }
+            else if (e.bloom_mode == EBloomMode.Additive)
+            {
+                env.Bloom.Mode = Bloom.Additive;
+            }
+            else if (e.bloom_mode == EBloomMode.Screen)
+            {
+                env.Bloom.Mode = Bloom.Screen;
+            }
+            env.Bloom.Intensity = e.bloom_intensity;
+            env.Bloom.Levels = e.bloom_levels;
+            env.Bloom.Threshold = e.bloom_threshold;
+            env.Bloom.SoftThreshold = e.bloom_soft_threshold;
+            env.Bloom.FilterRadius = e.bloom_filter_radius;
+            env.Ssao.Enabled = e.ssao_enabled;
+            env.Ssao.Radius = e.ssao_radius;
+            env.Ssao.Intensity = e.ssao_intensity;
+            env.Ssao.Power = e.ssao_power;
+            env.Ssao.Bias = e.ssao_bias;
+            env.Ssao.SampleCount = e.ssao_samples;
+        });
 
         if (!sun_ready)
         {
             sun_light = R3D.CreateLight(LightType.Dir);
             sun_ready = true;
         }
-        R3D.SetLightActive(sun_light, sun_enabled);
-        R3D.SetLightColor(sun_light, sun_color);
-        R3D.SetLightEnergy(sun_light, sun_intensity);
-        R3D.SetLightSpecular(sun_light, sun_specular);
-        bool want_shadow = sun_cast_shadows;
+
+        if (e.sun_enabled)
+        {
+            R3D.EnableLight(sun_light);
+        }
+        else
+        {
+            R3D.DisableLight(sun_light);
+        }
+        R3D.SetLightColor(sun_light, e.sun_color);
+        R3D.SetLightEnergy(sun_light, e.sun_intensity);
+        R3D.SetLightSpecular(sun_light, e.sun_specular);
+        bool want_shadow = e.sun_cast_shadows;
         if (want_shadow != R3D.IsShadowEnabled(sun_light))
         {
-            if (want_shadow) R3D.EnableShadow(sun_light);
-            else R3D.DisableShadow(sun_light);
+            if (want_shadow)
+            {
+                R3D.EnableShadow(sun_light);
+            }
+            else
+            {
+                R3D.DisableShadow(sun_light);
+            }
         }
         float d = MathF.PI / 180f;
-        Quaternion sun_q = Quaternion.CreateFromYawPitchRoll(sun_rotation.Y * d, sun_rotation.X * d, sun_rotation.Z * d);
+        Quaternion sun_q = Quaternion.CreateFromYawPitchRoll(e.sun_rotation.Y * d, e.sun_rotation.X * d, e.sun_rotation.Z * d);
         R3D.SetLightDirection(sun_light, Vector3.Transform(-Vector3.UnitZ, sun_q));
     }
     
@@ -338,6 +344,8 @@ public class ImpScene : ImpAsset
     public void RBegin()
     {
         root.OnBegin();
+
+        ImpApp.view_target = starting_camera;
 
         impScriptVm = null;
         A_Script s = Script_Get();
@@ -357,6 +365,7 @@ public class ImpScene : ImpAsset
 
     public void REnd()
     {
+        ImpApp.view_target = null;
         if (impScriptVm != null)
         {
             impScriptVm.Event_Run("OnEnd", null);
@@ -413,14 +422,44 @@ public class ImpScene : ImpAsset
         {
             copy = new ImpScene();
         }
+        ImpComp src_root = root;
         ImpComp tree = null;
-        if (root != null)
+        if (src_root != null)
         {
-            tree = root.Clone();
+            tree = src_root.Clone();
         }
         if (tree != null)
         {
             copy.root = tree;
+        }
+        // Clone copies ImpComp ImpVars as the original objects. starting_camera (and any
+        // other scene-level comp ref) has to land on the play tree, not the authored one.
+        if (copy.starting_camera != null)
+        {
+            C3_Camera mapped = null;
+            void Find(ImpComp a, ImpComp b)
+            {
+                if (mapped != null || a == null || b == null)
+                {
+                    return;
+                }
+                if (ReferenceEquals(a, starting_camera) && b is C3_Camera cam)
+                {
+                    mapped = cam;
+                    return;
+                }
+                int n = a.children.Count;
+                if (b.children.Count < n)
+                {
+                    n = b.children.Count;
+                }
+                for (int i = 0; i < n; i++)
+                {
+                    Find(a.children[i], b.children[i]);
+                }
+            }
+            Find(src_root, tree);
+            copy.starting_camera = mapped;
         }
         copy.is_running = true;
         copy.filepath = "";

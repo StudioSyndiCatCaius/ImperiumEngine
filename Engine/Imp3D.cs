@@ -3,7 +3,9 @@ using ImperiumEngine.Assets;
 using ImperiumEngine.Comps._3D;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Structs;
+using R3D_cs;
 using Raylib_cs;
+using Material = R3D_cs.Material;
 
 namespace ImperiumEngine;
 
@@ -14,15 +16,78 @@ public class Imp3D : ImpComp
     // Static
     // #######################################################################################################################
     // #######################################################################################################################
-    
-    public static void Draw_Line(Vector3 start, Vector3 end, float thickness, Color color)
+
+    [ImpVar][Config] public static AntiAliasingMode anti_aliasing_mode = AntiAliasingMode.Fxaa;
+    [ImpVar][Config] public static AntiAliasingPreset anti_aliasing_preset = AntiAliasingPreset.Medium;
+
+    public static void RefreshGraphics()
     {
-        Raylib.DrawLine3D(start, end, color);
+        R3D.SetAntiAliasingMode(anti_aliasing_mode);
+        R3D.SetAntiAliasingPreset(anti_aliasing_preset);
+    }
+    
+    // ---------------------------------------------------------------------------------------------------
+    // Draw
+    // ---------------------------------------------------------------------------------------------------
+
+    static R3D_cs.Mesh _line_mesh;
+    static bool _line_mesh_ready;
+
+    public static void Draw3D_Line(Vector3 start, Vector3 end, float thickness, Color color)
+    {
+        Vector3 delta = end - start;
+        float len = delta.Length();
+        if (len < 1e-6f)
+        {
+            return;
+        }
+        if (thickness < 0.001f)
+        {
+            thickness = 0.001f;
+        }
+        if (!_line_mesh_ready)
+        {
+            _line_mesh = R3D.GenMeshCylinder(0.5f, 1f, 8);
+            _line_mesh.ShadowCastMode = ShadowCastMode.Disabled;
+            _line_mesh_ready = true;
+        }
+
+        Vector3 dir = delta / len;
+        Vector3 mid = (start + end) * 0.5f;
+        Quaternion rot;
+        float along = Vector3.Dot(Vector3.UnitY, dir);
+        if (along > 0.9999f)
+        {
+            rot = Quaternion.Identity;
+        }
+        else if (along < -0.9999f)
+        {
+            rot = Quaternion.CreateFromAxisAngle(Vector3.UnitX, MathF.PI);
+        }
+        else
+        {
+            Vector3 axis = Vector3.Cross(Vector3.UnitY, dir);
+            rot = Quaternion.Normalize(new Quaternion(axis.X, axis.Y, axis.Z, 1f + along));
+        }
+
+        Material mat = R3D.GetDefaultMaterial();
+        AlbedoMap alb = mat.Albedo;
+        alb.Color = color;
+        mat.Albedo = alb;
+        mat.Unlit = true;
+        R3D.DrawMeshEx(_line_mesh, mat, mid, rot, new Vector3(thickness, len, thickness));
+    }
+    
+    public static void Draw3D_Mesh(A_Mesh mesh, TTransform3 transform, bool cast_shadow = true)
+    {
+        mesh.mesh.ShadowCastMode = ShadowCastMode.Disabled;
+        R3D.DrawMeshEx(mesh.mesh,R3D.MATERIAL_BASE,transform.position,ImpMath.Euler_2_Quat(transform.rotation),transform.scale);
+        mesh.mesh.ShadowCastMode = ShadowCastMode.OnAuto;
     }
 
-    // ---------------------------------
+    // ---------------------------------------------------------------------------------------------------
     // Trace
-    // ---------------------------------
+    // ---------------------------------------------------------------------------------------------------
 
     public static TTraceResult3D Trace_Line(Vector3 start, Vector3 end, ECollisionChannel channel,
         Func<Imp3D, bool> filter = null)
@@ -66,72 +131,113 @@ public class Imp3D : ImpComp
         return t >= 0f;
     }
 
-    public static bool Pickable(Imp3D c) => c != null && !c.IsGroupPivot;
-
-    public static void Comp3D_LocalBounds(Imp3D c, out Vector3 min, out Vector3 max)
-    {
-        min = new Vector3(-0.2f);
-        max = new Vector3(0.2f);
-        if (c is C3_Collider col)
-        {
-            col.Shape_Local(out Vector3 size, out Vector3 center);
-            Vector3 half = size * 0.5f;
-            min = center - half;
-            max = center + half;
-            return;
-        }
-        if (c is not C3_Mesh mesh || mesh.mesh == null) return;
-        if (ReferenceEquals(mesh.mesh, A_Mesh.GEO_PLANE))
-        {
-            min = new Vector3(-0.5f, -0.02f, -0.5f);
-            max = new Vector3(0.5f, 0.02f, 0.5f);
-            return;
-        }
-        min = new Vector3(-0.5f);
-        max = new Vector3(0.5f);
-    }
-
     public static bool Ray_Comp3D(Ray ray, Imp3D c, out float t, out Vector3 hit)
     {
         t = 0f;
         hit = default;
-        if (c == null || !c.is_visible) return false;
-        TTransform3 w = c.Transform_Get(true);
-        Quaternion q = ImpMath.EulerToQuat(w.rotation);
+        if (c == null || !c.is_visible)
+        {
+            return false;
+        }
+        TBounds3 b = c.Bounds_Get();
+        if (b.IsEmpty)
+        {
+            return false;
+        }
+        Quaternion q = ImpMath.Euler_2_Quat(b.rotation);
         Quaternion inv_q = Quaternion.Inverse(q);
-        Vector3 inv_s = new(
-            w.scale.X != 0 ? 1f / w.scale.X : 0,
-            w.scale.Y != 0 ? 1f / w.scale.Y : 0,
-            w.scale.Z != 0 ? 1f / w.scale.Z : 0);
-        Vector3 o = Vector3.Transform(ray.Position - w.position, inv_q) * inv_s;
-        Vector3 d = Vector3.Transform(ray.Direction, inv_q) * inv_s;
-        Comp3D_LocalBounds(c, out Vector3 min, out Vector3 max);
-        Ray local = new(o, d);
-        if (!Ray_AABB(local, min, max, out t)) return false;
+        Vector3 h = new(
+            MathF.Abs(b.size.X) * 0.5f,
+            MathF.Abs(b.size.Y) * 0.5f,
+            MathF.Abs(b.size.Z) * 0.5f);
+        Vector3 o = Vector3.Transform(ray.Position - b.center, inv_q);
+        Vector3 d = Vector3.Transform(ray.Direction, inv_q);
+        if (!Ray_AABB(new Ray(o, d), -h, h, out t))
+        {
+            return false;
+        }
         hit = ray.Position + ray.Direction * t;
         return true;
     }
 
-    public static Imp3D Pick_Comp3D(ImpComp root, Ray ray, out Vector3 hit)
+    public static Imp3D Select(ImpComp root, Ray ray, out Vector3 hit)
     {
+        List<Imp3D> comps = new();
+        List<float> ts = new();
+        List<Vector3> pts = new();
+        void Walk(ImpComp n)
+        {
+            if (n == null || !n.is_visible)
+            {
+                return;
+            }
+            if (n is Imp3D c3 && n is not C3_Gizmo)
+            {
+                if (Ray_Comp3D(ray, c3, out float t, out Vector3 h))
+                {
+                    comps.Add(c3);
+                    ts.Add(t);
+                    pts.Add(h);
+                }
+            }
+            int nchild = n.children.Count;
+            for (int i = 0; i < nchild; i++)
+            {
+                Walk(n.children[i]);
+            }
+        }
+        Walk(root);
+
         Imp3D best = null;
         Vector3 best_hit = default;
         float best_t = float.MaxValue;
-        void Walk(ImpComp n)
+        float best_vol = float.MaxValue;
+        int n_hits = comps.Count;
+        for (int i = 0; i < n_hits; i++)
         {
-            if (n == null || !n.is_visible) return;
-            if (n is Imp3D c3 && n is not C3_Gizmo && Pickable(c3))
+            Imp3D c = comps[i];
+            bool covered = false;
+            for (int j = 0; j < n_hits; j++)
             {
-                if (Ray_Comp3D(ray, c3, out float t, out Vector3 h) && t < best_t)
+                if (i == j)
                 {
-                    best_t = t;
-                    best = c3;
-                    best_hit = h;
+                    continue;
+                }
+                ImpComp p = comps[j].parent;
+                while (p != null)
+                {
+                    if (p == c)
+                    {
+                        covered = true;
+                        break;
+                    }
+                    p = p.parent;
+                }
+                if (covered)
+                {
+                    break;
                 }
             }
-            for (int i = 0; i < n.children.Count; i++) Walk(n.children[i]);
+            if (covered)
+            {
+                continue;
+            }
+            TBounds3 b = c.cached_bounds;
+            float vol = MathF.Abs(b.size.X) * MathF.Abs(b.size.Y) * MathF.Abs(b.size.Z);
+            float t = ts[i];
+            bool better = t < best_t - 1e-4f;
+            if (!better && MathF.Abs(t - best_t) <= 1e-4f && vol < best_vol)
+            {
+                better = true;
+            }
+            if (better)
+            {
+                best_t = t;
+                best_vol = vol;
+                best = c;
+                best_hit = pts[i];
+            }
         }
-        Walk(root);
         hit = best_hit;
         return best;
     }
@@ -143,9 +249,23 @@ public class Imp3D : ImpComp
         _occ.Clear();
         void Walk(ImpComp n)
         {
-            if (n == null || !n.is_visible) return;
-            if (n is Imp3D c3 && n is not C3_Gizmo && Pickable(c3)) _occ.Add(c3);
-            for (int i = 0; i < n.children.Count; i++) Walk(n.children[i]);
+            if (n == null || !n.is_visible)
+            {
+                return;
+            }
+            if (n is Imp3D c3 && n is not C3_Gizmo)
+            {
+                TBounds3 b = c3.Bounds_Get();
+                if (!b.IsEmpty)
+                {
+                    _occ.Add(c3);
+                }
+            }
+            int nchild = n.children.Count;
+            for (int i = 0; i < nchild; i++)
+            {
+                Walk(n.children[i]);
+            }
         }
         Walk(root);
     }
@@ -154,30 +274,23 @@ public class Imp3D : ImpComp
     {
         Vector3 dir = world - cam.Position;
         float dist = dir.Length();
-        if (dist < 1e-4f) return false;
+        if (dist < 1e-4f)
+        {
+            return false;
+        }
         Ray ray = new(cam.Position, dir / dist);
         for (int i = 0; i < _occ.Count; i++)
         {
-            if (!Ray_Comp3D(ray, _occ[i], out float t, out _)) continue;
-            if (t > 0f && t < dist - bias) return true;
+            if (!Ray_Comp3D(ray, _occ[i], out float t, out _))
+            {
+                continue;
+            }
+            if (t > 0f && t < dist - bias)
+            {
+                return true;
+            }
         }
         return false;
-    }
-
-    public static void Comp3D_WorldCorners(Imp3D c, Vector3[] corners)
-    {
-        TTransform3 w = c.Transform_Get(true);
-        Quaternion q = ImpMath.EulerToQuat(w.rotation);
-        Comp3D_LocalBounds(c, out Vector3 min, out Vector3 max);
-        Vector3[] local =
-        {
-            new(min.X, min.Y, min.Z), new(max.X, min.Y, min.Z),
-            new(min.X, max.Y, min.Z), new(max.X, max.Y, min.Z),
-            new(min.X, min.Y, max.Z), new(max.X, min.Y, max.Z),
-            new(min.X, max.Y, max.Z), new(max.X, max.Y, max.Z),
-        };
-        for (int i = 0; i < 8; i++)
-            corners[i] = w.position + Vector3.Transform(local[i] * w.scale, q);
     }
 
     // #######################################################################################################################
@@ -194,9 +307,73 @@ public class Imp3D : ImpComp
     Vector3 _wish;
     internal bool _phys_dirty;
     internal Vector3 _phys_scale = Vector3.One;
+    
+    // Cached every update, parent first, so children/parents can read world without a tree walk.
+    public TTransform3 cached_global_transform = new();
+    public TBounds3 cached_bounds;
+    static uint _cache_epoch = 1;
+    uint _e_cached;
+
+    public static void Cache_Invalidate()
+    {
+        if (++_cache_epoch == 0)
+        {
+            _cache_epoch = 1;
+        }
+    }
+
+    public void Cache_Refresh(bool force = false)
+    {
+        if (!force && _e_cached == _cache_epoch)
+        {
+            return;
+        }
+        TTransform3 world;
+        if (parent is Imp3D p)
+        {
+            p.Cache_Refresh();
+            world = WorldFromLocal(p.cached_global_transform, transform);
+        }
+        else
+        {
+            world = transform;
+        }
+        bool moved =
+            cached_global_transform.position != world.position
+            || cached_global_transform.rotation != world.rotation
+            || cached_global_transform.scale != world.scale;
+        cached_global_transform = world;
+        _e_cached = _cache_epoch;
+        if (force && moved)
+        {
+            int n = children.Count;
+            for (int i = 0; i < n; i++)
+            {
+                if (children[i] is Imp3D c)
+                {
+                    c.Cache_Dirty();
+                }
+            }
+        }
+        cached_bounds = Bounds_Calc();
+    }
+
+    void Cache_Dirty()
+    {
+        _e_cached = 0;
+        int n = children.Count;
+        for (int i = 0; i < n; i++)
+        {
+            if (children[i] is Imp3D c)
+            {
+                c.Cache_Dirty();
+            }
+        }
+    }
 
     public override void OnBegin()
     {
+        Cache_Refresh();
         if (physics_enabled)
         {
             Phys_Register();
@@ -237,17 +414,27 @@ public class Imp3D : ImpComp
     public void Transform_Set(TTransform3 value, bool world_space = false)
     {
         if (!world_space || parent is not Imp3D p)
+        {
             transform = value;
+        }
         else
-            transform = LocalFromWorld(p.Transform_Get(true), value);
+        {
+            p.Cache_Refresh();
+            transform = LocalFromWorld(p.cached_global_transform, value);
+        }
         _phys_dirty = true;
+        Cache_Dirty();
+        Cache_Refresh();
     }
     [ScriptCall]
     public TTransform3 Transform_Get(bool world_space = false)
     {
         if (!world_space || parent is not Imp3D p)
+        {
             return transform;
-        return WorldFromLocal(p.Transform_Get(true), transform);
+        }
+        p.Cache_Refresh();
+        return WorldFromLocal(p.cached_global_transform, transform);
     }
     [ScriptCall]
     public Vector3 Position_Get(bool world_space = false)
@@ -261,17 +448,22 @@ public class Imp3D : ImpComp
         {
             transform.position = position;
             _phys_dirty = true;
+            Cache_Dirty();
+            Cache_Refresh();
             return;
         }
 
-        var parent_w = p.Transform_Get(true);
-        var q = EulerToQuat(parent_w.rotation);
+        p.Cache_Refresh();
+        var parent_w = p.cached_global_transform;
+        var q = ImpMath.Euler_2_Quat(parent_w.rotation);
         Vector3 inv_s = new(
             parent_w.scale.X != 0 ? 1f / parent_w.scale.X : 0,
             parent_w.scale.Y != 0 ? 1f / parent_w.scale.Y : 0,
             parent_w.scale.Z != 0 ? 1f / parent_w.scale.Z : 0);
         transform.position = Vector3.Transform(position - parent_w.position, Quaternion.Inverse(q)) * inv_s;
         _phys_dirty = true;
+        Cache_Dirty();
+        Cache_Refresh();
     }
     [ScriptCall]
     public Vector3 Rotation_Get(bool world_space = false)
@@ -285,12 +477,17 @@ public class Imp3D : ImpComp
         {
             transform.rotation = rotation;
             _phys_dirty = true;
+            Cache_Dirty();
+            Cache_Refresh();
             return;
         }
 
-        var parent_q = EulerToQuat(p.Transform_Get(true).rotation);
-        transform.rotation = QuatToEuler(Quaternion.Inverse(parent_q) * EulerToQuat(rotation));
+        p.Cache_Refresh();
+        var parent_q = ImpMath.Euler_2_Quat(p.cached_global_transform.rotation);
+        transform.rotation = ImpMath.Quat_2_Euler(Quaternion.Inverse(parent_q) * ImpMath.Euler_2_Quat(rotation));
         _phys_dirty = true;
+        Cache_Dirty();
+        Cache_Refresh();
     }
     [ScriptCall]
     public Vector3 Scale_Get(bool world_space = false)
@@ -304,31 +501,36 @@ public class Imp3D : ImpComp
         {
             transform.scale = scale;
             _phys_dirty = true;
+            Cache_Dirty();
+            Cache_Refresh();
             return;
         }
 
-        var ps = p.Transform_Get(true).scale;
+        p.Cache_Refresh();
+        var ps = p.cached_global_transform.scale;
         transform.scale = new Vector3(
             ps.X != 0 ? scale.X / ps.X : 0,
             ps.Y != 0 ? scale.Y / ps.Y : 0,
             ps.Z != 0 ? scale.Z / ps.Z : 0);
         _phys_dirty = true;
+        Cache_Dirty();
+        Cache_Refresh();
     }
     [ScriptCall]
     static TTransform3 WorldFromLocal(TTransform3 parent, TTransform3 local)
     {
-        var pq = EulerToQuat(parent.rotation);
+        var pq = ImpMath.Euler_2_Quat(parent.rotation);
         return new TTransform3
         {
             position = parent.position + Vector3.Transform(local.position * parent.scale, pq),
-            rotation = QuatToEuler(pq * EulerToQuat(local.rotation)),
+            rotation = ImpMath.Quat_2_Euler(pq * ImpMath.Euler_2_Quat(local.rotation)),
             scale = parent.scale * local.scale
         };
     }
     [ScriptCall]
     static TTransform3 LocalFromWorld(TTransform3 parent, TTransform3 world)
     {
-        var pq = EulerToQuat(parent.rotation);
+        var pq = ImpMath.Euler_2_Quat(parent.rotation);
         Vector3 inv_s = new(
             parent.scale.X != 0 ? 1f / parent.scale.X : 0,
             parent.scale.Y != 0 ? 1f / parent.scale.Y : 0,
@@ -336,31 +538,60 @@ public class Imp3D : ImpComp
         return new TTransform3
         {
             position = Vector3.Transform(world.position - parent.position, Quaternion.Inverse(pq)) * inv_s,
-            rotation = QuatToEuler(Quaternion.Inverse(pq) * EulerToQuat(world.rotation)),
+            rotation = ImpMath.Quat_2_Euler(Quaternion.Inverse(pq) * ImpMath.Euler_2_Quat(world.rotation)),
             scale = world.scale * inv_s
         };
     }
-
-    // X=pitch, Y=yaw, Z=roll (degrees)
-    static Quaternion EulerToQuat(Vector3 euler_deg)
+    
+    // ---------------------------------------------------------------------------------------------------------------
+    // Bounds
+    // ---------------------------------------------------------------------------------------------------------------
+    public TBounds3 Bounds_Get()
     {
-        float deg2rad = MathF.PI / 180f;
-        return Quaternion.CreateFromYawPitchRoll(euler_deg.Y * deg2rad, euler_deg.X * deg2rad, euler_deg.Z * deg2rad);
+        Cache_Refresh();
+        return cached_bounds;
     }
 
-    static Vector3 QuatToEuler(Quaternion q)
+    protected virtual TBounds3 Bounds_Calc()
     {
-        q = Quaternion.Normalize(q);
-        float sinp = 2f * (q.W * q.X - q.Z * q.Y);
-        float pitch, yaw, roll;
-        if (MathF.Abs(sinp) >= 1f)
-            pitch = MathF.CopySign(MathF.PI / 2f, sinp);
-        else
-            pitch = MathF.Asin(sinp);
-        yaw = MathF.Atan2(2f * (q.W * q.Y + q.Z * q.X), 1f - 2f * (q.X * q.X + q.Y * q.Y));
-        roll = MathF.Atan2(2f * (q.W * q.Z + q.X * q.Y), 1f - 2f * (q.X * q.X + q.Z * q.Z));
-        float rad2deg = 180f / MathF.PI;
-        return new Vector3(pitch * rad2deg, yaw * rad2deg, roll * rad2deg);
+        Vector3 min = new(float.MaxValue);
+        Vector3 max = new(float.MinValue);
+        bool any = false;
+        Span<Vector3> corners = stackalloc Vector3[8];
+        int n = children.Count;
+        for (int i = 0; i < n; i++)
+        {
+            if (children[i] is not Imp3D c)
+            {
+                continue;
+            }
+            if (!c.is_visible || c is C3_Gizmo)
+            {
+                continue;
+            }
+            TBounds3 b = c.Bounds_Get();
+            if (b.IsEmpty)
+            {
+                continue;
+            }
+            b.Corners(corners);
+            for (int k = 0; k < 8; k++)
+            {
+                min = Vector3.Min(min, corners[k]);
+                max = Vector3.Max(max, corners[k]);
+            }
+            any = true;
+        }
+        if (!any)
+        {
+            return TBounds3.ZERO;
+        }
+        return new TBounds3
+        {
+            center = (min + max) * 0.5f,
+            size = max - min,
+            rotation = Vector3.Zero,
+        };
     }
     
     // ---------------------------------------------------------------------------------------------------------------
@@ -418,7 +649,7 @@ public class Imp3D : ImpComp
         {
             return;
         }
-        Vector3 world = Vector3.Transform(dir, ImpMath.EulerToQuat(rot_axis));
+        Vector3 world = Vector3.Transform(dir, ImpMath.Euler_2_Quat(rot_axis));
         Phys_Move(world, scale);
     }
 
@@ -592,5 +823,12 @@ public class Imp3D : ImpComp
         }
         return Vector3.Normalize(g);
     }
+    
+    // ---------------------------------------------------------------------------------------------------
+    // Camera
+    // ---------------------------------------------------------------------------------------------------
+    static Camera _invalid_camera = new();
+    public virtual Camera Camera_GetData() { return _invalid_camera; }
+    public virtual bool Camera_IsValid() { return false; }
     
 };

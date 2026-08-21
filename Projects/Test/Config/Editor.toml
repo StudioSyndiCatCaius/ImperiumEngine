@@ -1,18 +1,19 @@
-saved_at = "2026-08-19T00:31:17.3608703Z"
+saved_at = "2026-08-21T20:21:05.2938537Z"
 
 [window]
-main_tab = "Flow"
+main_tab = "Scene"
+play_mode = "Standalone"
 inspector_tab = 0
 outliner_tab = 0
 file_browser_expanded = true
 file_browser_asset_expanded = true
-panel_width = 327
+panel_width = 372
 browser_stretch = 0.5
 browser_asset_stretch = 0.5
 scene_tabs_stretch = 1
 asset_tabs_stretch = 1
-outliner_stretch = 1
-inspector_stretch = 1.20000005
+outliner_stretch = 0.410051554
+inspector_stretch = 0.589948416
 
 [tabs]
 active_scene = 0
@@ -20,7 +21,7 @@ active_asset = 0
 active_flow = 0
 
 [file_browser]
-current_dir = "{game}/Assets/Dialoges"
+current_dir = "{game}/Assets/Modes"
 dir_tab = 0
 search = ""
 show_source_files = true
@@ -54,12 +55,12 @@ gizmo_mode = "Translate"
 gizmo_space = "Local"
 snap_translate = 0.25
 snap_translate_2d = 8
-cam3_position = [-5.77537584, 3.17131352, 1.07459509]
-cam3_target = [-0.324331373, 1.52685082, 2.87411451]
+cam3_position = [7.58117771, 4.7598443, 8.73280239]
+cam3_target = [-0.742940128, -4.05544138, -9.52133656]
 cam3_fovy = 50
-cam2_position = [960, 540]
-cam2_zoom = 0.5
-selected = ["Ground"]
+cam2_position = [824.982361, 386.949615]
+cam2_zoom = 0.821515858
+selected = ["Character/C3_Mesh"]
 
 [[open_assets]]
 path = "{game}/Assets/Textures/po_F2_1.ImpAsset"

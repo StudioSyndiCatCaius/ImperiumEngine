@@ -16,6 +16,10 @@ public class C2_Viewport3D : Imp2D
     public ImpComp? root;
     public ImpComp? overlay;
     public bool transpose_traces = true;
+    // Editor scene view sets Editor (G toggle). Game / standalone leave None.
+    public EDrawFlags draw_flags;
+    // When set, this widget looks through a live C3_Camera (play starting_camera) instead of `camera`.
+    public Imp3D? view_camera;
 
     public Camera3D camera = new()
     {
@@ -46,17 +50,39 @@ public class C2_Viewport3D : Imp2D
         return view_scene?.root;
     }
 
+    Camera3D Camera_GetRL()
+    {
+        if (view_camera != null && view_camera.Camera_IsValid())
+        {
+            return R3D.CameraToRL(view_camera.Camera_GetData());
+        }
+        return camera;
+    }
+
+    Camera Camera_GetR3D()
+    {
+        if (view_camera != null && view_camera.Camera_IsValid())
+        {
+            return view_camera.Camera_GetData();
+        }
+        Camera rcam = R3D.CameraFromRL(camera);
+        rcam.NearPlane = 0.05f;
+        rcam.FarPlane = 500f;
+        return rcam;
+    }
+
     public Ray Trace_Ray(Vector2 screen)
     {
+        Camera3D cam = Camera_GetRL();
         if (transpose_traces)
         {
-            return ImpGizmo.ScreenToRay3(screen, camera, Dimensions_Get());
+            return ImpGizmo.ScreenToRay3(screen, cam, Dimensions_Get());
         }
         if (ImpApp.app != null)
         {
             return Raylib.GetScreenToWorldRay(screen, ImpApp.app.camera);
         }
-        return ImpGizmo.ScreenToRay3(screen, camera, Dimensions_Get());
+        return ImpGizmo.ScreenToRay3(screen, cam, Dimensions_Get());
     }
 
     public Imp3D Trace_Pick(Vector2 screen, out Vector3 hit)
@@ -67,7 +93,7 @@ public class C2_Viewport3D : Imp2D
             hit = default;
             return null;
         }
-        return Imp3D.Pick_Comp3D(src, Trace_Ray(screen), out hit);
+        return Imp3D.Select(src, Trace_Ray(screen), out hit);
     }
 
     public bool Trace_World(Vector2 screen, out Vector3 pos, out Imp3D hit)
@@ -115,9 +141,7 @@ public class C2_Viewport3D : Imp2D
         view_scene?.ApplyRenderState();
         R3D.SetAspectMode(AspectMode.Expand);
 
-        Camera rcam = R3D.CameraFromRL(camera);
-        rcam.NearPlane = 0.05f;
-        rcam.FarPlane = 500f;
+        Camera rcam = Camera_GetR3D();
 
         View view = new()
         {
@@ -131,9 +155,9 @@ public class C2_Viewport3D : Imp2D
         ImpComp src = Root_Get();
         if (src != null)
         {
-            src.Draw(dt, 0, 0);
+            src.Draw(dt, draw_flags, 0);
         }
-        overlay?.Draw(dt, 0, 0);
+        overlay?.Draw(dt, draw_flags, 0);
         R3D.End();
         Raylib.EndScissorMode();
         Rlgl.SetBlendMode(Raylib_cs.BlendMode.Alpha);

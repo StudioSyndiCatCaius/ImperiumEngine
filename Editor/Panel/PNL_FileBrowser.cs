@@ -1790,7 +1790,6 @@ public class EdFileThumbnail : Imp2D
     public string display_name;
     public string type_label;
     public Color type_color = new(90, 90, 90, 255);
-    public bool is_selected;
     public PNL_FileBrowser owner;
 
     bool _hover;

@@ -384,6 +384,26 @@ public class C2_Tree : Imp2D
         return n;
     }
 
+    public static readonly Color COLOR_INSTANCE = new(236, 196, 82, 255);
+    public static readonly Color COLOR_OWNED = new(140, 180, 220, 255);
+
+    public static Color Comp_Tint(ImpComp comp)
+    {
+        if (comp == null)
+        {
+            return default;
+        }
+        if (comp.IsInstanceRoot || comp.IsPackedForeign)
+        {
+            return COLOR_INSTANCE;
+        }
+        if (comp.IsOwned)
+        {
+            return COLOR_OWNED;
+        }
+        return default;
+    }
+
     public static A_Texture Class_Icon(Type type)
     {
         if (type == null) return A_Texture.ICO_COMP;
@@ -444,15 +464,7 @@ public class C2_Tree : Imp2D
             kid_list.Add(FromComp(child, components));
         }
         A_Texture icon = Class_Icon(comp.GetType());
-        Color name_col = default;
-        if (comp.IsInstanceRoot || comp.IsPackedForeign)
-        {
-            name_col = new Color(236, 196, 82, 255);
-        }
-        else if (comp.IsOwned)
-        {
-            name_col = new Color(140, 180, 220, 255);
-        }
+        Color name_col = Comp_Tint(comp);
         if (comp.IsInstanceRoot)
         {
             _expanded.Add(KeyOf(comp));

@@ -125,21 +125,31 @@ public class C3_Gizmo : Imp3D
         void Walk(ImpComp n)
         {
             if (n == null || !n.is_visible) return;
-            if (n is Imp3D c3 && n is not C3_Gizmo && Pickable(c3))
+            if (n is Imp3D c3 && n is not C3_Gizmo)
             {
-                Comp3D_WorldCorners(c3, corners);
-                Vector2 lo = new(float.MaxValue);
-                Vector2 hi = new(float.MinValue);
-                bool any = false;
-                for (int i = 0; i < 8; i++)
+                TBounds3 b = c3.Bounds_Get();
+                if (!b.IsEmpty)
                 {
-                    if (!ImpGizmo.PointInFront(corners[i], cam)) continue;
-                    Vector2 s = ImpGizmo.WorldToScreen3(corners[i], cam, vp);
-                    lo = Vector2.Min(lo, s);
-                    hi = Vector2.Max(hi, s);
-                    any = true;
+                    b.Corners(corners);
+                    Vector2 lo = new(float.MaxValue);
+                    Vector2 hi = new(float.MinValue);
+                    bool any = false;
+                    for (int i = 0; i < 8; i++)
+                    {
+                        if (!ImpGizmo.PointInFront(corners[i], cam))
+                        {
+                            continue;
+                        }
+                        Vector2 s = ImpGizmo.WorldToScreen3(corners[i], cam, vp);
+                        lo = Vector2.Min(lo, s);
+                        hi = Vector2.Max(hi, s);
+                        any = true;
+                    }
+                    if (any && hi.X >= min.X && lo.X <= max.X && hi.Y >= min.Y && lo.Y <= max.Y)
+                    {
+                        found.Add(c3);
+                    }
                 }
-                if (any && hi.X >= min.X && lo.X <= max.X && hi.Y >= min.Y && lo.Y <= max.Y) found.Add(c3);
             }
             for (int i = 0; i < n.children.Count; i++) Walk(n.children[i]);
         }
@@ -178,7 +188,7 @@ public class C3_Gizmo : Imp3D
         ay = Vector3.UnitY;
         az = Vector3.UnitZ;
         if (gizmo_data.space != EGizmoSpace.Local || first == null) return;
-        Quaternion q = ImpMath.EulerToQuat(first.Rotation_Get(true));
+        Quaternion q = ImpMath.Euler_2_Quat(first.Rotation_Get(true));
         ax = Vector3.Normalize(Vector3.Transform(Vector3.UnitX, q));
         ay = Vector3.Normalize(Vector3.Transform(Vector3.UnitY, q));
         az = Vector3.Normalize(Vector3.Transform(Vector3.UnitZ, q));
@@ -383,9 +393,9 @@ public class C3_Gizmo : Imp3D
         for (int i = 0; i < _sel.Count; i++)
         {
             Vector3 p = _origin0 + Vector3.Transform(_start[i].position - _origin0, dq);
-            Quaternion r = dq * ImpMath.EulerToQuat(_start[i].rotation);
+            Quaternion r = dq * ImpMath.Euler_2_Quat(_start[i].rotation);
             _sel[i].Position_Set(p, true);
-            _sel[i].Rotation_Set(ImpMath.QuatToEuler(r), true);
+            _sel[i].Rotation_Set(ImpMath.Quat_2_Euler(r), true);
         }
     }
 
@@ -561,7 +571,12 @@ public class C3_Gizmo : Imp3D
         int[] e = { 0, 1, 1, 3, 3, 2, 2, 0, 4, 5, 5, 7, 7, 6, 6, 4, 0, 4, 1, 5, 2, 6, 3, 7 };
         for (int i = 0; i < _sel.Count; i++)
         {
-            Comp3D_WorldCorners(_sel[i], corners);
+            TBounds3 b = _sel[i].Bounds_Get();
+            if (b.IsEmpty)
+            {
+                continue;
+            }
+            b.Corners(corners);
             for (int k = 0; k < e.Length; k += 2)
             {
                 Vector3 wa = corners[e[k]], wb = corners[e[k + 1]];

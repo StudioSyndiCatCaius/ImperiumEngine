@@ -39,14 +39,18 @@ public static class ImpMath
         return new Vector3(v.X, v.Y, 0);
     }
 
+    // -------------------------------------------------------------------------------------
+    // Rotation
+    // -------------------------------------------------------------------------------------
+    
     // X=pitch, Y=yaw, Z=roll (degrees) — same convention as Imp3D.
-    public static Quaternion EulerToQuat(Vector3 euler_deg)
+    public static Quaternion Euler_2_Quat(Vector3 euler_deg)
     {
         float deg2rad = MathF.PI / 180f;
         return Quaternion.CreateFromYawPitchRoll(euler_deg.Y * deg2rad, euler_deg.X * deg2rad, euler_deg.Z * deg2rad);
     }
 
-    public static Vector3 QuatToEuler(Quaternion q)
+    public static Vector3 Quat_2_Euler(Quaternion q)
     {
         q = Quaternion.Normalize(q);
         float sinp = 2f * (q.W * q.X - q.Z * q.Y);

@@ -87,5 +87,6 @@ public class A_Texture : ImpAsset
 
 public class A_TextureHDR : A_Texture
 {
-
+    public static A_TextureHDR SKY_DAY_1=Import<A_TextureHDR>("{engine}/Textures/HDRI/sky_1.hdr");
+    public static A_TextureHDR SKY_DAY_2=Import<A_TextureHDR>("{engine}/Textures/HDRI/sky_2.hdr");
 }

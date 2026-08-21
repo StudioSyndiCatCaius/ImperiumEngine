@@ -11,7 +11,7 @@ public class C3_Character : C3_Collider
     public C3_Mesh mesh=new()
     {
         mesh = A_Mesh.SK_MANNEQUIN,
-        transform={rotation = new(0, 180, 0)}
+        transform={rotation = new(0, 0, 0)}
     };
     public C3_Skeleton skeleton=new();
     public C1_Creature creature=new();
@@ -47,16 +47,15 @@ public class C3_Character : C3_Collider
         {
             return;
         }
-        Vector3 rot = Rotation_Get(true);
-        C3_Camera cam = Camera_Find(this);
-        if (cam != null)
+
+        if (ImpApp.view_target!=null)
         {
-            rot = cam.Rotation_Get(true);
+            
+            Vector3 local = new(axis.Z, axis.Y, -axis.X);
+            Phys_MoveByRot(local, 1,ImpApp.view_target.cached_global_transform.rotation);
         }
-        rot.X = 0f;
-        rot.Z = 0f;
-        Vector3 local = new(axis.Z, axis.Y, -axis.X);
-        Phys_MoveByRot(local, 1, rot);
+        
+      
     }
 
     public override void Input_Pressed(ImpPlayer player, TLabel iaction, Vector3 axis)

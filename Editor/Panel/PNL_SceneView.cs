@@ -66,8 +66,8 @@ public class PNL_SceneView : C2_Box
         },
     };
 
-    //draw flags
-    bool view_is_debug = false;
+    //draw flags — Editor helpers on by default; G toggles
+    bool view_is_debug = true;
     
     C2_EnumOption opt_edit;
     C2_EnumOption opt_gizmo;
@@ -207,6 +207,13 @@ public class PNL_SceneView : C2_Box
         base.OnUpdate(dt);
         viewport3D.view_scene = scene;
         viewport2D.view_scene = scene;
+        EDrawFlags view_flags = EDrawFlags.None;
+        if (view_is_debug)
+        {
+            view_flags = EDrawFlags.Editor;
+        }
+        viewport3D.draw_flags = view_flags;
+        viewport2D.draw_flags = view_flags;
         if (script_graph != null)
         {
             script_graph.Bind(scene);
@@ -379,6 +386,10 @@ public class PNL_SceneView : C2_Box
         if (ImpPlayer.Key_IsPressed(EInputKey.Key_Escape))
         {
             gizmo_data.Selection_Clear();
+        }
+        if (!IsCameraBusy && ImpPlayer.Key_IsPressed(EInputKey.Key_G))
+        {
+            view_is_debug = !view_is_debug;
         }
 
         if (drag == ECaptureDrag.Look && lmb)
@@ -652,13 +663,14 @@ public class PNL_SceneView : C2_Box
         ImpComp hit;
         if (edit_mode == ESceneEditorMode.Mode_3D)
         {
-            hit = viewport3D.Trace_Pick(screen, out _);
+            hit = Imp3D.Select(viewport3D.Root_Get(), viewport3D.Trace_Ray(screen), out _);
         }
         else
         {
             hit = viewport2D.Trace_Pick(screen);
         }
 
+        hit = ImpComp.OutlinerHost(hit);
         if (hit == null)
         {
             if (!additive)
@@ -695,13 +707,36 @@ public class PNL_SceneView : C2_Box
             C2_Gizmo.PickRect(scene.root, viewport2D.camera, vp, min, max, hits);
         }
 
+        List<ImpComp> hosts = new();
+        for (int i = 0; i < hits.Count; i++)
+        {
+            ImpComp h = ImpComp.OutlinerHost(hits[i]);
+            if (h == null)
+            {
+                continue;
+            }
+            bool already = false;
+            for (int j = 0; j < hosts.Count; j++)
+            {
+                if (hosts[j] == h)
+                {
+                    already = true;
+                    break;
+                }
+            }
+            if (!already)
+            {
+                hosts.Add(h);
+            }
+        }
+
         if (additive)
         {
-            gizmo_data.Selection_Add(hits);
+            gizmo_data.Selection_Add(hosts);
         }
         else
         {
-            gizmo_data.Selection_Set(hits);
+            gizmo_data.Selection_Set(hosts);
         }
     }
 
@@ -722,7 +757,12 @@ public class PNL_SceneView : C2_Box
                 {
                     continue;
                 }
-                Imp3D.Comp3D_WorldCorners(c3, corners);
+                TBounds3 b = c3.Bounds_Get();
+                if (b.IsEmpty)
+                {
+                    continue;
+                }
+                b.Corners(corners);
                 for (int k = 0; k < 8; k++)
                 {
                     min = Vector3.Min(min, corners[k]);

@@ -17,11 +17,22 @@ Per-`ImpGame` Jolt world. `Foundation` + `JobSystemThreadPool` are process-wide 
 - Register on `Imp3D.OnBegin` if `physics_enabled`. Unregister on `OnEnd` / `OnDestroy`.
 - Tick: `ImpScene.Update` walks the tree (`Update_Physics` / `Update_Movement`) **then** `game.phys.Step(dt)` so same-frame `Phys_Move` applies.
 - Two object layers: Static (0) / Moving (1). Static↔Moving and Moving↔Moving collide.
-- `Trace_Line` uses `NarrowPhaseQuery.CastRay` when a world exists. Editor picking still uses AABB `Ray_Comp3D`.
+- `Trace_Line` uses `NarrowPhaseQuery.CastRay` when a world exists. Editor click select uses `Imp3D.Select` against `Bounds_Calc` OBBs, not physics.
 - `C3_Mesh` shapes: `GEO_PLANE` = thin box, everything else (including `GEO_CUBE` and imports) = `BoxShape(0.5 * scale)`. Triangle `MeshShape` from R3D meshes is not wired (R3D `Mesh` has no vertex accessor).
-- `C3_Collider`: collision volume only (not a mesh). Cube/Sphere/Cylinder/Capsule primitives, Cone = convex hull. Capsule `Phys_ShapeOffset` lifts the shape so `CharacterVirtual.Position` is at the feet. Editor draws a translucent cyan debug primitive matching `shape`/`extents` (hidden in PIE). `Shape_Local` feeds `Comp3D_LocalBounds` so the volume is pickable. Default `physics_enabled`.
+- `C3_Collider`: collision volume only (not a mesh). Cube/Sphere/Cylinder/Capsule primitives, Cone = convex hull. Capsule `Phys_ShapeOffset` lifts the shape so `CharacterVirtual.Position` is at the feet. Debug volume draws only with `EDrawFlags.Editor` (scene viewport, not standalone/PIE). `Bounds_Calc` from `Shape_Local` so the volume is selectable. Default `physics_enabled`.
 - No dynamic rigid bodies in v1.
 - `ImpComp.OnBegin` / `OnEnd` now cascade to children. `Destroy` calls `OnDestroy` before detaching.
+
+### Transform / bounds cache (`Imp3D`)
+
+`cached_global_transform` + `cached_bounds` are filled parent-first each Update (before `OnUpdate`, then again after so children see mutations) and again at the start of 3D Draw. `Cache_Invalidate` bumps a phase epoch (same places as `Imp2D.Layout_Invalidate`). `Cache_Refresh` is a no-op if this node is already stamped this epoch.
+
+- `Transform_Get(true)` uses `parent.cached_global_transform` + live local (O(1), not a parent walk). Local `Transform_Get(false)` is still the `transform` field.
+- `Bounds_Get()` returns `cached_bounds`. Default `Bounds_Calc()` is the world AABB of visible Imp3D children's bounds. `C3_Mesh` / `C3_Camera` / `C3_Collider` override with their own volume (mesh AABB, boom mesh, collision shape). Empty leaf → `TBounds3.ZERO` (not pickable).
+- Editor click (`PNL_SceneView.PickAt` → `Imp3D.Select`) traces those bounds, then `OutlinerHost` so packed-foreign / owned kids are not viewport-selectable (instance root / C# host instead). Inspector Components tree is how you inspect those. A parent whose volume is only a child union is skipped when a descendant also hits, so clicking a user-added mesh in a group selects the mesh; clicking the gap around children selects the group. Marquee / gizmo outline / F-focus use `TBounds3.Corners`. `Comp3D_LocalBounds` / `Comp3D_WorldCorners` / `Pick_Comp3D` / `Pickable` are gone.
+- `Cache_Refresh(force)` after `OnUpdate` dirties children only when this node's world transform actually moved, then `Bounds_Calc` rebuilds the union.
+- Setters dirty the subtree then refresh this node. Read the cached fields after `Cache_Refresh`, or just call `Transform_Get` / `Bounds_Get`.
+- Clone skips the cached fields.
 
 ### Movement (`Imp3D`)
 
@@ -46,8 +57,9 @@ Scene-graph node. `Imp2D` / `Imp3D` inherit.
 |---|---|
 | `name` | ImpVar. Defaults to type name. |
 | `is_visible` | ImpVar. Local only — `IsVisibleInTree()` walks ancestors. |
+| `is_selected` | **Not** ImpVar. Editor stamp. `TGizmoData` sets/clears it on Selection_*. `Draw` ORs `EDrawFlags.Selected` for that node only (children keep the caller's flags). Clone skips it. |
 | `parent` / `children` | Tree. `children` is readonly list, mutate via Child_* / Detach. |
-| owned / native | Public (or private) `ImpComp` fields that are also children — `C3_Character.mesh` / `skeleton` / `creature`. `IsOwned`, `OwnedFields`, `OwnedFieldOf`, `Owned_Bind`, `OutlinerHost`. |
+| owned / native | Public (or private) `ImpComp` fields that are also children — `C3_Character.mesh` / `skeleton` / `creature`. **Not** `[ImpVar]` ImpComp slots (those are object refs: `look_target`). `IsOwned`, `OwnedFields`, `OwnedFieldOf`, `Owned_Bind`, `OutlinerHost`. |
 | `scene` | Cached owning `ImpScene`. **Not** ImpVar. Property: assign cascades to descendants. |
 | `game_owner` | Cached owning `ImpGame`. **Not** ImpVar. Same cascade as `scene`. Get(0) = editor/standalone, Get(1) = PIE. |
 | `input_owner` | `ImpPlayer` that feeds input into this subtree. |
@@ -59,7 +71,12 @@ Scene-graph node. `Imp2D` / `Imp3D` inherit.
 - Scene root is bound by `ImpScene.root` setter (`root.scene = this`, `root.game_owner = scene.game`).
 - `ImpGame.scene` setter stamps `ImpScene.game`, which stamps the tree.
 - Loose / cloned comps have `scene` / `game_owner` == null until attached under a bound root.
-- Clone skips `_scene` and `_game_owner` (and parent/children/input_owner/is_destroying). Re-attach to bind.
+- Clone skips `_scene` and `_game_owner` (and parent/children/input_owner/is_destroying/`is_selected`). Re-attach to bind. After the tree is copied, `CompRefs_Remap` walks original→copy and retargets ImpComp ImpVars (`look_target`, …) onto the clone. Sibling refs are remapped by the top `Clone()`; `skip_self` kids are skipped in the map so indices stay aligned.
+
+**`EDrawFlags`** (`[Flags]`, `Engine/ImpComp.cs`)
+- `None = 0`, `Editor = 1`, `Selected = 2`. First member must **not** be 0 — `HasFlag(Editor)` was always true when `Editor` was the implicit 0, so camera/collider debug drew in standalone/PIE.
+- `Editor`: helpers in the authored scene viewport (camera mesh + boom, collider volume). `PNL_SceneView` sets `C2_Viewport*.draw_flags = Editor` when `view_is_debug` (default on; **G** toggles). Standalone `ImpScene.Draw` and PIE Game view leave flags `None`.
+- `Selected`: extra overlays on the **selected** node (camera frustum). Stamped via `is_selected`, not passed from the viewport.
 
 **Tree ops**
 - `Child_Add` / `Child_Insert` Detach first (or reorder if already a child).
@@ -70,7 +87,7 @@ Scene-graph node. `Imp2D` / `Imp3D` inherit.
 
 **Inspector Components tree**
 - Unreal-style: outliner picks the host (`OutlinerHost` walks past owned / packed-foreign). Inspector top `Components` tree lists the host + **public** owned slots + packed-foreign kids (and extras under those hidden nodes).
-- Click a row to inspect that comp’s ImpVars; gizmo follows; outliner stays on the host. Prefab instance children are the same path (hidden from outliner, yellow in the inspector tree). User-added siblings of the host still live in the outliner.
+- Click a row to inspect that comp’s ImpVars; gizmo follows; outliner stays on the host. Prefab instance children are the same path (hidden from outliner, yellow in the inspector tree). User-added siblings of the host still live in the outliner. Scene-view click / marquee never select packed-foreign or owned children — they promote to `OutlinerHost` (instance root, or the C# class that declared the field). Inspector Components is the only way to pick those kids.
 
 **Do not confuse with** `Imp2D._scene_root` — static per-frame flag for “this subtree is scene canvas content” (layout/pivot/rotation). That is **not** `ImpComp.scene`.
 
@@ -121,12 +138,14 @@ Icons autoload from `{engine}/Icons/type/` then `{engine}/Icons/Types/`. Tried n
 | `root` | Property. Assign unbinds old tree (`scene=null`), Detach, binds new (`scene=this`). Null coalesces to a fresh ImpComp. |
 | `root_type` | ImpVar `TClass<ImpComp>` — intended root class when creating a scene, not the live instance. |
 | `script_builtin` / `script_override` | Hidden inline `A_Script` + optional on-disk override. `Script_Get()` prefers override. New scenes always have a builtin (`parent_type` = ImpScene). |
+| `starting_camera` | ImpVar `C3_Camera` object ref (JSON `comp_path`). Play camera. `RBegin` assigns `ImpApp.view_target` (null if unset). Standalone `ImpApp` 3D pass looks through it and applies `ApplyRenderState`. PIE `C2_GameView` binds `C2_Viewport3D.view_camera` to the **cloned** camera so the Game tab follows it; unset falls back to the editor orbit snapshot. `PlayCopy` remaps the ref onto the cloned tree (Clone copies the authored object). |
 | `is_running` | Toggles `RuntimeBegin` / `RuntimeEnd` on the root, then `root.Update`. |
 | `canvas_size` | 2D scene canvas (default 1920x1080). |
+| `environment` | ImpVar `TRef<A_Environment>` (default `ENVI_DAY`). Shared lighting/sky/fog/tonemap/bloom/SSAO. `ApplyRenderState` pushes it into R3D **by ref** (`SetEnvironmentEx(updater)`) every viewport draw so Scene-inspector / asset-editor edits show immediately. Do not copy `GetEnvironmentEx()` then `SetEnvironmentEx(struct)` — nested Background/Fog/Bloom/SSAO fields did not stick. `TRef.Get()` re-resolves `path` so picking a different environment cannot keep a stale `loaded`. Inspector expands the asset like `C2_AssetSlot` (inline unique via **Inline**). |
 
 Ctor always creates a bound default root. Replacing root is how the editor boots (`ImpScene.current.root = new Scene_Editor()`).
 
-`root` is **not** ImpVar. File_JSON special-cases ImpScene: `vars.root` is `{ _class, name, vars, children }` via `Comp_ToJson` / `Comp_FromJson`. Comp vars are ImpVar fields (skips `name` — stored at the node — and ImpComp-typed fields). Comp class from `ImpComp.Type_FromName`.
+`root` is **not** ImpVar. File_JSON special-cases ImpScene: `vars.root` is `{ _class, name, vars, children }` via `Comp_ToJson` / `Comp_FromJson`. Comp vars are ImpVar fields (skips `name` — stored at the node). Comp class from `ImpComp.Type_FromName`. ImpComp-typed ImpVar fields (object refs like `look_target`, or `ImpScene.starting_camera`) serialize as `{ "comp_path": "Name#occurrence/Name#occurrence/…" }` — a name+occurrence chain from the tree root, resolved back to the same node on load (deferred until the whole tree exists, so forward references across branches work). Root-relative, so a ref pointing outside the tree being written silently becomes `null`.
 
 **SceneDrop** — `Instantiate()` of this asset (packed instance, not a flattened copy). Ghost on `view.overlay`. Drop parents the instance root under a host-owned dest (`scene.root` if empty). Will not parent inside an instance capsule. Undo via `ImpUndo.Comp_Moved`. Selection after drop is `PNL_SceneView`.
 
@@ -200,7 +219,7 @@ Loaded at the end of `Scene_Editor` ctor (`EdState.Load`). Written every 2s whil
 
 | Section | What |
 |---|---|
-| `[window]` | Main tab name, inspector/outliner tab, scene + asset file-browser expanded/stretch (`file_browser_expanded`, `file_browser_asset_expanded`, `browser_stretch` + `scene_tabs_stretch`, `browser_asset_stretch` + `asset_tabs_stretch`), splitter sizes (`panel_width`, sidebar) |
+| `[window]` | Main tab name, play mode (`play_mode` = `PlayInEditor` / `Standalone`), inspector/outliner tab, scene + asset file-browser expanded/stretch (`file_browser_expanded`, `file_browser_asset_expanded`, `browser_stretch` + `scene_tabs_stretch`, `browser_asset_stretch` + `asset_tabs_stretch`), splitter sizes (`panel_width`, sidebar) |
 | `[tabs]` | Active scene tab index, active asset tab index, active flow tab index |
 | `[[open_scenes]]` | Saved scenes only (`File_CanWrite`). Camera 3D/2D, edit/gizmo/snap, selected comp name-paths |
 | `[[open_assets]]` | Open asset file paths |
@@ -266,7 +285,7 @@ Editor outliner panel. Search bar + `C2_Tree`. Binds `scene` (or `root_comp` if 
 
 ## PNL_SceneView (`Editor/Panel/PNL_SceneView.cs`)
 
-Scene viewport tab (`C2_Box`, `cursor_filter = Hit`). Owns `scene`, `undo`, `edit_mode`, `gizmo_data`, `C2_Viewport3D` + `C2_Viewport2D` (both `Pass` so clicks land on the panel), 2D/3D gizmos, camera nav, marquee/selection, asset drop, and the mode/gizmo/space/snap toolbar. `WND_Scene` still hosts the tab box, selection/inspector bind, and dup/delete hotkeys.
+Scene viewport tab (`C2_Box`, `cursor_filter = Hit`). Owns `scene`, `undo`, `edit_mode`, `gizmo_data`, `C2_Viewport3D` + `C2_Viewport2D` (both `Pass` so clicks land on the panel), 2D/3D gizmos, camera nav, marquee/selection, asset drop, and the mode/gizmo/space/snap toolbar. `WND_Scene` still hosts the tab box, selection/inspector bind, and dup/delete hotkeys. `view_is_debug` (default true) drives `viewport*.draw_flags = Editor`; **G** toggles it while the Scene page is focused.
 
 Inner `tabs_view` pages: **Scene** (`view_root` — toolbar + 3D/2D viewports), **Game** (`PNL_GameView`), **Script** (`PNL_ScriptGraph`). Camera / gizmo / marquee only run while this panel is **visible in the tree** (the Scene main tab, inner Scene page). Local `is_visible` stays true when Flow/Asset is selected — the last layout rect still covers that area, so polling `Cursor_IsInDimensions` without `IsVisibleInTree()` would hog clicks and keys. Switching away drops hog / drag / leftover `target_focus`.
 
@@ -402,6 +421,7 @@ Chrome (`C2_DialogHost` / `C2_DialogShade`) is hidden. The panel is a later sibl
 | `Dialog_Confirm` | `Run(message, on_yes, on_no?, text_yes?, text_no?)` |
 | `Dialog_ClassPicker` | `Run(root_type, on_picked, on_cancel?, title?, current?, allow_none?)` |
 | `Dialog_AssetPicker` | `Run(asset_type, on_picked, on_cancel?, current_path?, title?, allow_none?)` |
+| `Dialog_CompPicker` | `Run(accepted_type, on_picked, on_cancel?, scene?, current?, title?, allow_none?, filter?)` — scene tree of live `ImpComp`s. Includes owned natives + packed-foreign kids (yellow). Non-matching types are disabled. None + search. Inspector `ImpComp` ImpVars open this. |
 | `DLG_ChooseComp` | `Run(on_picked, title?)` |
 | `DLG_ConfirmDelete` | `Run(message, on_yes, on_no?)` — Confirm with Delete / Cancel |
 | `DLG_NewScene` / `DLG_NewAsset` | `Run(folder?)` |
@@ -445,11 +465,16 @@ C# statics cannot be instanced (one AppDomain, and Raylib/R3D/Jolt are process-g
 
 `C2_GameView.view_game` is the session it *shows* (PIE). `ImpComp.game_owner` on that widget is still Get(0) — it lives in the editor tree.
 
-**Play** (`Scene_Editor.MOpt_Play`, also `PIE_Play` = Alt+P): `Play_Start` clones the active `PNL_SceneView` scene, binds it on that tab's `PNL_GameView` (`C2_GameView` inside), copies the 3D camera, selects the **Game** inner tab. Play again is a no-op while PIE is live. Scene / Script stay usable — switch back to edit the authored scene while play keeps ticking (Update does not skip hidden tabs).
+**Play** (`Scene_Editor.MOpt_Play`, also `PIE_Play` = Alt+P) follows `Scene_Editor.play_mode` (toolbar dropdown next to the play buttons: **Play-in-Editor** / **Standalone**, persisted as `[window].play_mode`).
 
-**Stop** (`MOpt_Play_Stop` / toolbar Stop / `PIE_Quit` = Alt+Escape): unbinds every scene tab's Game view, then `Play_Stop`. Closing the hosting scene tab also stops PIE. Toolbar: Stop is `is_disabled` when `Get(1)` is null; Play and Play From Start are `is_disabled` during PIE.
+- **Play-in-Editor:** `Play_Start` clones the active `PNL_SceneView` scene, binds it on that tab's `PNL_GameView` (`C2_GameView` inside), copies the 3D camera, selects the **Game** inner tab. Play again is a no-op while PIE is live. Scene / Script stay usable — switch back to edit the authored scene while play keeps ticking (Update does not skip hidden tabs).
+- **Standalone:** launches `Engine.exe` (beside the editor) with `--game <project root>` and `--scene <tokenized current scene>`. Dirty scenes are written first; untitled scenes refuse until saved. A live standalone process is killed and replaced on Play. The editor stays usable.
 
-`C2_GameView` ticks `view_game.scene` under `Bind`. It lives in `PNL_GameView` (the Game inner tab), not as an overlay on Scene. 3D is `C2_Viewport3D` with `R3D.SetAspectMode(Expand)` so the blit fills the widget. 2D HUD (`clear_background` / `draw_canvas` false) draws in-place over that blit — not through a second RT (R3D scissor leftover was covering the bottom of the 3D image). Physics is per-`ImpGame` (`ImpGame.phys`). `ImpPlayer.players` is still process-global, but **action input is now routed per session** — see below.
+**Stop** (`MOpt_Play_Stop` / toolbar Stop / `PIE_Quit` = Alt+Escape): kills the standalone process if any, unbinds every scene tab's Game view, then `Play_Stop`. Closing the hosting scene tab also stops PIE. Editor shutdown also kills standalone. Toolbar: Stop is `is_disabled` when `Get(1)` is null **and** no standalone process is live; Play and Play From Start are `is_disabled` during PIE (not during standalone).
+
+**Engine.exe boot** (`Engine/Program.cs`): `--game` binds `A_Game.game` before `ImpConfig.LoadAll`. Scene is `--scene` if given, else `ImpGame.starting_scene` from config. Host `ImpScene.current` is that scene with `is_running = true`. `ImpApp`’s window 3D pass (`R3D.BeginEx` / `R3D.Begin`) is what actually shows the game: `ApplyRenderState` while `is_running`, camera from `ImpApp.view_target` (`starting_camera` after `RBegin`), else `default_camera`. Do **not** `R3D.Begin(default_camera)` unconditionally — that was a blank 3D view because the computed `camera` was never used and the scene environment/sun never applied. PIE still draws through `C2_Viewport3D`, not this pass.
+
+`C2_GameView` ticks `view_game.scene` under `Bind`. It lives in `PNL_GameView` (the Game inner tab), not as an overlay on Scene. 3D is `C2_Viewport3D` with `R3D.SetAspectMode(Expand)` so the blit fills the widget. After each play `Update`, `Camera_Sync` points `viewport3D.view_camera` at the play scene’s `starting_camera` when set (cloned node, not the authored one); otherwise the editor camera snapshot from `Bind` stays. 2D HUD (`clear_background` / `draw_canvas` false) draws in-place over that blit — not through a second RT (R3D scissor leftover was covering the bottom of the 3D image). Physics is per-`ImpGame` (`ImpGame.phys`). `ImpPlayer.players` is still process-global, but **action input is now routed per session** — see below.
 
 ### Input target game
 
@@ -475,15 +500,18 @@ Do **not** try AssemblyLoadContext or a second process for PIE. Shared GPU asset
 
 Dumb display widgets. Each takes `view_scene` and/or `root` (root wins) plus optional `overlay` (drop ghost, not in the tree). Do **not** name the viewed scene `scene` — that hides `ImpComp.scene` (the editor chrome tree). `transpose_traces` (default true) remaps mouse picks through the widget camera / rect (`Trace_Ray` / `Trace_Pick` / `Trace_World`). Standalone default `cursor_filter = Hit`. Editor sets `Pass` so `PNL_SceneView` receives clicks.
 
-- 3D: R3D into a render texture, blit. Camera is on the widget; editor writes it.
+- 3D: R3D into a render texture, blit. Camera is on the widget (`camera`); editor writes it. Optional `view_camera` (`Imp3D`, e.g. `C3_Camera`) overrides that with `Camera_GetData()` for draw and traces — PIE Game view sets this from `ImpScene.starting_camera`.
 - 2D: canvas fill + `SceneLayout_Set` / `SceneDraw_*` of 2D comps. `clear_background` / `draw_canvas` (default true) — Game view turns both off so 2D HUD composites over the 3D blit.
+- `draw_flags`: forwarded into `src.Draw` / `overlay.Draw`. Scene view sets `Editor`; Game view leaves `None` so play does not draw editor helpers.
+
+**3D debug draw** (`Imp3D.Draw3D_*`) must go through R3D (`DrawMeshEx`), not Raylib `DrawLine3D` / `BeginMode3D`. Viewport 3D is `R3D.BeginPro` → scene `Draw` → `R3D.End`; Raylib immediate 3D is discarded. `Draw3D_Line` is an unlit cylinder (`thickness` = world diameter). `C3_Camera` boom line + util mesh draw only with `EDrawFlags.Editor`; frustum (and orange boom) only with `Selected`. Zero-length lines (e.g. `boom_distance == 0`) are skipped.
 
 No gizmos, selection, or camera-drag on the viewports.
 
 **Asset drop** (on `PNL_SceneView`)
 - `overlay` — live ghost drawn after the scene, **not** in the tree until commit.
 - Panel `_Notify_OnGrabDrop` + `_Notify_AsCursorTarget(Update)` call ImpAsset SceneDrop_*.
-- `C2_Viewport3D.Trace_World` — mesh pick, else Y=0 plane. `C2_Viewport2D.Trace_World` — canvas point.
+- `C2_Viewport3D.Trace_Pick` / `Trace_World` — `Imp3D.Select` (bounds), else Y=0 plane. `C2_Viewport2D.Trace_World` — canvas point.
 - Any active grab (`player.grab_is_active`) blocks camera / gizmo / marquee.
 - File-browser drop target is `PNL_SceneView` (`ImpScene` or `A_Mesh`).
 
@@ -522,6 +550,7 @@ Inspects `[ImpVar]` fields/properties on the selected object(s). Categories are 
 - `include_static` — also collect public static `[ImpVar]`s (`Members_GetStatic`). Off by default so instance inspectors stay instance-only.
 - Target may be a `Type` (`InspectType`): inspect that type's members instead of `System.Type`. `TPropertyBind.Member` binds statics via `GetValue(null)` / `SetValue(null, …)` and pulls revert defaults from `ImpConfig.Default_TryGet`.
 - Comp inspector: top **Components** tree (`Tree_Populate_Components`) for public owned slots + packed-foreign kids. `on_component_click` retargets vars / gizmo. Host is `ImpComp.OutlinerHost`. No reorder.
+- `[ImpVar]` fields whose type is `ImpComp` (or a subclass — `C3_Camera.look_target`, `C1_Creature.creature_root`, …) use `C2_Picker`. Click opens `Dialog_CompPicker` on the inspected comp’s `scene` (the edited level, not editor chrome). Accepted types only; instance natives / packed-foreign rows are yellow (`C2_Tree.COLOR_INSTANCE`). Clear × sets null. These ImpVars are **object refs**, not owned natives — `OwnedFields` skips `[ImpVar]` ImpComp slots. Round-trips through save/reload via `File_JSON`'s `comp_path` scheme (see File_JSON section) — same mechanism whether the field lives on a comp in the tree or on the `ImpScene` asset itself.
 
 ## C2_TabBox (`Engine/Comps/2D/C2_TabBox.cs`)
 
@@ -687,7 +716,7 @@ Ghost = `packed.Instantiate()` (real root type), parked on `overlay`. Drop paren
 
 ### Editor lock (v1)
 
-Packaged children (`IsPackedForeign`) are selected and edited like any other comp (inspector + gizmo). Tree identity stays locked:
+Packaged children (`IsPackedForeign`) and owned field comps (`IsOwned`) cannot be click-selected in the scene view (click / marquee promote to `OutlinerHost`). Inspector **Components** tree is how you inspect them; gizmo then follows that row. Tree identity stays locked:
 
 - No delete, duplicate, reparent, or reorder.
 - No parenting into an instance root or a foreign node (`Child_Add` / `Child_Insert` / `Reparent` refuse).

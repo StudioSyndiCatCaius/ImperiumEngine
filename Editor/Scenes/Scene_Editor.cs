@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Numerics;
 using Editor.Dialog;
 using Editor.Panel;
@@ -5,11 +6,19 @@ using Editor.Windows;
 using ImperiumEngine;
 using ImperiumEngine.Assets;
 using ImperiumEngine.Comps._2D;
+using ImperiumEngine.Dialogs;
 using ImperiumEngine.Enums;
+using ImperiumEngine.Files;
 using ImperiumEngine.Structs;
 using Raylib_cs;
 
 namespace Editor.Scenes;
+
+public enum EPlayMode
+{
+    PlayInEditor,
+    Standalone,
+}
 
 public class Scene_Editor : ImpComp
 {
@@ -21,8 +30,8 @@ public class Scene_Editor : ImpComp
     };
 
     // tall enough for icon + label underneath, or the buttons spill over the menubar
-    public const float MAIN_BUTTON_ICON = 28;
-    public const float MAIN_BUTTON_HEIGHT = 56;
+    public const float MAIN_BUTTON_ICON = 20;
+    public const float MAIN_BUTTON_HEIGHT = 36;
     public const float MAIN_BUTTON_WIDTH = 80;
 
     public C2_List ui_main_buttons = new()
@@ -82,6 +91,9 @@ public class Scene_Editor : ImpComp
     public C2_Button btn_stop;
     public C2_Button btn_play;
     public C2_Button btn_play_start;
+    public C2_Dropdown drop_play_mode;
+    public EPlayMode play_mode = EPlayMode.PlayInEditor;
+    Process? _standalone;
     
     public Scene_Editor()
     {
@@ -123,7 +135,7 @@ public class Scene_Editor : ImpComp
                 text = text,
                 icon = icon,
                 on_click = on_press,
-                button_layout = EButtonLayout.Icon_Text_V,
+                //button_layout = EButtonLayout.Icon_Text_V,
                 text_style = UI_Text.DEFAULT,
                 icon_size = MAIN_BUTTON_ICON,
                 override_font_size = 10,
@@ -165,8 +177,32 @@ public class Scene_Editor : ImpComp
         _AddMainSeperator();
         btn_stop = _AddMainButton("Stop", A_Texture.ICO_STOP, () => { MOpt_Play_Stop(); });
         btn_play = _AddMainButton("Play", A_Texture.ICO_PLAY, () => { MOpt_Play(); });
-        btn_play_start = _AddMainButton("Play From Start", A_Texture.ICO_PLAY, () => { MOpt_Play_Start(); });
+        btn_play_start = _AddMainButton("Play (Start)", A_Texture.ICO_PLAY, () => { MOpt_Play_Start(); });
         btn_stop.is_disabled = true;
+
+        drop_play_mode = new C2_Dropdown
+        {
+            layout = new TLayout2
+            {
+                size = new Vector2(160, MAIN_BUTTON_HEIGHT),
+                size_min = new Vector2(160, 0),
+                orient_V = EUIViewportAlignment.Fill,
+            },
+        };
+        drop_play_mode.Options_Set(new[] { "Play-in-Editor", "Standalone" });
+        drop_play_mode.Option_SetQuiet(0);
+        drop_play_mode.on_dropdown_change = (_, _, idx) =>
+        {
+            if (idx == 1)
+            {
+                play_mode = EPlayMode.Standalone;
+            }
+            else
+            {
+                play_mode = EPlayMode.PlayInEditor;
+            }
+        };
+        ui_main_buttons.Child_Add(drop_play_mode);
 
         // ---------------------
         // Main Tabs
@@ -220,9 +256,10 @@ public class Scene_Editor : ImpComp
         if (ctrl && ImpPlayer.Key_IsPressed(EInputKey.Key_Y)) MOpt_Redo();
 
         bool pie = ImpGame.Get(ImpGame.ID_PLAY) != null;
+        bool standalone = Standalone_IsLive();
         if (btn_stop != null)
         {
-            btn_stop.is_disabled = !pie;
+            btn_stop.is_disabled = !pie && !standalone;
         }
         if (btn_play != null)
         {
@@ -421,6 +458,11 @@ public class Scene_Editor : ImpComp
     
     public void MOpt_Play()
     {
+        if (play_mode == EPlayMode.Standalone)
+        {
+            Standalone_Play();
+            return;
+        }
         if (ImpGame.Get(ImpGame.ID_PLAY) != null)
         {
             return;
@@ -450,6 +492,7 @@ public class Scene_Editor : ImpComp
 
     public void MOpt_Play_Stop()
     {
+        Standalone_Stop();
         if (mtab_scene != null)
         {
             for (int i = 0; i < mtab_scene.tab_scenes.children.Count; i++)
@@ -465,6 +508,118 @@ public class Scene_Editor : ImpComp
             }
         }
         ImpGame.Play_Stop();
+    }
+
+    public bool Standalone_IsLive()
+    {
+        if (_standalone == null)
+        {
+            return false;
+        }
+        try
+        {
+            if (!_standalone.HasExited)
+            {
+                return true;
+            }
+            _standalone.Dispose();
+        }
+        catch
+        {
+        }
+        _standalone = null;
+        return false;
+    }
+
+    public void Standalone_Stop()
+    {
+        if (_standalone == null)
+        {
+            return;
+        }
+        try
+        {
+            if (!_standalone.HasExited)
+            {
+                _standalone.Kill(true);
+                _standalone.WaitForExit(2000);
+            }
+        }
+        catch
+        {
+        }
+        try
+        {
+            _standalone.Dispose();
+        }
+        catch
+        {
+        }
+        _standalone = null;
+    }
+
+    public void Standalone_Play()
+    {
+        PNL_SceneView view = mtab_scene.ActiveEdScene();
+        if (view == null || view.scene == null)
+        {
+            return;
+        }
+        ImpScene scene = view.scene;
+        if (!scene.File_CanWrite())
+        {
+            Dialog_Alert.Run("Save the scene before Standalone play.");
+            return;
+        }
+        if (scene.is_dirty)
+        {
+            scene.File_Write();
+            PNL_FileBrowser.Browsers_Notify();
+        }
+
+        string exe_name = "Engine";
+        if (OperatingSystem.IsWindows())
+        {
+            exe_name = "Engine.exe";
+        }
+        string exe = Path.Combine(AppContext.BaseDirectory, exe_name);
+        if (!File.Exists(exe))
+        {
+            Dialog_Alert.Run("Standalone game exe was not found (" + exe_name + ").");
+            return;
+        }
+
+        Standalone_Stop();
+
+        string scene_arg = File_JSON.Path_Tokenize(scene.filepath);
+        string game_arg = "";
+        if (A_Game.game != null)
+        {
+            game_arg = A_Game.game.GetRootDir();
+        }
+
+        ProcessStartInfo psi = new ProcessStartInfo
+        {
+            FileName = exe,
+            WorkingDirectory = Path.GetDirectoryName(exe) ?? "",
+            UseShellExecute = false,
+        };
+        if (!string.IsNullOrWhiteSpace(game_arg))
+        {
+            psi.ArgumentList.Add("--game");
+            psi.ArgumentList.Add(game_arg);
+        }
+        psi.ArgumentList.Add("--scene");
+        psi.ArgumentList.Add(scene_arg);
+
+        try
+        {
+            _standalone = Process.Start(psi);
+        }
+        catch (Exception e)
+        {
+            Dialog_Alert.Run("Failed to launch Standalone: " + e.Message);
+        }
     }
 
     public override void OnDraw2DForeground(double dt, EDrawFlags flags)

@@ -30,12 +30,20 @@ public class File_JSON : ImpFile
         if (target is ImpAsset asset)
         {
             if (root["vars"] is not JsonObject vars) return false;
-            ApplyVars(asset, vars, asset.filepath);
-            if (asset is ImpScene scene && vars["root"] is JsonNode root_node)
+            ImpComp? comp_root = null;
+            if (asset is ImpScene scene)
             {
-                ImpComp? loaded = Comp_FromJson(root_node, asset.filepath);
-                if (loaded != null) scene.root = loaded;
+                // Rebuild the comp tree before applying the scene's own vars, so an ImpVar
+                // that references a node in that tree (e.g. starting_camera) has something
+                // to resolve against.
+                if (vars["root"] is JsonNode root_node)
+                {
+                    ImpComp? loaded = Comp_FromJson(root_node, asset.filepath);
+                    if (loaded != null) scene.root = loaded;
+                }
+                comp_root = scene.root;
             }
+            ApplyVars(asset, vars, asset.filepath, comp_root);
             return true;
         }
         ApplyFields(target, root, null);
@@ -55,8 +63,9 @@ public class File_JSON : ImpFile
             if (target is ImpAsset asset)
             {
                 visiting.Add(asset);
-                JsonObject vars = Vars_ToJson(asset, visiting);
-                if (asset is ImpScene scene) vars["root"] = Comp_ToJson(scene.root, visiting);
+                ImpComp? comp_root = asset is ImpScene sc ? sc.root : null;
+                JsonObject vars = Vars_ToJson(asset, visiting, comp_root);
+                if (asset is ImpScene scene) vars["root"] = Comp_ToJson(scene.root, visiting, scene.root);
                 node = new JsonObject
                 {
                     ["_class"] = asset.GetType().Name,
@@ -88,21 +97,23 @@ public class File_JSON : ImpFile
         return type.GetFields(BindingFlags.Public | BindingFlags.Instance);
     }
 
-    static JsonObject Vars_ToJson(ImpAsset asset, HashSet<object> visiting)
+    static JsonObject Vars_ToJson(ImpAsset asset, HashSet<object> visiting, ImpComp? comp_root)
     {
         var vars = new JsonObject();
         foreach (FieldInfo f in ImpVarFields(asset.GetType()))
         {
             ImpVarAttribute attr = f.GetCustomAttribute<ImpVarAttribute>()!;
             string key = string.IsNullOrEmpty(attr.Name) ? f.Name : attr.Name;
-            vars[key] = ToJson(f.GetValue(asset), visiting);
+            vars[key] = typeof(ImpComp).IsAssignableFrom(f.FieldType)
+                ? CompRef_ToJson(f.GetValue(asset) as ImpComp, comp_root)
+                : ToJson(f.GetValue(asset), visiting);
         }
         vars["source_file"] = SourceFile_ToJson(asset);
         vars["source_index"] = asset.source_index;
         return vars;
     }
 
-    static void ApplyVars(ImpAsset asset, JsonObject vars, string? path_context)
+    static void ApplyVars(ImpAsset asset, JsonObject vars, string? path_context, ImpComp? comp_root)
     {
         string? ctx = string.IsNullOrEmpty(asset.filepath) ? path_context : asset.filepath;
 
@@ -128,6 +139,12 @@ public class File_JSON : ImpFile
             string key = string.IsNullOrEmpty(attr.Name) ? f.Name : attr.Name;
             if (key == "source_file" || key == "source_index") continue;
             if (!vars.ContainsKey(key)) continue;
+            if (typeof(ImpComp).IsAssignableFrom(f.FieldType))
+            {
+                string? p = CompRef_Path(vars[key]);
+                f.SetValue(asset, p != null ? CompPath_Resolve(comp_root, p) : null);
+                continue;
+            }
             object? val = FromJson(vars[key], f.FieldType, ctx);
             if (val != null || !f.FieldType.IsValueType)
                 f.SetValue(asset, val);
@@ -268,6 +285,74 @@ public class File_JSON : ImpFile
         return null;
     }
 
+    /// <summary>
+    /// Locates <paramref name="target"/> under <paramref name="root"/> as a chain of
+    /// "name#occurrence" segments (occurrence disambiguates same-named siblings). Name-based
+    /// rather than index-based so it survives owned/child reordering across a save/load
+    /// round-trip. Returns null if target isn't actually under root.
+    /// </summary>
+    static string? CompPath_Get(ImpComp root, ImpComp target)
+    {
+        if (ReferenceEquals(root, target)) return "";
+        var segs = new List<string>();
+        ImpComp? cur = target;
+        while (cur != null && !ReferenceEquals(cur, root))
+        {
+            ImpComp? parent = cur.parent;
+            if (parent == null) return null;
+            string name = cur.name ?? "";
+            int occurrence = 0;
+            for (int i = 0; i < parent.children.Count; i++)
+            {
+                ImpComp sib = parent.children[i];
+                if (ReferenceEquals(sib, cur)) break;
+                if (string.Equals(sib.name ?? "", name, StringComparison.Ordinal)) occurrence++;
+            }
+            segs.Add(name + "#" + occurrence);
+            cur = parent;
+        }
+        if (!ReferenceEquals(cur, root)) return null;
+        segs.Reverse();
+        return string.Join("/", segs);
+    }
+
+    static ImpComp? CompPath_Resolve(ImpComp? root, string path)
+    {
+        if (root == null) return null;
+        if (string.IsNullOrEmpty(path)) return root;
+        ImpComp cur = root;
+        foreach (string seg in path.Split('/'))
+        {
+            int hash = seg.LastIndexOf('#');
+            if (hash < 0 || !int.TryParse(seg[(hash + 1)..], out int occurrence)) return null;
+            string name = seg[..hash];
+            ImpComp? next = null;
+            int count = 0;
+            for (int i = 0; i < cur.children.Count; i++)
+            {
+                ImpComp c = cur.children[i];
+                if (!string.Equals(c.name ?? "", name, StringComparison.Ordinal)) continue;
+                if (count == occurrence) { next = c; break; }
+                count++;
+            }
+            if (next == null) return null;
+            cur = next;
+        }
+        return cur;
+    }
+
+    static JsonNode? CompRef_ToJson(ImpComp? target, ImpComp? comp_root)
+    {
+        if (target == null || comp_root == null) return null;
+        string? path = CompPath_Get(comp_root, target);
+        return path == null ? null : new JsonObject { ["comp_path"] = path };
+    }
+
+    static string? CompRef_Path(JsonNode? node)
+    {
+        return node is JsonObject o && o["comp_path"] is JsonValue v && v.TryGetValue<string>(out string? s) ? s : null;
+    }
+
     static object? KeyFromString(string s, Type key_type)
     {
         if (key_type == typeof(string)) return s;
@@ -308,7 +393,7 @@ public class File_JSON : ImpFile
                 var inline = new JsonObject
                 {
                     ["_class"] = asset.GetType().Name,
-                    ["vars"] = Vars_ToJson(asset, visiting),
+                    ["vars"] = Vars_ToJson(asset, visiting, null),
                 };
                 visiting.Remove(asset);
                 return inline;
@@ -422,7 +507,7 @@ public class File_JSON : ImpFile
                         return null;
                     if (o["vars"] is JsonObject v)
                     {
-                        ApplyVars(inst, v, path_context);
+                        ApplyVars(inst, v, path_context, null);
                         inst.BindSource(false);
                     }
                     return inst;
@@ -503,10 +588,10 @@ public class File_JSON : ImpFile
     public static JsonObject? Comp_ToJson(ImpComp? comp)
     {
         if (comp == null) return null;
-        return Comp_ToJson(comp, new HashSet<object>(ReferenceEqualityComparer.Instance));
+        return Comp_ToJson(comp, new HashSet<object>(ReferenceEqualityComparer.Instance), comp);
     }
 
-    static JsonObject Comp_ToJson(ImpComp comp, HashSet<object> visiting)
+    static JsonObject Comp_ToJson(ImpComp comp, HashSet<object> visiting, ImpComp comp_root)
     {
         var vars = new JsonObject();
         foreach (FieldInfo f in ImpVarFields(comp.GetType()))
@@ -514,7 +599,11 @@ public class File_JSON : ImpFile
             ImpVarAttribute attr = f.GetCustomAttribute<ImpVarAttribute>()!;
             string key = string.IsNullOrEmpty(attr.Name) ? f.Name : attr.Name;
             if (key == "name") continue;
-            if (typeof(ImpComp).IsAssignableFrom(f.FieldType)) continue;
+            if (typeof(ImpComp).IsAssignableFrom(f.FieldType))
+            {
+                vars[key] = CompRef_ToJson(f.GetValue(comp) as ImpComp, comp_root);
+                continue;
+            }
             vars[key] = ToJson(f.GetValue(comp), visiting);
         }
 
@@ -526,7 +615,7 @@ public class File_JSON : ImpFile
                 ImpComp child = comp.children[i];
                 if (child.IsPackedForeign) continue;
                 if (child.IsOwned) continue;
-                children.Add(Comp_ToJson(child, visiting));
+                children.Add(Comp_ToJson(child, visiting, comp_root));
             }
         }
 
@@ -543,7 +632,7 @@ public class File_JSON : ImpFile
             {
                 continue;
             }
-            owned[f.Name] = Comp_ToJson(slot, visiting);
+            owned[f.Name] = Comp_ToJson(slot, visiting, comp_root);
         }
 
         var obj = new JsonObject
@@ -563,6 +652,21 @@ public class File_JSON : ImpFile
     }
 
     public static ImpComp? Comp_FromJson(JsonNode? node, string? path_context)
+    {
+        // Comp-ref ImpVar fields (e.g. a camera's look_target) may point to a node that
+        // hasn't been built yet at the point they're read, so resolution is deferred to a
+        // pending list and applied once this whole (self-rooted) tree exists.
+        var pending = new List<(object target, FieldInfo field, string path)>();
+        ImpComp? result = Comp_FromJson(node, path_context, pending, null);
+        if (result != null)
+        {
+            foreach (var (target, field, path) in pending)
+                field.SetValue(target, CompPath_Resolve(result, path));
+        }
+        return result;
+    }
+
+    static ImpComp? Comp_FromJson(JsonNode? node, string? path_context, List<(object target, FieldInfo field, string path)> pending, ImpComp? comp_root)
     {
         if (node is not JsonObject obj) return null;
         string? instance_path = JsonPath(obj["instance"]);
@@ -594,15 +698,17 @@ public class File_JSON : ImpFile
             comp = created;
         }
 
+        comp_root ??= comp;
+
         if (!comp.IsInstanceRoot)
         {
             comp.Owned_Bind();
         }
-        Comp_ApplyJson(comp, obj, path_context, !comp.IsInstanceRoot);
+        Comp_ApplyJson(comp, obj, path_context, !comp.IsInstanceRoot, pending, comp_root);
         return comp;
     }
 
-    static void Comp_ApplyJson(ImpComp comp, JsonObject obj, string? path_context, bool apply_tree)
+    static void Comp_ApplyJson(ImpComp comp, JsonObject obj, string? path_context, bool apply_tree, List<(object target, FieldInfo field, string path)> pending, ImpComp comp_root)
     {
         if (obj["name"] is JsonValue jn && jn.TryGetValue<string>(out string? named) && named != null)
             comp.name = named;
@@ -613,8 +719,13 @@ public class File_JSON : ImpFile
             {
                 ImpVarAttribute attr = f.GetCustomAttribute<ImpVarAttribute>()!;
                 string key = string.IsNullOrEmpty(attr.Name) ? f.Name : attr.Name;
-                if (typeof(ImpComp).IsAssignableFrom(f.FieldType)) continue;
                 if (!vars.ContainsKey(key)) continue;
+                if (typeof(ImpComp).IsAssignableFrom(f.FieldType))
+                {
+                    string? p = CompRef_Path(vars[key]);
+                    if (p != null) pending.Add((comp, f, p));
+                    continue;
+                }
                 object? val = FromJson(vars[key], f.FieldType, path_context);
                 if (val != null || !f.FieldType.IsValueType)
                     f.SetValue(comp, val);
@@ -638,10 +749,10 @@ public class File_JSON : ImpFile
                 }
                 if (f.GetValue(comp) is ImpComp native)
                 {
-                    Comp_ApplyJson(native, slot_obj, path_context, true);
+                    Comp_ApplyJson(native, slot_obj, path_context, true, pending, comp_root);
                     continue;
                 }
-                ImpComp? made = Comp_FromJson(slot_obj, path_context);
+                ImpComp? made = Comp_FromJson(slot_obj, path_context, pending, comp_root);
                 if (made == null)
                 {
                     continue;
@@ -655,17 +766,17 @@ public class File_JSON : ImpFile
         {
             foreach (JsonNode? child in arr)
             {
-                if (Comp_TryMergeOwned(comp, child, path_context))
+                if (Comp_TryMergeOwned(comp, child, path_context, pending, comp_root))
                 {
                     continue;
                 }
-                ImpComp? c = Comp_FromJson(child, path_context);
+                ImpComp? c = Comp_FromJson(child, path_context, pending, comp_root);
                 if (c != null) comp.Child_Add(c);
             }
         }
     }
 
-    static bool Comp_TryMergeOwned(ImpComp host, JsonNode? node, string? path_context)
+    static bool Comp_TryMergeOwned(ImpComp host, JsonNode? node, string? path_context, List<(object target, FieldInfo field, string path)> pending, ImpComp comp_root)
     {
         if (host == null || node is not JsonObject obj)
         {
@@ -698,7 +809,7 @@ public class File_JSON : ImpFile
             {
                 continue;
             }
-            Comp_ApplyJson(native, obj, path_context, true);
+            Comp_ApplyJson(native, obj, path_context, true, pending, comp_root);
             return true;
         }
         return false;
