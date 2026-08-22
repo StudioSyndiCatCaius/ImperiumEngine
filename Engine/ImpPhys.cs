@@ -199,12 +199,13 @@ public class ImpPhys
             cs.Shape = standing;
             cs.Up = Vector3.UnitY;
             cs.MaxSlopeAngle = 45f * (MathF.PI / 180f);
-            float stand_h = feet.Y;
-            if (stand_h < 0.5f)
+            cs.EnhancedInternalEdgeRemoval = true;
+            float support_r = comp.Phys_SupportRadius(world.scale);
+            if (support_r < 0.05f)
             {
-                stand_h = 0.5f;
+                support_r = 0.05f;
             }
-            cs.SupportingVolume = new Plane(Vector3.UnitY, -stand_h);
+            cs.SupportingVolume = new Plane(Vector3.UnitY, -support_r);
 
             CharacterVirtual character = new(cs, world.position, rot, 0, _system);
             e.character = character;
@@ -280,7 +281,6 @@ public class ImpPhys
         }
 
         BodyInterface bodies = _system.BodyInterface;
-        ExtendedUpdateSettings update_settings = new();
         List<Imp3D> comps = new(_entries.Keys);
 
         for (int i = 0; i < comps.Count; i++)
@@ -308,6 +308,14 @@ public class ImpPhys
                     e.character.Rotation = rot;
                     comp._phys_dirty = false;
                 }
+                Vector3 grav = Imp3D.GravityDir(comp.move_mode);
+                Vector3 up = -grav;
+                e.character.Up = up;
+                ExtendedUpdateSettings update_settings = new()
+                {
+                    StickToFloorStepDown = -up * 0.5f,
+                    WalkStairsStepUp = up * 0.4f,
+                };
                 e.character.LinearVelocity = comp.velocity;
                 e.character.ExtendedUpdate(step, update_settings, LayerMoving, _system);
                 comp.velocity = e.character.LinearVelocity;

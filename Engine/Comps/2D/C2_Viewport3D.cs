@@ -1,4 +1,5 @@
 using System.Numerics;
+using ImperiumEngine.Assets;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Structs;
 using R3D_cs;
@@ -140,6 +141,7 @@ public class C2_Viewport3D : Imp2D
 
         view_scene?.ApplyRenderState();
         R3D.SetAspectMode(AspectMode.Expand);
+        Imp3D.Resolution_Sync(w, h);
 
         Camera rcam = Camera_GetR3D();
 
@@ -151,6 +153,7 @@ public class C2_Viewport3D : Imp2D
         };
 
         double t0 = ImpProfiler.enabled ? ImpProfiler.Now_Ms : 0;
+        A_Material.draw_stamp++;
         R3D.BeginPro(view);
         ImpComp src = Root_Get();
         if (src != null)

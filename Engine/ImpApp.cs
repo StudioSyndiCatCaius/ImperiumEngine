@@ -1,6 +1,7 @@
 ﻿//using raygui_cs;
 
 using System.Numerics;
+using ImperiumEngine.Assets;
 using ImperiumEngine.Comps;
 using ImperiumEngine.Enums;
 using R3D_cs;
@@ -46,20 +47,45 @@ public class ImpApp
         on_pre_init?.Invoke();
         ImpConfig.LoadAll();
         
-        Raylib.SetConfigFlags(ConfigFlags.Msaa4xHint | ConfigFlags.HighDpiWindow | ConfigFlags.ResizableWindow | ConfigFlags.MaximizedWindow );
+        // ---- Raylib
+        Raylib.SetConfigFlags(ConfigFlags.Msaa4xHint | 
+                              ConfigFlags.HighDpiWindow | 
+                              ConfigFlags.ResizableWindow | 
+                              ConfigFlags.MaximizedWindow );
         Raylib.InitWindow(1600, 900, "Imperium");
         
         Raylib.SetTargetFPS(60);
         Raylib.SetExitKey(KeyboardKey.Null);
-        R3D.Init(Raylib.GetScreenWidth(), Raylib.GetScreenHeight());
+        
+        // ---- R3D
+        R3D.SetHint(Hint.ShadowDirSize,2048);
+
+        // Internal R3D framebuffer. Use the HiDPI render size, not GetScreenWidth
+        // (logical). MaximizeWindow in on_post_init happens after this, so the
+        // first draw also Resolution_Sync's to the live window.
+        int rw = Raylib.GetRenderWidth();
+        int rh = Raylib.GetRenderHeight();
+        if (rw < 1)
+        {
+            rw = 1;
+        }
+        if (rh < 1)
+        {
+            rh = 1;
+        }
+        R3D.Init(rw, rh);
+        Imp3D.Resolution_Track(rw, rh);
         R3D.SetAspectMode(AspectMode.Expand);
+        Imp3D.RefreshGraphics();
+        
+        // ---- IMP
         ImpPhys.Init();
         ImpPlayer.Init();
         
         on_post_init?.Invoke();
+        Imp3D.Resolution_Sync(Raylib.GetRenderWidth(), Raylib.GetRenderHeight());
         ImpGame.EnsureHost();
         
-        Imp3D.RefreshGraphics();
         while (!Raylib.WindowShouldClose())
         {
             // ----- BEGIN ------------------------------------------------------------------------------------
@@ -103,22 +129,31 @@ public class ImpApp
             Imp2D.Layout_Invalidate();
             Imp3D.Cache_Invalidate();
             ImpProfiler.Phase_Begin(ImpProfiler.EPhase.Draw3D);
-            // Standalone (and any host whose scene is running) draws 3D to the window.
-            // PIE still renders through C2_Viewport3D, which applies its own environment.
-            if (ImpScene.current.is_running)
+            // Standalone draws 3D to the window. Editor chrome (Scene_Editor) is also
+            // is_running so its UI ticks, but its 3D lives in C2_Viewport3D — a window
+            // pass here created a second sun and painted an empty sky behind the editor.
+            bool window_3d = ImpScene.current.is_running;
+            ImpComp host_root = ImpScene.current.root;
+            if (window_3d && host_root != null && host_root.GetType().Name == "Scene_Editor")
             {
+                window_3d = false;
+            }
+            if (window_3d)
+            {
+                Imp3D.Resolution_Sync(Raylib.GetRenderWidth(), Raylib.GetRenderHeight());
                 ImpScene.current.ApplyRenderState();
+                A_Material.draw_stamp++;
+                if (view_target != null && view_target.Camera_IsValid())
+                {
+                    R3D.BeginEx(view_target.Camera_GetData());
+                }
+                else
+                {
+                    R3D.Begin(camera);
+                }
+                ImpScene.current.Draw(dt,0); //3D
+                R3D.End();
             }
-            if (view_target != null && view_target.Camera_IsValid())
-            {
-                R3D.BeginEx(view_target.Camera_GetData());
-            }
-            else
-            {
-                R3D.Begin(camera);
-            }
-            ImpScene.current.Draw(dt,0); //3D
-            R3D.End();
 
             ImpProfiler.Phase_Begin(ImpProfiler.EPhase.Draw2D);
             ImpScene.current.Draw(dt,1); //2D

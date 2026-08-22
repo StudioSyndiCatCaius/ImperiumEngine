@@ -928,8 +928,6 @@ public class PNL_FileBrowser : EdPanel
         {
             opts.Add(new() { text = "Open", on_press = () => file?.Editor_File_Open() });
         }
-        if (file is ImpFile src && src.default_asset_type != null)
-            opts.Add(new() { text = "Create Asset", on_press = () => { src.Editor_CreateAsset(); Browsers_Notify(); } });
         opts.Add(new() { is_separator = true });
         opts.Add(new() { text = "Rename", on_press = () => Rename_Begin(path) });
         opts.Add(new() { text = "Duplicate", on_press = () => Path_Duplicate(path) });

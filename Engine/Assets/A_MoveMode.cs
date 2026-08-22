@@ -14,8 +14,8 @@ public class A_MoveMode : ImpAsset
     [ImpVar][Category("Speed")] public float deceleration=20.0f;
     [ImpVar][Category("Speed")] public float jump_speed=6.0f;
     
-    [ImpVar][Category("Air")] public float air_control=1.0f;
-    [ImpVar][Category("Air")] public float air_friction=0.1f;
+    [ImpVar][Category("Air")] public float air_control=0.8f;
+    [ImpVar][Category("Air")] public float air_friction=0.02f;
     
     [ImpVar][Category("Gravity")] public bool gravity_enabled=true;
     [ImpVar][Category("Gravity")] public Vector3 gravity_dir=new(0, -1.0f, 0);

@@ -13,6 +13,14 @@ public enum EFileType
     Texture, Sound, Model, Animation, Font,
 }
 
+// One asset that can be written from an ImpFile (a named mesh, texture, clip, …).
+public class TFileAssetOffer
+{
+    public Type asset_type;
+    public string name;
+    public int source_index;
+}
+
 public class ImpFile : I_File
 {
     // #################################################################################
@@ -198,6 +206,7 @@ public class ImpFile : I_File
         // jpg/jpeg are textures — reuse File_PNG (Raylib LoadTexture handles both)
         string extKey = ext.TrimStart('.').ToUpperInvariant();
         if (extKey is "JPG" or "JPEG") extKey = "PNG";
+        if (extKey is "EXR") extKey = "HDR";
         if (extKey is "GLTF" or "FBX" or "OBJ") extKey = "GLB";
         string typeName = "File_" + extKey;
 
@@ -261,7 +270,11 @@ public class ImpFile : I_File
                 src_sounds.Add(_snd);
                 break;
             case EFileType.Model:
-                src_models.Add(R3D.LoadModel(filepath));
+                src_models.Add(R3D.LoadModelEx(filepath, ImportFlags.RetainMeshNames));
+                if (src_models.Count > 0)
+                {
+                    Textures_CollectFromModel(src_models[0]);
+                }
                 break;
             case EFileType.Animation:
                 break;
@@ -286,10 +299,56 @@ public class ImpFile : I_File
     public virtual bool File_Read(object target) { return false; }
     public virtual bool File_Write(object target) { return false; }
 
+    protected void Textures_CollectFromModel(R3D_cs.Model mdl)
+    {
+        R3D_cs.Material def = R3D.GetDefaultMaterial();
+        HashSet<uint> seen = new();
+
+        void Skip(Texture2D tex)
+        {
+            if (tex.Id != 0)
+            {
+                seen.Add(tex.Id);
+            }
+        }
+
+        void Take(Texture2D tex)
+        {
+            if (tex.Id == 0)
+            {
+                return;
+            }
+            if (seen.Contains(tex.Id))
+            {
+                return;
+            }
+            seen.Add(tex.Id);
+            src_textures.Add(tex);
+        }
+
+        Skip(def.Albedo.Texture);
+        Skip(def.Orm.Texture);
+        Skip(def.Normal.Texture);
+        Skip(def.Emission.Texture);
+
+        Span<R3D_cs.Material> mats = mdl.Materials;
+        for (int i = 0; i < mats.Length; i++)
+        {
+            Take(mats[i].Albedo.Texture);
+            Take(mats[i].Orm.Texture);
+            Take(mats[i].Normal.Texture);
+            Take(mats[i].Emission.Texture);
+        }
+    }
+
     
     // -----------------------------------------
     // Editor File
     // -----------------------------------------
+
+    // Editor wires this to DLG_CreateAssetFromFile. Null (standalone) writes the default asset.
+    public static Action<ImpFile> Editor_OnCreateAssetFromFile;
+
     public override void Editor_File_Open()
     {
         base.Editor_File_Open();
@@ -299,7 +358,24 @@ public class ImpFile : I_File
     {
         List<TPopupMenuOption> options = new();
         options.Add(new() { text = "Source_Reimport" , on_press = () => Reimport(true) });
-        options.Add(new() { text = "Create Asset" , on_press = () => Editor_CreateAsset() });
+        if (default_asset_type != null)
+        {
+            options.Add(new()
+            {
+                text = "Create Asset",
+                on_press = () =>
+                {
+                    if (Editor_OnCreateAssetFromFile != null)
+                    {
+                        Editor_OnCreateAssetFromFile(this);
+                    }
+                    else
+                    {
+                        Editor_CreateAsset();
+                    }
+                }
+            });
+        }
 
         return options;
     }
@@ -319,23 +395,115 @@ public class ImpFile : I_File
         return base.Editor_GetThumbnail_Texture();
     }
 
+    public virtual List<TFileAssetOffer> Editor_ListCreateableAssets()
+    {
+        List<TFileAssetOffer> list = new();
+        if (default_asset_type == null || string.IsNullOrEmpty(filepath))
+        {
+            return list;
+        }
+        Reimport();
+        string name = Path.GetFileNameWithoutExtension(filepath);
+        if (string.IsNullOrEmpty(name))
+        {
+            name = "Asset";
+        }
+        list.Add(new TFileAssetOffer
+        {
+            asset_type = default_asset_type,
+            name = name,
+            source_index = 0,
+        });
+        return list;
+    }
+
+    public static string AssetName_Sanitize(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return "";
+        }
+        name = name.Trim();
+        char[] bad = Path.GetInvalidFileNameChars();
+        char[] chars = name.ToCharArray();
+        for (int i = 0; i < chars.Length; i++)
+        {
+            if (Array.IndexOf(bad, chars[i]) >= 0)
+            {
+                chars[i] = '_';
+            }
+        }
+        return new string(chars).Trim('_', ' ');
+    }
+
+    // Silent default used by Import Sources. Writes the default-type offer next to the file.
     public void Editor_CreateAsset()
     {
-        if (default_asset_type == null || string.IsNullOrEmpty(filepath)) return;
-        if (Activator.CreateInstance(default_asset_type) is not ImpAsset asset) return;
+        List<TFileAssetOffer> offers = Editor_ListCreateableAssets();
+        if (offers.Count == 0)
+        {
+            return;
+        }
+        TFileAssetOffer pick = offers[0];
+        for (int i = 0; i < offers.Count; i++)
+        {
+            if (offers[i].asset_type == default_asset_type)
+            {
+                pick = offers[i];
+                break;
+            }
+        }
+        Editor_WriteAsset(pick.asset_type, pick.name, pick.source_index);
+    }
+
+    public ImpAsset Editor_WriteAsset(Type type, string name, int source_index)
+    {
+        if (type == null || type.IsAbstract || !typeof(ImpAsset).IsAssignableFrom(type))
+        {
+            return null;
+        }
+        if (string.IsNullOrEmpty(filepath))
+        {
+            return null;
+        }
+        if (Activator.CreateInstance(type) is not ImpAsset asset)
+        {
+            return null;
+        }
+
         string dir = Path.GetDirectoryName(filepath) ?? "";
-        string name = Path.GetFileNameWithoutExtension(filepath);
-        string dest = Path.Combine(dir, name + "." + asset.File_GetExtension());
+        name = (name ?? "").Trim();
+        string ext = "." + asset.File_GetExtension();
+        if (name.EndsWith(ext, StringComparison.OrdinalIgnoreCase))
+        {
+            name = name.Substring(0, name.Length - ext.Length);
+        }
+        name = AssetName_Sanitize(name);
+        if (string.IsNullOrEmpty(name))
+        {
+            return null;
+        }
+
+        string dest = Path.Combine(dir, name + ext);
         if (File.Exists(dest))
         {
             int i = 1;
-            while (File.Exists(Path.Combine(dir, name + "_" + i + "." + asset.File_GetExtension()))) i++;
-            dest = Path.Combine(dir, name + "_" + i + "." + asset.File_GetExtension());
+            while (File.Exists(Path.Combine(dir, name + "_" + i + ext)))
+            {
+                i++;
+            }
+            dest = Path.Combine(dir, name + "_" + i + ext);
         }
+
         asset.source_file = this;
+        asset.source_index = source_index;
         asset.filepath = dest;
         Reimport();
         asset.Source_OnReload(this);
-        asset.File_Write();
+        if (!asset.File_Write())
+        {
+            return null;
+        }
+        return asset;
     }
 }

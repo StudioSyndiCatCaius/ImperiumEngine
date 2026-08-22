@@ -18,19 +18,25 @@ public class A_Environment : ImpAsset
     // light left to a comp meant any number of scenes could quietly fight over the sunlight.
     [Category("Sun")][ImpVar] public bool sun_enabled=true;
     [Category("Sun")][ImpVar] public Color sun_color=new Color(255, 244, 228, 255);
-    [Category("Sun")][ImpVar] public float sun_intensity=0.5f;
+    [Category("Sun")][ImpVar] public float sun_intensity=1.0f;
     //euler degrees; the direction light travels, same convention as a comp's rotation
     [Category("Sun")][ImpVar] public Vector3 sun_rotation=new Vector3(-45f, -35f, 0f);
     [Category("Sun")][ImpVar] public float sun_specular=1.0f;
     [Category("Sun")][ImpVar] public bool sun_cast_shadows=true;
+    // PCF radius in shadow-map texels. Enough to hide remaining texel steps; keep low so edges stay crisp.
+    [Category("Sun")][ImpVar] public float sun_shadow_softness=1.5f;
+    // Dir shadows fit an ortho around a camera frustum this deep (meters). Smaller = tighter texels.
+    [Category("Sun")][ImpVar] public float sun_shadow_range=20.0f;
+    // NDC depth bias. R3D's 0.001 on a ~150m dir far-plane is ~15cm of peter-panning.
+    [Category("Sun")][ImpVar] public float sun_shadow_depth_bias=0.0001f;
+    [Category("Sun")][ImpVar] public float sun_shadow_slope_bias=0.0002f;
 
-    // Equirectangular .hdr panorama used as the background, and optionally as the light
-    // probe. Loaded as a cubemap rather than through A_TextureHDR's own resource, because a
-    // sky is a cubemap to R3D and a flat Texture2D is no use for one.
+    // Equirectangular .hdr panorama. A_TextureHDR.Cubemap_Ensure builds the R3D cubemap
+    // (and IBL probe) lazily from the source file — a flat Texture2D is not a sky.
     [Category("Sky")][ImpVar] public A_TextureHDR sky_texture;
     //let the panorama light the scene too (image-based lighting), not just sit behind it
     [Category("Sky")][ImpVar] public bool sky_lights_scene=true;
-    [Category("Sky")][ImpVar] public float sky_energy=0.5f;
+    [Category("Sky")][ImpVar] public float sky_energy=1.0f;
     [Category("Sky")][ImpVar] public float sky_blur=0.0f;
     //degrees about Y, for turning the panorama to put its sun where the scene's sun is
     [Category("Sky")][ImpVar] public float sky_rotation=0.0f;

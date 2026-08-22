@@ -1,0 +1,32 @@
+{
+  "_class": "Mat_Object",
+  "vars": {
+    "commons": {
+      "color_map": null,
+      "color_tint": {
+        "R": 39,
+        "G": 39,
+        "B": 39,
+        "A": 255
+      },
+      "specular_intensity": 0.5,
+      "ORM_map": null,
+      "occlusion_intensity": 1,
+      "roughness_intensity": 0.5,
+      "metal_intensity": 0,
+      "normal_map": null,
+      "normal_intensity": 1,
+      "emission_map": null,
+      "emission_color": {
+        "R": 0,
+        "G": 0,
+        "B": 0,
+        "A": 255
+      },
+      "emission_intensity": 0,
+      "two_sided": true
+    },
+    "source_file": "sk_c_mannequin.glb",
+    "source_index": 1
+  }
+}

@@ -3,6 +3,7 @@ using Editor.Dialog;
 using Editor.Panel;
 using Editor.Scenes;
 using ImperiumEngine;
+using ImperiumEngine.Assets;
 using ImperiumEngine.Comps._2D;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Structs;
@@ -50,15 +51,13 @@ public class WND_Asset : EdWindow
             page++;
         }
 
-        EdAssetEditor editor = new()
+        EdAssetEditor editor = EdAssetEditor.Create(asset);
+        editor.asset = asset;
+        editor.name = asset.GetName();
+        editor.layout = new TLayout2
         {
-            asset = asset,
-            name = asset.GetName(),
-            layout = new TLayout2
-            {
-                orient_H = EUIViewportAlignment.Fill,
-                orient_V = EUIViewportAlignment.Fill,
-            },
+            orient_H = EUIViewportAlignment.Fill,
+            orient_V = EUIViewportAlignment.Fill,
         };
         editor.Rebuild();
         tab_assets.Child_Add(editor);
@@ -264,6 +263,23 @@ public class EdAssetEditor : EdPanel
         name = "Asset Editor";
     }
 
+    public static EdAssetEditor Create(ImpAsset asset)
+    {
+        if (asset is A_Texture)
+        {
+            return new EdAssetEditor_Texture();
+        }
+        if (asset is A_Mesh)
+        {
+            return new EdAssetEditor_Mesh();
+        }
+        if (asset is A_Material)
+        {
+            return new EdAssetEditor_Material();
+        }
+        return new EdAssetEditor();
+    }
+
     public override void OnUpdate(double dt)
     {
         base.OnUpdate(dt);
@@ -272,24 +288,50 @@ public class EdAssetEditor : EdPanel
         ImpUndo.active = undo;
     }
 
-    public void Rebuild()
+    public virtual void Rebuild()
+    {
+        Child_RemoveAll();
+        inspector = new C2_Inspector
+        {
+            layout = TLayout2.FULL,
+        };
+        Child_Add(inspector);
+        BindAsset();
+    }
+
+    protected void BindAsset()
+    {
+        if (asset == null)
+        {
+            return;
+        }
+        name = asset.GetName();
+        inspector.Object_Add(asset, true);
+    }
+
+    protected void Layout_Split(Imp2D extra)
     {
         Child_RemoveAll();
         inspector = new C2_Inspector
         {
             layout = new TLayout2
-                {
-                    orient_H = EUIViewportAlignment.Fill,
-                    orient_V = EUIViewportAlignment.Fill,
-                },
+            {
+                size = new Vector2(280, 0),
+                size_min = new Vector2(180, 0),
+                orient_V = EUIViewportAlignment.Fill,
+            },
         };
-        Child_Add(inspector);
-        if (asset != null)
+        extra.layout = TLayout2.FULL;
+
+        C2_List row = new()
         {
-            name = asset.GetName();
-            inspector.Object_Add(asset, true);
-        }
+            orentation = EUIOrentation.H,
+            layout = TLayout2.FULL,
+        };
+        row.Child_Add(inspector);
+        row.Child_Add(new C2_Seperator { orentation = EUIOrentation.H });
+        row.Child_Add(extra);
+        Child_Add(row);
+        BindAsset();
     }
-    
-    
 }

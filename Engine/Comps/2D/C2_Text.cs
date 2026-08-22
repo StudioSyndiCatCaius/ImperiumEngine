@@ -49,7 +49,7 @@ public class UI_Text : ImpAsset
     
     [ImpVar] public A_Font font=A_Font.FONT_ARIAL;
     [ImpVar] public int size=16;
-    [ImpVar] public Color color=Color.Black;
+    [ImpVar] public Color color=Color.White;
     
     [ImpVar] public int outline_size=0; //if 0, no outline
     [ImpVar] public Color outline_color=Color.Black;

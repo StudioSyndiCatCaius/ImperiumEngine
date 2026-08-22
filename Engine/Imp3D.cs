@@ -17,13 +17,52 @@ public class Imp3D : ImpComp
     // #######################################################################################################################
     // #######################################################################################################################
 
-    [ImpVar][Config] public static AntiAliasingMode anti_aliasing_mode = AntiAliasingMode.Fxaa;
-    [ImpVar][Config] public static AntiAliasingPreset anti_aliasing_preset = AntiAliasingPreset.Medium;
+    [ImpVar][Config] public static AntiAliasingMode anti_aliasing_mode = AntiAliasingMode.Smaa;
+    [ImpVar][Config] public static AntiAliasingPreset anti_aliasing_preset = AntiAliasingPreset.High;
+
+    static int _r3d_res_w;
+    static int _r3d_res_h;
 
     public static void RefreshGraphics()
     {
         R3D.SetAntiAliasingMode(anti_aliasing_mode);
         R3D.SetAntiAliasingPreset(anti_aliasing_preset);
+    }
+
+    // R3D renders to a fixed internal framebuffer (Init / SetResolution), then
+    // nearest-upscales into the window or viewport RT. Skip realloc when size
+    // is unchanged — SetResolution stalls.
+    public static void Resolution_Sync(int w, int h)
+    {
+        if (w < 1)
+        {
+            w = 1;
+        }
+        if (h < 1)
+        {
+            h = 1;
+        }
+        if (w == _r3d_res_w && h == _r3d_res_h)
+        {
+            return;
+        }
+        R3D.SetResolution(w, h);
+        _r3d_res_w = w;
+        _r3d_res_h = h;
+    }
+
+    public static void Resolution_Track(int w, int h)
+    {
+        if (w < 1)
+        {
+            w = 1;
+        }
+        if (h < 1)
+        {
+            h = 1;
+        }
+        _r3d_res_w = w;
+        _r3d_res_h = h;
     }
     
     // ---------------------------------------------------------------------------------------------------
@@ -303,9 +342,7 @@ public class Imp3D : ImpComp
         {
             return TBounds3.ZERO;
         }
-        mesh.mesh.ShadowCastMode = ShadowCastMode.Disabled;
-        R3D.DrawMeshEx(mesh.mesh,R3D.MATERIAL_BASE,transform.position,ImpMath.Euler_2_Quat(transform.rotation),transform.scale);
-        mesh.mesh.ShadowCastMode = ShadowCastMode.OnAuto;
+        mesh.Draw(transform.position, ImpMath.Euler_2_Quat(transform.rotation), transform.scale, null, cast_shadow);
         return mesh.Bounds_Get(transform);
     }
 
@@ -857,6 +894,11 @@ public class Imp3D : ImpComp
         return Vector3.Zero;
     }
 
+    public virtual float Phys_SupportRadius(Vector3 world_scale)
+    {
+        return 0.1f;
+    }
+
     //equip of pawn Movement Input in UE
     public void Phys_Move(Vector3 dir, double scale)
     {
@@ -924,12 +966,12 @@ public class Imp3D : ImpComp
         if (is_grounded)
         {
             float v_up = Vector3.Dot(velocity, up);
-            if (v_up < 0f)
+            if (v_up < 0.1f)
             {
                 velocity -= up * v_up;
             }
         }
-        else if (mode.gravity_enabled)
+        if (mode.gravity_enabled)
         {
             velocity += grav * 9.81f * mode.gravity_scale * (float)dt;
         }
@@ -1039,9 +1081,17 @@ public class Imp3D : ImpComp
         return A_MoveMode.DEFAULT;
     }
 
-    static Vector3 GravityDir(A_MoveMode mode)
+    internal static Vector3 GravityDir(A_MoveMode mode)
     {
-        Vector3 g = mode.gravity_dir;
+        Vector3 g;
+        if (mode == null)
+        {
+            g = new Vector3(0f, -1f, 0f);
+        }
+        else
+        {
+            g = mode.gravity_dir;
+        }
         if (g.LengthSquared() < 1e-8f)
         {
             return new Vector3(0f, -1f, 0f);

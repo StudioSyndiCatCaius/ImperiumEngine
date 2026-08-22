@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Globalization;
 using System.Numerics;
 using System.Reflection;
@@ -136,6 +137,79 @@ public class TPropertyBind
                 parent.Set(box);
             },
             locked || parent.is_readonly, attr, has_def, def);
+    }
+
+    public static TPropertyBind Item(TPropertyBind parent, int index, Type element_type)
+    {
+        if (parent == null || element_type == null)
+        {
+            return null;
+        }
+        return new TPropertyBind("[" + index + "]", element_type,
+            () =>
+            {
+                object col = parent.Get();
+                if (col is IList list && index >= 0 && index < list.Count)
+                {
+                    return list[index];
+                }
+                return null;
+            },
+            v =>
+            {
+                object col = parent.Get();
+                if (col is IList list && index >= 0 && index < list.Count)
+                {
+                    list[index] = v;
+                    parent.Set(col);
+                }
+            },
+            parent.is_readonly);
+    }
+
+    public static TPropertyBind DictValue(TPropertyBind parent, Func<object> key_get, Type value_type)
+    {
+        if (parent == null || key_get == null || value_type == null)
+        {
+            return null;
+        }
+        return new TPropertyBind("Value", value_type,
+            () =>
+            {
+                object col = parent.Get();
+                if (col is IDictionary dict)
+                {
+                    object key = key_get();
+                    if (key != null && dict.Contains(key))
+                    {
+                        return dict[key];
+                    }
+                }
+                return null;
+            },
+            v =>
+            {
+                object col = parent.Get();
+                if (col is IDictionary dict)
+                {
+                    object key = key_get();
+                    if (key != null && dict.Contains(key))
+                    {
+                        dict[key] = v;
+                        parent.Set(col);
+                    }
+                }
+            },
+            parent.is_readonly);
+    }
+
+    public static TPropertyBind DictKey(TPropertyBind parent, Func<object> key_get, Action<object> key_set, Type key_type)
+    {
+        if (parent == null || key_get == null || key_set == null || key_type == null)
+        {
+            return null;
+        }
+        return new TPropertyBind("Key", key_type, () => key_get(), v => key_set(v), parent.is_readonly);
     }
 
     static void Default_Read(Func<object, object> get, object owner, out bool has_default, out object value)
@@ -697,6 +771,37 @@ public class C2_Inspector : Imp2D
         {
             return false;
         }
+        List<Type> extra = new();
+        if (Type_IsList(t) || Type_IsSpan(t))
+        {
+            extra.Add(Type_Element(t));
+        }
+        else if (Type_IsDict(t))
+        {
+            Type[] args = t.GetGenericArguments();
+            extra.Add(args[0]);
+            extra.Add(args[1]);
+        }
+        for (int e = 0; e < extra.Count; e++)
+        {
+            Type et = extra[e];
+            if (et == null || et == t)
+            {
+                continue;
+            }
+            if (et.Name.Contains(q, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            List<MemberInfo> inner = Members_GetNested(et);
+            for (int i = 0; i < inner.Count; i++)
+            {
+                if (Member_Hits(inner[i], q, depth + 1))
+                {
+                    return true;
+                }
+            }
+        }
         List<MemberInfo> nested = Members_GetNested(t);
         for (int i = 0; i < nested.Count; i++)
         {
@@ -933,6 +1038,120 @@ public class C2_Inspector : Imp2D
         _ => typeof(object),
     };
 
+    public static bool Type_IsSpan(Type t)
+    {
+        if (t == null || !t.IsGenericType)
+        {
+            return false;
+        }
+        Type gen = t.GetGenericTypeDefinition();
+        return gen == typeof(Span<>) || gen == typeof(ReadOnlySpan<>);
+    }
+
+    public static bool Type_IsList(Type t)
+    {
+        if (t == null)
+        {
+            return false;
+        }
+        if (t.IsArray)
+        {
+            return t.GetArrayRank() == 1;
+        }
+        if (!t.IsGenericType)
+        {
+            return false;
+        }
+        return t.GetGenericTypeDefinition() == typeof(List<>);
+    }
+
+    public static bool Type_IsDict(Type t)
+    {
+        if (t == null || !t.IsGenericType)
+        {
+            return false;
+        }
+        return t.GetGenericTypeDefinition() == typeof(Dictionary<,>);
+    }
+
+    public static Type Type_Element(Type t)
+    {
+        if (t == null)
+        {
+            return typeof(object);
+        }
+        if (t.IsArray)
+        {
+            Type e = t.GetElementType();
+            if (e != null)
+            {
+                return e;
+            }
+            return typeof(object);
+        }
+        if (t.IsGenericType)
+        {
+            Type[] args = t.GetGenericArguments();
+            if (args.Length > 0)
+            {
+                return args[0];
+            }
+        }
+        return typeof(object);
+    }
+
+    public static object Value_Default(Type t)
+    {
+        if (t == null)
+        {
+            return null;
+        }
+        if (t == typeof(string))
+        {
+            return "";
+        }
+        if (t == typeof(TLabel))
+        {
+            return TLabel.From("Key");
+        }
+        if (t == typeof(TTag))
+        {
+            return new TTag("Tag");
+        }
+        if (t.IsArray)
+        {
+            Type e = t.GetElementType();
+            if (e == null)
+            {
+                return null;
+            }
+            return Array.CreateInstance(e, 0);
+        }
+        if (t.IsValueType)
+        {
+            return Activator.CreateInstance(t);
+        }
+        if (t.IsAbstract)
+        {
+            return null;
+        }
+        if (typeof(ImpAsset).IsAssignableFrom(t) || typeof(ImpComp).IsAssignableFrom(t))
+        {
+            return null;
+        }
+        try
+        {
+            if (t.GetConstructor(Type.EmptyTypes) != null)
+            {
+                return Activator.CreateInstance(t);
+            }
+        }
+        catch
+        {
+        }
+        return null;
+    }
+
     public static string Name_Pretty(string raw)
     {
         if (string.IsNullOrEmpty(raw)) return "";
@@ -1098,12 +1317,41 @@ public class C2_InspectorProperty : Imp2D
         cursor_filter = ECursorFilter.Pass;
 
         Type t = value_type;
+        if (C2_Inspector.Type_IsSpan(t))
+        {
+            Editor_SetFull(new C2_Text
+            {
+                text = label + " (span)",
+                style = UI_Text.MUTED,
+                text_alignment_h = EUIPositionAlignment.Start,
+                wrap = ETextWrap.None,
+                cursor_filter = ECursorFilter.Ignore,
+                layout = new TLayout2
+                {
+                    orient_H = EUIViewportAlignment.Fill,
+                    size = new Vector2(0, RowH),
+                    size_min = new Vector2(0, RowH),
+                },
+            });
+            return;
+        }
+
         I_Property custom = Property_Custom(t);
         if (custom != null)
         {
             custom.Inspector_Rebuild(this);
             if (IsReadOnly) ReadOnly_Apply();
             FitHeight();
+            return;
+        }
+
+        if (C2_Inspector.Type_IsList(t) || C2_Inspector.Type_IsDict(t))
+        {
+            C2_CollectionEdit edit = new()
+            {
+                host = this,
+            };
+            Editor_SetFull(edit);
             return;
         }
 
@@ -1279,6 +1527,12 @@ public class C2_InspectorProperty : Imp2D
         {
             C2_TextEdit edit = new() { text_placeholder = "..." };
             edit.on_text_changed = s => Value_Set(s ?? "");
+            return edit;
+        }
+        if (t == typeof(TLabel))
+        {
+            C2_TextEdit edit = new() { text_placeholder = "..." };
+            edit.on_text_changed = s => Value_Set(TLabel.From(s ?? ""));
             return edit;
         }
         if (Type_IsNumeric(t))

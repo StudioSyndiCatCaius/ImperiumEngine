@@ -22,28 +22,28 @@ public class UI_Box : ImpAsset
 {
     public static UI_Box BkgDark = new()
     {
-        tint = new Color(65, 65, 65, 255),
+        tint = new Color(30, 30, 30, 255),
     };
     
     public static UI_Box BkgMid = new()
     {
-        tint = new Color(100, 100, 100, 255),
+        tint = new Color(50, 50, 50, 255),
     };
     
     public static UI_Box BkgLight = new()
     {
-        tint = new Color(200, 200, 200, 255),
+        tint = new Color(100, 100, 100, 255),
     };
 
     public static UI_Box BtnIdle = new()
     {
         texture = A_Texture.BTN_A,
-        tint = new Color(120, 120, 120, 255),
+        tint = new Color(50, 50, 50, 255),
     };
     public static UI_Box BtnHover = new()
     {
         texture = A_Texture.BTN_A,
-        tint = new Color(0, 120, 215, 255),
+        tint = new Color(60, 100, 100, 255),
     };
     public static UI_Box BtnPress = new()
     {
@@ -54,7 +54,7 @@ public class UI_Box : ImpAsset
     public static UI_Box TabIdle = new()
     {
         texture = A_Texture.TAB_A,
-        tint = new Color(200, 200, 200, 255),
+        tint = new Color(100, 100, 100, 255),
     };
     public static UI_Box TabHover = new()
     {

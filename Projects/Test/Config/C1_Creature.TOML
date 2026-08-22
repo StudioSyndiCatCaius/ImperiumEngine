@@ -1,0 +1,2 @@
+abilities_default = "System.Collections.Generic.List`1[ImperiumEngine.Structs.TClass`1[ImperiumEngine.Comps._1D.C1_Ability]]"
+abilities_character_default = "System.Collections.Generic.List`1[ImperiumEngine.Structs.TClass`1[ImperiumEngine.Comps._1D.C1_Ability]]"

@@ -536,7 +536,7 @@
               "position": {
                 "X": 0,
                 "Y": 1,
-                "Z": 0
+                "Z": -2.25
               },
               "rotation": {
                 "X": 0,
@@ -572,6 +572,356 @@
             }
           },
           "children": []
+        },
+        {
+          "_class": "Imp3D",
+          "name": "PFB_ed_trees_A",
+          "vars": {
+            "transform": {
+              "position": {
+                "X": -11.47991,
+                "Y": 0.00024795532,
+                "Z": -6.5960865
+              },
+              "rotation": {
+                "X": 0,
+                "Y": 0,
+                "Z": 0
+              },
+              "scale": {
+                "X": 1,
+                "Y": 1,
+                "Z": 1
+              }
+            },
+            "physics_enabled": false,
+            "movement_enabled": false,
+            "move_mode": null,
+            "is_visible": true,
+            "is_locked": false,
+            "children_editable": true,
+            "popup_config": null,
+            "script_override": null,
+            "script_builtin": {
+              "_class": "A_Script",
+              "vars": {
+                "parent_type": {
+                  "class_name": "Imp3D"
+                },
+                "nodes": [],
+                "connections": [],
+                "vars": [],
+                "source_file": null,
+                "source_index": 0
+              }
+            }
+          },
+          "children": [],
+          "instance": {
+            "path": "{engine}/Scenes/PFB/PFB_ed_trees_A.ImpScene"
+          }
+        },
+        {
+          "_class": "Imp3D",
+          "name": "PFB_ed_trees_A1",
+          "vars": {
+            "transform": {
+              "position": {
+                "X": 5.1504574,
+                "Y": 0.00024795532,
+                "Z": -9.250975
+              },
+              "rotation": {
+                "X": 0,
+                "Y": 0,
+                "Z": 0
+              },
+              "scale": {
+                "X": 1,
+                "Y": 1,
+                "Z": 1
+              }
+            },
+            "physics_enabled": false,
+            "movement_enabled": false,
+            "move_mode": null,
+            "is_visible": true,
+            "is_locked": false,
+            "children_editable": true,
+            "popup_config": null,
+            "script_override": null,
+            "script_builtin": {
+              "_class": "A_Script",
+              "vars": {
+                "parent_type": {
+                  "class_name": "Imp3D"
+                },
+                "nodes": [],
+                "connections": [],
+                "vars": [],
+                "source_file": null,
+                "source_index": 0
+              }
+            }
+          },
+          "children": [],
+          "instance": {
+            "path": "{engine}/Scenes/PFB/PFB_ed_trees_A.ImpScene"
+          }
+        },
+        {
+          "_class": "Imp3D",
+          "name": "PFB_ed_trees_A2",
+          "vars": {
+            "transform": {
+              "position": {
+                "X": 6.2841187,
+                "Y": 0.00024795532,
+                "Z": 9.3847685
+              },
+              "rotation": {
+                "X": 0,
+                "Y": 34.061485,
+                "Z": -0
+              },
+              "scale": {
+                "X": 1,
+                "Y": 1,
+                "Z": 1
+              }
+            },
+            "physics_enabled": false,
+            "movement_enabled": false,
+            "move_mode": null,
+            "is_visible": true,
+            "is_locked": false,
+            "children_editable": true,
+            "popup_config": null,
+            "script_override": null,
+            "script_builtin": {
+              "_class": "A_Script",
+              "vars": {
+                "parent_type": {
+                  "class_name": "Imp3D"
+                },
+                "nodes": [],
+                "connections": [],
+                "vars": [],
+                "source_file": null,
+                "source_index": 0
+              }
+            }
+          },
+          "children": [],
+          "instance": {
+            "path": "{engine}/Scenes/PFB/PFB_ed_trees_A.ImpScene"
+          }
+        },
+        {
+          "_class": "C3_Character",
+          "name": "Character",
+          "vars": {
+            "shape": "Capsule",
+            "extents": {
+              "X": 0.4,
+              "Y": 1.8,
+              "Z": 0.4
+            },
+            "transform": {
+              "position": {
+                "X": -3.5,
+                "Y": 0.00024795532,
+                "Z": -6.75
+              },
+              "rotation": {
+                "X": -0,
+                "Y": -135,
+                "Z": 0
+              },
+              "scale": {
+                "X": 1,
+                "Y": 1,
+                "Z": 1
+              }
+            },
+            "physics_enabled": true,
+            "movement_enabled": true,
+            "move_mode": {
+              "_class": "A_MoveMode",
+              "vars": {
+                "speed": 5,
+                "acceleration": 20,
+                "deceleration": 20,
+                "jump_speed": 6,
+                "air_control": 0.8,
+                "air_friction": 0.02,
+                "gravity_enabled": true,
+                "gravity_dir": {
+                  "X": 0,
+                  "Y": -1,
+                  "Z": 0
+                },
+                "gravity_accel_curve": null,
+                "gravity_scale": 1,
+                "rotate_with_movement": true,
+                "velocity_rotation_rate": {
+                  "X": 0,
+                  "Y": 360,
+                  "Z": 0
+                },
+                "forward_adjust_rotation": false,
+                "source_file": null,
+                "source_index": 0
+              }
+            },
+            "is_visible": true,
+            "is_locked": false,
+            "children_editable": true,
+            "popup_config": null,
+            "script_override": null,
+            "script_builtin": {
+              "_class": "A_Script",
+              "vars": {
+                "parent_type": {
+                  "class_name": "C3_Character"
+                },
+                "nodes": [],
+                "connections": [],
+                "vars": [],
+                "source_file": null,
+                "source_index": 0
+              }
+            }
+          },
+          "children": [],
+          "owned": {
+            "mesh": {
+              "_class": "C3_Mesh",
+              "name": "C3_Mesh",
+              "vars": {
+                "mesh": {
+                  "path": "builtin:A_Mesh.SK_MANNEQUIN"
+                },
+                "materials": [],
+                "cast_shadows": true,
+                "transform": {
+                  "position": {
+                    "X": 0,
+                    "Y": 0,
+                    "Z": 0
+                  },
+                  "rotation": {
+                    "X": 0,
+                    "Y": 180,
+                    "Z": 0
+                  },
+                  "scale": {
+                    "X": 1,
+                    "Y": 1,
+                    "Z": 1
+                  }
+                },
+                "physics_enabled": false,
+                "movement_enabled": false,
+                "move_mode": null,
+                "is_visible": true,
+                "is_locked": false,
+                "children_editable": true,
+                "popup_config": null,
+                "script_override": null,
+                "script_builtin": {
+                  "_class": "A_Script",
+                  "vars": {
+                    "parent_type": {
+                      "class_name": "C3_Mesh"
+                    },
+                    "nodes": [],
+                    "connections": [],
+                    "vars": [],
+                    "source_file": null,
+                    "source_index": 0
+                  }
+                }
+              },
+              "children": []
+            },
+            "skeleton": {
+              "_class": "C3_Skeleton",
+              "name": "C3_Skeleton",
+              "vars": {
+                "skeleton": null,
+                "bound_meshes": null,
+                "default_animation": null,
+                "anim_graph": null,
+                "transform": {
+                  "position": {
+                    "X": 0,
+                    "Y": 0,
+                    "Z": 0
+                  },
+                  "rotation": {
+                    "X": 0,
+                    "Y": 0,
+                    "Z": 0
+                  },
+                  "scale": {
+                    "X": 1,
+                    "Y": 1,
+                    "Z": 1
+                  }
+                },
+                "physics_enabled": false,
+                "movement_enabled": false,
+                "move_mode": null,
+                "is_visible": true,
+                "is_locked": false,
+                "children_editable": true,
+                "popup_config": null,
+                "script_override": null,
+                "script_builtin": {
+                  "_class": "A_Script",
+                  "vars": {
+                    "parent_type": {
+                      "class_name": "C3_Skeleton"
+                    },
+                    "nodes": [],
+                    "connections": [],
+                    "vars": [],
+                    "source_file": null,
+                    "source_index": 0
+                  }
+                }
+              },
+              "children": []
+            },
+            "creature": {
+              "_class": "C1_Creature",
+              "name": "C1_Creature",
+              "vars": {
+                "creature_root": null,
+                "auto_abilities": null,
+                "is_visible": true,
+                "is_locked": false,
+                "children_editable": true,
+                "popup_config": null,
+                "script_override": null,
+                "script_builtin": {
+                  "_class": "A_Script",
+                  "vars": {
+                    "parent_type": {
+                      "class_name": "C1_Creature"
+                    },
+                    "nodes": [],
+                    "connections": [],
+                    "vars": [],
+                    "source_file": null,
+                    "source_index": 0
+                  }
+                }
+              },
+              "children": []
+            }
+          }
         }
       ]
     }

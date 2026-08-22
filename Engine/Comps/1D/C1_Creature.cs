@@ -7,6 +7,16 @@ namespace ImperiumEngine.Comps._1D;
 // Creature is an advanced component for handling common gameplay functions for an entity (E.G, Attribute, Abilities, Equipment, Inventory, etc.)  
 public class C1_Creature : ImpComp
 {
+    // ================================================================================================================
+    // Static
+    // ================================================================================================================
+    
+    [ImpVar][Config] public static List<TClass<C1_Ability>> abilities_default;
+    [ImpVar][Config] public static List<TClass<C1_Ability>> abilities_character_default;
+    
+    // ================================================================================================================
+    // Class
+    // ================================================================================================================
     [ImpVar] public Imp3D creature_root; // intended to be the rootmost comp of this scene.
     
     private List<C1_Ability> _abilities;

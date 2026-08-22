@@ -7,6 +7,7 @@ namespace ImperiumEngine.Structs;
 public class TInputAction : I_Property
 {
     [ImpVar] public string name;
+    [ImpVar] public bool average_axis;
     [ImpVar] public Dictionary<EInputKey, TInputKey> keys = new();
     
 }

@@ -1,6 +1,7 @@
 ﻿using System.Numerics;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Structs;
+using R3D_cs;
 using Raylib_cs;
 
 namespace ImperiumEngine.Assets;
@@ -15,10 +16,12 @@ public class A_Texture : ImpAsset
     public Texture2D texture;
     [ImpVar] public PixelFormat pixel_format;
     [ImpVar] public float hue;
-    [ImpVar] public float saturation=0.1f;
+    [ImpVar] public float saturation=1.0f;
     [ImpVar] public float brightness=1.0f;
     [ImpVar] public EImageLayout ui_layout=EImageLayout.Stretch;
-    
+
+    bool _gpu_3d;
+
     public override void Source_OnReload(ImpFile file)
     {
         base.Source_OnReload(file);
@@ -26,6 +29,23 @@ public class A_Texture : ImpAsset
         if (i < 0 || i >= file.src_textures.Count) return;
         texture = file.src_textures[i];
         if (pixel_format != 0) texture.Format = pixel_format;
+        _gpu_3d = false;
+    }
+
+    public Texture2D Gpu_Bind3D()
+    {
+        if (texture.Id == 0)
+        {
+            return texture;
+        }
+        if (!_gpu_3d)
+        {
+            Raylib.SetTextureWrap(texture, TextureWrap.Repeat);
+            Raylib.GenTextureMipmaps(ref texture);
+            Raylib.SetTextureFilter(texture, TextureFilter.Trilinear);
+            _gpu_3d = true;
+        }
+        return texture;
     }
     
     // #################################################################################
@@ -78,6 +98,10 @@ public class A_Texture : ImpAsset
     public static A_Texture? THUMB_FOLDER = ImpAsset.Import<A_Texture>("{engine}/Thumbnails/_folder.png");
     public static A_Texture? THUMB_FOLDER_OPEN = ImpAsset.Import<A_Texture>("{engine}/Thumbnails/_folder_open.png");
 
+    public static A_Texture? S_PROTO_FLOOR=Import<A_Texture>("{engine}/Textures/Surface/Prototype/T_editor_S_proto_floor.png");
+    public static A_Texture? S_PROTO_DOOR=Import<A_Texture>("{engine}/Textures/Surface/Prototype/T_editor_S_proto_door.png");
+    public static A_Texture? S_PROTO_STAIR=Import<A_Texture>("{engine}/Textures/Surface/Prototype/T_editor_S_proto_stair.png");
+    public static A_Texture? S_PROTO_WINDOW=Import<A_Texture>("{engine}/Textures/Surface/Prototype/T_editor_S_proto_window.png");
 
     public override Texture2D? Editor_GetThumbnail_Texture()
     {
@@ -88,6 +112,46 @@ public class A_Texture : ImpAsset
 
 public class A_TextureHDR : A_Texture
 {
+    public Cubemap cubemap;
+    public AmbientMap ambient;
+
+    public override void Source_OnReload(ImpFile file)
+    {
+        if (cubemap.Size > 0)
+        {
+            R3D.UnloadCubemap(cubemap);
+        }
+        if (ambient.Irradiance != 0)
+        {
+            R3D.UnloadAmbientMap(ambient);
+        }
+        cubemap = default;
+        ambient = default;
+        base.Source_OnReload(file);
+    }
+
+    public void Cubemap_Ensure()
+    {
+        if (cubemap.Size > 0)
+        {
+            return;
+        }
+        string path = "";
+        if (source_file != null && !string.IsNullOrEmpty(source_file.filepath))
+        {
+            path = ImpFile.Path_Resolve(source_file.filepath);
+        }
+        if (string.IsNullOrEmpty(path) || !File.Exists(path))
+        {
+            return;
+        }
+        cubemap = R3D.LoadCubemap(path, R3D_cs.CubemapLayout.Panorama);
+        if (cubemap.Size > 0)
+        {
+            ambient = R3D.GenAmbientMap(cubemap, AmbientFlags.Illumination | AmbientFlags.Reflection);
+        }
+    }
+
     public static A_TextureHDR SKY_DAY_1=Import<A_TextureHDR>("{engine}/Textures/HDRI/sky_1.hdr");
     public static A_TextureHDR SKY_DAY_2=Import<A_TextureHDR>("{engine}/Textures/HDRI/sky_2.hdr");
 }

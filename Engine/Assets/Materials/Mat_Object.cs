@@ -1,24 +1,30 @@
-﻿using Raylib_cs;
+﻿using Material = R3D_cs.Material;
 
 namespace ImperiumEngine.Assets.Materials;
 
 public class Mat_Object : A_Material
 {
-    public TMaterialCommons commons;
-    
-    
-    // --
-    
-    public static Mat_Object PROTO_STAIR=new()
+    [ImpVar] public TMaterialCommons commons = new();
+
+    public override void Source_OnReload(ImpFile file)
     {
-        commons = { color_map = Load<A_Texture>("{engine}/Textures/Surfaces/Prototype/T_Engine_S_proto_2.png")}
-    };
-    public static Mat_Object PROTO_DOOR=new()
+        base.Source_OnReload(file);
+        if (file.src_models.Count == 0)
+        {
+            return;
+        }
+        R3D_cs.Model mdl = file.src_models[0];
+        Span<Material> mats = mdl.Materials;
+        int i = source_index;
+        if (i < 0 || i >= mats.Length)
+        {
+            return;
+        }
+        commons = TMaterialCommons.FromMaterial(mats[i]);
+    }
+
+    protected override Material Material_Build()
     {
-        commons = { color_map = Load<A_Texture>("{engine}/Textures/Surfaces/Prototype/T_Engine_S_proto_3.png")}
-    };
-    public static Mat_Object PROTO_WINDOW=new()
-    {
-        commons = { color_map = Load<A_Texture>("{engine}/Textures/Surfaces/Prototype/T_Engine_S_proto_4.png")}
-    };
+        return commons.ToMaterial();
+    }
 }

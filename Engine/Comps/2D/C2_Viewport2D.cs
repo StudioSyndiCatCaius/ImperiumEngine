@@ -100,14 +100,18 @@ public class C2_Viewport2D : Imp2D
         // Game view already blitted 3D into this rect. Draw HUD here instead of
         // through an RT — R3D.End can leave scissor/viewport that make the RT
         // opaque and cover the bottom of the 3D image.
+        // Layout against this widget (same as standalone vs the window), and pass
+        // dim.position as the scene-draw origin so view-local coords land in the
+        // Game tab instead of the editor window's top-left.
         if (!clear_background && !draw_canvas)
         {
             Imp2D.Clip_Push(dim);
             ImpComp hud = Root_Get();
             if (hud != null)
             {
-                Imp2D.SceneLayout_Set(hud, CanvasSize());
-                Imp2D.SceneDraw_Begin(camera, new Vector2(w, h));
+                Vector2 _view = new Vector2(w, h);
+                Imp2D.SceneLayout_Set(hud, _view);
+                Imp2D.SceneDraw_Begin(camera, _view, dim.position);
                 hud.Draw(dt, draw_flags, 1);
                 overlay?.Draw(dt, draw_flags, 1);
                 Imp2D.SceneDraw_End();

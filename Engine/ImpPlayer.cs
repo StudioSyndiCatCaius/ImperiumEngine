@@ -755,7 +755,14 @@ public class ImpPlayer
                     : EInputState.None;
             }
             action_states[ia.Key] = state_new;
-            action_axis[ia.Key] = ImpMath.V3_Average(axis_list);
+            if (ia.Value.average_axis)
+            {
+                action_axis[ia.Key] = ImpMath.V3_Average(axis_list);
+            }
+            else
+            {
+                action_axis[ia.Key] = ImpMath.V3_Combine(axis_list);
+            }
         }
 
         //Process Input Hog ----------------------------------------------------

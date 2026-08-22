@@ -241,4 +241,43 @@ public class C3_Collider : Imp3D
         float height = MathF.Abs(extents.Y * world_scale.Y);
         return new Vector3(0f, height * 0.5f, 0f);
     }
+
+    public override float Phys_SupportRadius(Vector3 world_scale)
+    {
+        if (shape == ECollisionShape.Sphere)
+        {
+            float r = MathF.Abs(extents.X * world_scale.X);
+            float ry = MathF.Abs(extents.Y * world_scale.Y);
+            float rz = MathF.Abs(extents.Z * world_scale.Z);
+            if (ry > r)
+            {
+                r = ry;
+            }
+            if (rz > r)
+            {
+                r = rz;
+            }
+            r *= 0.5f;
+            if (r < 0.05f)
+            {
+                r = 0.05f;
+            }
+            return r;
+        }
+        if (shape == ECollisionShape.Capsule)
+        {
+            float radius = MathF.Abs(extents.X * world_scale.X) * 0.5f;
+            float rz = MathF.Abs(extents.Z * world_scale.Z) * 0.5f;
+            if (rz > radius)
+            {
+                radius = rz;
+            }
+            if (radius < 0.05f)
+            {
+                radius = 0.05f;
+            }
+            return radius;
+        }
+        return 0.1f;
+    }
 }

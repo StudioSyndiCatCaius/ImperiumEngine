@@ -19,6 +19,27 @@ public static class ImpMath
         return points.Aggregate((a, b) => a + b) / points.Count;
     }
 
+    public static Vector3 V3_Combine(List<Vector3> vectors, bool normalize = false)
+    {
+        if (vectors.Count == 0)
+        {
+            return Vector3.Zero;
+        }
+
+        Vector3 result = Vector3.Zero;
+        for (int i = 0; i < vectors.Count; i++)
+        {
+            result += vectors[i];
+        }
+
+        if (normalize && result.LengthSquared() > 0f)
+        {
+            result = Vector3.Normalize(result);
+        }
+
+        return result;
+    }
+
     public static Vector2 V3_to_V2(Vector3 v,bool spatial = false)
     {
         if(spatial) return new Vector2(v.X, v.Z);

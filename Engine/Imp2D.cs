@@ -173,6 +173,7 @@ public class Imp2D : ImpComp
     static bool _scene_draw;
     static TCamera2D _scene_cam;
     static Vector2 _scene_view;
+    static Vector2 _scene_origin;
     static Vector2 _scene_canvas = new(1920, 1080);
     static ImpComp _scene_root;
 
@@ -231,15 +232,22 @@ public class Imp2D : ImpComp
 
     public static void SceneDraw_Begin(TCamera2D cam, Vector2 view_size)
     {
+        SceneDraw_Begin(cam, view_size, Vector2.Zero);
+    }
+
+    public static void SceneDraw_Begin(TCamera2D cam, Vector2 view_size, Vector2 origin)
+    {
         _scene_draw = true;
         _scene_cam = cam;
         _scene_view = view_size;
+        _scene_origin = origin;
         Layout_Invalidate();
     }
 
     public static void SceneDraw_End()
     {
         _scene_draw = false;
+        _scene_origin = Vector2.Zero;
         Layout_Invalidate();
     }
 
@@ -379,7 +387,7 @@ public class Imp2D : ImpComp
 
             // transform.position is the pivot point, so the box hangs off it: a normalized
             // pivot of 1,1 puts the box up and left of the same point 0,0 puts it down-right of.
-            Vector2 pivot_view = ImpGizmo.WorldToView(world.position, _scene_cam, _scene_view);
+            Vector2 pivot_view = ImpGizmo.WorldToView(world.position, _scene_cam, _scene_view) + _scene_origin;
             return _c_dim = new TDimensions2
             {
                 position = pivot_view - px_pivot,

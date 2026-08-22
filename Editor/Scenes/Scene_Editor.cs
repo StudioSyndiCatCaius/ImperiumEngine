@@ -94,7 +94,7 @@ public class Scene_Editor : ImpComp
             size = new Vector2(0, 800),
             size_min = new Vector2(300, 100),
         },
-        tab_width = 200,
+        tab_width = 120,
     };
 
     //the Edit menu's own suboptions, kept so Undo/Redo can show what they would undo
@@ -265,6 +265,11 @@ public class Scene_Editor : ImpComp
                 mtab_asset.Asset_Add(asset);
                 SelectMainWindow(mtab_asset);
             }
+        };
+
+        ImpFile.Editor_OnCreateAssetFromFile = file =>
+        {
+            DLG_CreateAssetFromFile.Run(file);
         };
 
         EdState.Load(this);

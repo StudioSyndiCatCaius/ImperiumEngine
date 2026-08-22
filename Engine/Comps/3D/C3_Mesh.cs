@@ -2,7 +2,6 @@ using System.Numerics;
 using ImperiumEngine.Assets;
 using ImperiumEngine.Structs;
 using JoltPhysicsSharp;
-using R3D_cs;
 
 namespace ImperiumEngine.Comps._3D;
 
@@ -10,7 +9,7 @@ namespace ImperiumEngine.Comps._3D;
 public class C3_Mesh : Imp3D
 {
     [ImpVar] public A_Mesh mesh=A_Mesh.GEO_CUBE;
-    [ImpVar] public List<A_Material> materials;
+    [ImpVar] public List<A_Material> materials = new();
     [ImpVar] public bool cast_shadows=true;
 
     public C3_Mesh()
@@ -22,17 +21,20 @@ public class C3_Mesh : Imp3D
     public override void OnDraw3D(double dt, EDrawFlags flags)
     {
         base.OnDraw3D(dt, flags);
-        if (mesh == null || mesh.mesh.VertexCount <= 0) return;
+        if (mesh == null || mesh.Submesh_Count() <= 0)
+        {
+            return;
+        }
 
         TTransform3 t = Transform_Get(true);
         float d = MathF.PI / 180f;
         Quaternion rot = Quaternion.CreateFromYawPitchRoll(t.rotation.Y * d, t.rotation.X * d, t.rotation.Z * d);
-        R3D.DrawMeshEx(mesh.mesh, R3D.GetDefaultMaterial(), t.position, rot, t.scale);
+        mesh.Draw(t.position, rot, t.scale, materials, cast_shadows);
     }
 
     protected override TBounds3 Bounds_Calc()
     {
-        if (mesh != null && mesh.mesh.VertexCount > 0)
+        if (mesh != null && mesh.Submesh_Count() > 0)
         {
             return mesh.Bounds_Get(global_transform);
         }

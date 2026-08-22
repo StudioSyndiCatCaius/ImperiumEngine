@@ -137,23 +137,11 @@ public class C2_GameView : C2_Box
             return;
         }
 
-        Vector2 canvas = viewport2D.CanvasSize();
         TDimensions2 dim = Dimensions_Get();
-        if (canvas.X > 1f && canvas.Y > 1f && dim.size.X > 1f && dim.size.Y > 1f)
+        if (dim.size.X > 1f && dim.size.Y > 1f)
         {
-            float zx = dim.size.X / canvas.X;
-            float zy = dim.size.Y / canvas.Y;
-            float z = zx;
-            if (zy < z)
-            {
-                z = zy;
-            }
-            if (z < 0.001f)
-            {
-                z = 0.001f;
-            }
-            viewport2D.camera.position = canvas * 0.5f;
-            viewport2D.camera.zoom = z;
+            viewport2D.camera.position = dim.size * 0.5f;
+            viewport2D.camera.zoom = 1f;
         }
 
         ImpGame prev = ImpGame.Bind(view_game);

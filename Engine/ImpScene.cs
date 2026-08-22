@@ -143,11 +143,11 @@ public class ImpScene : ImpAsset
         Console.WriteLine(text);
     }
 
-    Light sun_light;
-    bool sun_ready;
-    Cubemap sky_cubemap;
-    AmbientMap sky_ambient;
-    string sky_loaded_path = "";
+    // R3D's light registry is process-wide. One sun, shared by every scene that
+    // calls ApplyRenderState — a per-scene handle left the previous scene's dir
+    // light enabled, so the editor Scene/Game views stacked two suns and blew out.
+    static Light sun_light;
+    static bool sun_ready;
     
     [ImpVar] public TClass<ImpComp> root_type = new TClass<ImpComp>(typeof(ImpComp));
     [ImpVar] public C3_Camera starting_camera;
@@ -191,40 +191,17 @@ public class ImpScene : ImpAsset
             e = A_Environment.ENVI_DAY;
         }
 
-        string hdr_path = "";
         A_TextureHDR sky = e.sky_texture;
-        if (sky != null && sky.source_file != null && !string.IsNullOrEmpty(sky.source_file.filepath))
-        {
-            hdr_path = ImpFile.Path_Resolve(sky.source_file.filepath);
-        }
-
-        if (!string.Equals(hdr_path, sky_loaded_path, StringComparison.OrdinalIgnoreCase))
-        {
-            if (sky_cubemap.Size > 0)
-            {
-                R3D.UnloadCubemap(sky_cubemap);
-            }
-            if (sky_ambient.Irradiance != 0)
-            {
-                R3D.UnloadAmbientMap(sky_ambient);
-            }
-            sky_cubemap = default;
-            sky_ambient = default;
-            sky_loaded_path = hdr_path;
-            if (!string.IsNullOrEmpty(hdr_path) && File.Exists(hdr_path))
-            {
-                sky_cubemap = R3D.LoadCubemap(hdr_path, R3D_cs.CubemapLayout.Panorama);
-                if (sky_cubemap.Size > 0)
-                {
-                    sky_ambient = R3D.GenAmbientMap(sky_cubemap, AmbientFlags.Illumination | AmbientFlags.Reflection);
-                }
-            }
-        }
-
+        Cubemap sky_cubemap = default;
         AmbientMap ambient_map = default;
-        if (e.sky_lights_scene)
+        if (sky != null)
         {
-            ambient_map = sky_ambient;
+            sky.Cubemap_Ensure();
+            sky_cubemap = sky.cubemap;
+            if (e.sky_lights_scene)
+            {
+                ambient_map = sky.ambient;
+            }
         }
         Quaternion sky_rot = Quaternion.CreateFromAxisAngle(Vector3.UnitY, e.sky_rotation * (MathF.PI / 180f));
 
@@ -321,16 +298,22 @@ public class ImpScene : ImpAsset
         R3D.SetLightEnergy(sun_light, e.sun_intensity);
         R3D.SetLightSpecular(sun_light, e.sun_specular);
         bool want_shadow = e.sun_cast_shadows;
-        if (want_shadow != R3D.IsShadowEnabled(sun_light))
+        if (want_shadow)
         {
-            if (want_shadow)
+            if (!R3D.IsShadowEnabled(sun_light))
             {
                 R3D.EnableShadow(sun_light);
             }
-            else
-            {
-                R3D.DisableShadow(sun_light);
-            }
+            // Softness is only valid after the shadow map exists.
+            R3D.SetShadowSoftness(sun_light, e.sun_shadow_softness);
+            R3D.SetLightRange(sun_light, e.sun_shadow_range);
+            R3D.SetShadowDepthBias(sun_light, e.sun_shadow_depth_bias);
+            R3D.SetShadowSlopeBias(sun_light, e.sun_shadow_slope_bias);
+            R3D.SetShadowUpdateMode(sun_light, ShadowUpdateMode.Continuous);
+        }
+        else if (R3D.IsShadowEnabled(sun_light))
+        {
+            R3D.DisableShadow(sun_light);
         }
         float d = MathF.PI / 180f;
         Quaternion sun_q = Quaternion.CreateFromYawPitchRoll(e.sun_rotation.Y * d, e.sun_rotation.X * d, e.sun_rotation.Z * d);
@@ -514,6 +497,81 @@ public class ImpScene : ImpAsset
         catch { return string.Equals(a, b, StringComparison.OrdinalIgnoreCase); }
     }
 
+    public bool WouldCycleInto(ImpScene dest)
+    {
+        if (dest == null)
+        {
+            return false;
+        }
+        if (ReferenceEquals(this, dest) || ScenePath_Equals(filepath, dest.filepath))
+        {
+            return true;
+        }
+        HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!string.IsNullOrEmpty(filepath))
+        {
+            seen.Add(filepath);
+        }
+        return Tree_UsesScene(root, dest, seen);
+    }
+
+    static bool ScenePath_Equals(string a, string b)
+    {
+        if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b))
+        {
+            return false;
+        }
+        try
+        {
+            return string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    static bool Tree_UsesScene(ImpComp n, ImpScene dest, HashSet<string> seen)
+    {
+        if (n == null)
+        {
+            return false;
+        }
+        if (n.IsInstanceRoot)
+        {
+            ImpScene packed = n.packed.Get();
+            string path = packed != null ? packed.filepath : n.packed.path;
+            if (packed != null && ReferenceEquals(packed, dest))
+            {
+                return true;
+            }
+            if (ScenePath_Equals(path, dest.filepath))
+            {
+                return true;
+            }
+            if (!string.IsNullOrEmpty(path) && seen.Add(path))
+            {
+                ImpScene next = packed;
+                if (next == null)
+                {
+                    next = ImpAsset.Load<ImpScene>(path);
+                }
+                if (next != null && Tree_UsesScene(next.root, dest, seen))
+                {
+                    return true;
+                }
+            }
+        }
+        for (int i = 0; i < n.children.Count; i++)
+        {
+            if (Tree_UsesScene(n.children[i], dest, seen))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static void BindPackedTree(ImpComp owner, ImpComp n)
     {
         if (n == null || owner == null) return;
@@ -537,7 +595,7 @@ public class ImpScene : ImpAsset
     {
         SceneDrop_Exit(view, player);
         ImpScene dest_scene = SceneOf(view);
-        if (dest_scene == null)
+        if (dest_scene == null || WouldCycleInto(dest_scene))
         {
             return;
         }
@@ -590,7 +648,7 @@ public class ImpScene : ImpAsset
         }
         ImpScene dest_scene = SceneOf(_drop_view) ?? comp?.scene;
         ImpComp dest = dest_scene?.root;
-        if (dest == null || dest == _drop_ghost || _drop_ghost.IsAncestorOf(dest))
+        if (dest == null || dest == _drop_ghost || _drop_ghost.IsAncestorOf(dest) || WouldCycleInto(dest_scene))
         {
             SceneDrop_Exit(_drop_view, player);
             return null;

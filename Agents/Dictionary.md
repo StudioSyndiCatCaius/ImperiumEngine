@@ -19,7 +19,7 @@ Per-`ImpGame` Jolt world. `Foundation` + `JobSystemThreadPool` are process-wide 
 - Two object layers: Static (0) / Moving (1). Static↔Moving and Moving↔Moving collide.
 - `Trace_Line` uses `NarrowPhaseQuery.CastRay` when a world exists. Editor click select uses `Imp3D.Select` against `Bounds_Calc` OBBs, not physics.
 - `C3_Mesh` shapes: `GEO_PLANE` = thin box, everything else (including `GEO_CUBE` and imports) = `BoxShape(0.5 * scale)`. Triangle `MeshShape` from R3D meshes is not wired (R3D `Mesh` has no vertex accessor).
-- `C3_Collider`: collision volume only (not a mesh). Cube/Sphere/Cylinder/Capsule primitives, Cone = convex hull. Capsule `Phys_ShapeOffset` lifts the shape so `CharacterVirtual.Position` is at the feet. Debug volume draws only with `EDrawFlags.Editor` (scene viewport, not standalone/PIE). `Bounds_Calc` from `Shape_Local` so the volume is selectable. Default `physics_enabled`.
+- `C3_Collider`: collision volume only (not a mesh). Cube/Sphere/Cylinder/Capsule primitives, Cone = convex hull. Capsule `Phys_ShapeOffset` lifts the shape so `CharacterVirtual.Position` is at the feet. `Phys_SupportRadius` is the bottom-sphere radius (capsule/sphere) used as Jolt `SupportingVolume` so wall contacts at hip height do not count as ground. CharacterVirtual: `EnhancedInternalEdgeRemoval`, stick-to-floor / walk-stairs along `-gravity`. Debug volume draws only with `EDrawFlags.Editor` (scene viewport, not standalone/PIE). `Bounds_Calc` from `Shape_Local` so the volume is selectable. Default `physics_enabled`.
 - No dynamic rigid bodies in v1.
 - `ImpComp.OnBegin` / `OnEnd` now cascade to children. `Destroy` calls `OnDestroy` before detaching.
 
@@ -41,10 +41,21 @@ Runtime (not ImpVar): `velocity`, `is_grounded`.
 - `Phys_Move(dir, scale)` — accumulate world wish (UE `AddMovementInput`).
 - `Phys_MoveByRot(dir, scale, rot_euler)` — `Transform(dir, rot)` then `Phys_Move`.
 - `Phys_Launch(axis, scale, force_h, force_v)` — impulse; force flags replace that plane.
-- `Update_Physics` — gravity / zero downward when grounded.
+- `Update_Physics` — if grounded and not jumping (`v_up < 0.1`), zero vertical so fall speed cannot accumulate, **then always apply gravity** (including on ground). Zero vertical + horizontal move lets `CharacterVirtual` lose the floor for a frame; `StickToFloor` then teleports them back (visible snap in/out of falling). The small downward stick matches Jolt’s CharacterVirtual sample.
 - `Update_Movement` — accel/decel toward wish * `A_MoveMode.speed`, air control + friction, then `rotate_with_movement` (UE Orient Rotation to Movement): face horizontal velocity, up = `-gravity`. `velocity_rotation_rate` is deg/s per euler axis (0 locks that axis). Default yaw 360. `CharacterVirtual` drives position only — facing stays on the Imp3D.
 - `C3_Character` is the default pawn body (capsule, mesh, skeleton, creature). It does **not** consume input. `_Move` / `_Jump` / `_Rotate` live on `C3_Camera`, which calls `ImpPlayer.pawn`.
-- Visual child meshes of a character must keep `physics_enabled = false` or they double-collide. `C3_Character.mesh` is a child `C3_Mesh` defaulting to `A_Mesh.SK_MANNEQUIN` (`Import` of `{engine}/Meshes/Character/Mannequin/sk_c_mannequin.glb`).
+- Visual child meshes of a character must keep `physics_enabled = false` or they double-collide. `C3_Character.mesh` is a child `C3_Mesh` defaulting to `A_Mesh.SK_MANNEQUIN` (`Import` of `{engine}/Meshes/Character/Mannequin/sk_c_mannequin.glb`). That GLB is one named mesh with **two primitives** (Assimp/R3D splits them into two GPU meshes): `M_Main` (orange body) and `M_Joints` (purple). `A_Mesh.Source_OnReload` takes **every** `Model.Meshes` entry plus every `Model.Materials` (as `Mat_Object` / `TMaterialCommons`: albedo tint, ORM, normal, emission, `two_sided` from `CullMode.None`). `mesh_materials[i]` is the R3D slot index for submesh `i`. `C3_Mesh.OnDraw3D` calls `A_Mesh.Draw`: each submesh with `C3_Mesh.materials[i]` if set, else `A_Mesh.Material_Get(i)`, else `GetDefaultMaterial()`. Empty component list = asset defaults, so the character picks up both mannequin materials with no extra wiring. `GEO_CUBE` / `GEO_PLANE` ship `Mat_Surface.PROTO_TILE_WHITE` (world-aligned proto floor).
+
+### Materials (`A_Material` / `Mat_Object` / `Mat_Surface`)
+
+Ext `ImpMaterial`. Shared PBR block is `TMaterialCommons` (`ToMaterial` / `FromMaterial`). `A_Material.Material_Get` rebuilds the R3D `Material` **once per 3D pass** (`draw_stamp++` at `R3D.Begin` / `BeginPro` / `BeginEx`), not per mesh. Maps go through `A_Texture.Gpu_Bind3D` (Repeat + mips + trilinear).
+
+| Type | Draw |
+|---|---|
+| `Mat_Object` | Mesh UVs. Imported GLB materials. `commons` → R3D albedo/ORM/normal/emission. |
+| `Mat_Surface` | World-space triplanar. Wall maps live on the R3D material (`SampleAlbedo` etc). Floor maps are 4 custom samplers (R3D max). Slope blend: `t = saturate((dot(N, slope_normal) - offset) * sharpness)` when `use_floor`. One compiled surface shader, **alias per asset** so different surfaces can differ in the same `R3D.End`. |
+
+R3D uniforms are per-shader-object and cannot change between draws in one frame — do not share one `SurfaceShader` across distinct `Mat_Surface` instances. Proto tiles: `{engine}/Textures/Surface/Prototype/T_editor_S_proto_*.png`. `S_PROTO_FLOOR` / `DOOR` / `STAIR` / `WINDOW`. Builtins `Mat_Surface.PROTO_TILE_*` (tinted walls) + `PROTO_TILE_2SURFACE` (white floor, red wall).
 
 `A_MoveMode` defaults: speed 5, accel/decel 20, jump 6, `rotate_with_movement` on, `velocity_rotation_rate` (0, 360, 0) deg/s. Gravity is `gravity_dir * 9.81 * gravity_scale` (curve unused). `PRESET_PAWN` / `ECollisionChannel.World` + `Pawn` added; body vs body still uses the two Jolt layers only.
 
@@ -52,7 +63,7 @@ Runtime (not ImpVar): `velocity`, `is_grounded`.
 
 All lens / look / input flags live on `A_CameraConfig` (`Engine/Assets/A_CameraConfig.cs`, ext `ImpCameraConfig`). The comp holds `config` (inline unique by default) and `look_target`. Eye = pivot minus local forward (`-Z`) × `boom_distance`. `boom_uses_collision` (on by default on `CAM_THIRDPERSON`) raycasts that boom against world bodies and shortens it so the eye sits 15 cm in front of the hit. The pawn and its descendants are skipped (`ImpPhys.Trace_Line` walks past rejected hits). `Camera_GetData` uses config fov / `ECameraViewMode` (ortho fovy = vertical world size).
 
-Runtime: if this is `ImpApp.view_target`, apply `starting_rotation` once, then snap the pivot to the first player's pawn (capsule center when the pawn is a `C3_Collider`) so the boom stays behind the character without inheriting pawn yaw. `look_target` aims the pivot at that node (yaw/pitch from Δ, converted to local if parented). Camera does **not** claim `input_owner` itself — the game mode / possess path assigns it (`sys_Explore` forwards input). `_Rotate` (mouse + right stick) yaws/pitches `_aim` when no look target; yaw subtracts mouse X (mouse right looks right); pitch subtracts mouse Y (mouse down looks down); `look_lerp` slerps toward it. Stick axes (|axis| ≤ 2) are analog (`180 * dt`). Pitch clamped ±89.9°. `enable_move`: `_Move` → `player.pawn.Phys_MoveByRot` (yaw only, remap `(Z, Y, -X)`); `_Jump` → `player.pawn.Phys_Launch` if grounded. Null pawn is a no-op.
+Runtime: if this is `ImpApp.view_target`, apply `starting_rotation` once, then put the pivot on the first player's pawn (capsule center when the pawn is a `C3_Collider`) so the boom stays behind the character without inheriting pawn yaw. `boom_lag_position` exp-smooths that follow (`1-exp(-dt*speed)`); speed 0 or first possess frame snaps. `boom_lag_rotation` does the same for boom/look rotation toward `_aim` and **replaces** `look_lerp` while enabled (`look_lerp * 12` is the fallback when rotation lag is off). Collision still runs from the lagged pivot in `Transform_GetForCamera`. `look_target` aims the pivot at that node (yaw/pitch from Δ, converted to local if parented). Camera does **not** claim `input_owner` itself — the game mode / possess path assigns it (`sys_Explore` forwards input). `_Rotate` (mouse + right stick) yaws/pitches `_aim` when no look target; yaw subtracts mouse X (mouse right looks right); pitch subtracts mouse Y (mouse down looks down). Stick axes (|axis| ≤ 2) are analog (`180 * dt`). Pitch clamped ±89.9°. `enable_move`: `_Move` → `player.pawn.Phys_MoveByRot` (yaw only, remap `(Z, Y, -X)`); `_Jump` → `player.pawn.Phys_Launch` if grounded. Null pawn is a no-op.
 
 Builtins (filepath `builtin:A_CameraConfig.CAM_*`):
 
@@ -152,6 +163,8 @@ Was `ImpComp2D`. Size + viewport alignment live on `layout` (`TLayout2` in `Engi
 
 **`Bounds_Get`** — screen-absolute *layout* AABB: `new TBounds2(position, layout, parent.Bounds_GetForChild(index))`. No Imp2D parent → screen rect. Cached on `_layout_epoch`. Does **not** include `transform` — draw with `Draw_*(Bounds_Get(), Transform_Get(true), …)`. **`Bounds_GetForChild(index)`** virtual; default is `Bounds_Get()`. Lists/scrolls override to hand a child its slot (padding, stretch) and ignore the child's `position`.
 
+**Scene draw** — `SceneLayout_Set(root, canvas)` + `SceneDraw_Begin(cam, view, origin)`. `origin` is added to `WorldToView` so a HUD overlay inside `C2_Viewport2D` can draw in the widget (Game tab) instead of at window (0,0). Omit/`Zero` when drawing into an RT whose (0,0) is already the target.
+
 `C2_Button.layout` was renamed to `button_layout` (`EButtonLayout`) so it does not hide `Imp2D.layout`. `layout.size.X =` is illegal (struct-in-struct) — assign the whole `Vector2`.
 
 ## C2_EnumOption (`Engine/Comps/2D/C2_EnumOption.cs`)
@@ -180,13 +193,13 @@ Icons autoload from `{engine}/Icons/type/` then `{engine}/Icons/Types/`. Tried n
 | `starting_camera` | ImpVar `C3_Camera` object ref (JSON `comp_path`). Play camera. `RBegin` assigns `ImpApp.view_target` (null if unset). Standalone `ImpApp` 3D pass looks through it and applies `ApplyRenderState`. PIE `C2_GameView` binds `C2_Viewport3D.view_camera` to the **cloned** camera so the Game tab follows it; unset falls back to the editor orbit snapshot. `PlayCopy` remaps the ref onto the cloned tree (Clone copies the authored object). |
 | `is_running` | Toggles `RuntimeBegin` / `RuntimeEnd` on the root, then `root.Update`. |
 | `canvas_size` | 2D scene canvas (default 1920x1080). |
-| `environment` | ImpVar `TRef<A_Environment>` (default `ENVI_DAY`). Shared lighting/sky/fog/tonemap/bloom/SSAO. `ApplyRenderState` pushes it into R3D **by ref** (`SetEnvironmentEx(updater)`) every viewport draw so Scene-inspector / asset-editor edits show immediately. Do not copy `GetEnvironmentEx()` then `SetEnvironmentEx(struct)` — nested Background/Fog/Bloom/SSAO fields did not stick. `TRef.Get()` re-resolves `path` so picking a different environment cannot keep a stale `loaded`. Inspector expands the asset like `C2_AssetSlot` (inline unique via **Inline**). |
+| `environment` | ImpVar `TRef<A_Environment>` (default `ENVI_DAY`). Shared lighting/sky/fog/tonemap/bloom/SSAO. `ApplyRenderState` pushes it into R3D **by ref** (`SetEnvironmentEx(updater)`) every viewport draw so Scene-inspector / asset-editor edits show immediately. Do not copy `GetEnvironmentEx()` then `SetEnvironmentEx(struct)` — nested Background/Fog/Bloom/SSAO fields did not stick. `TRef.Get()` re-resolves `path` so picking a different environment cannot keep a stale `loaded`. Inspector expands the asset like `C2_AssetSlot` (inline unique via **Inline**). Sky: `A_Environment.sky_texture` is `A_TextureHDR`. `.hdr` / `.exr` import through `File_HDR` (`EFileType.Texture`, default asset `A_TextureHDR`) — without that parser `Import<A_TextureHDR>` returned null, so `ENVI_DAY` / `ENVI_NIGHT` / `ENVI_MORNING` / `ENVI_EVENING` had no panorama (`SKY_DAY_1` = `sky_1.hdr`, `SKY_DAY_2` = `sky_2.hdr`). Cubemap + IBL probe live on `A_TextureHDR` (`Cubemap_Ensure` from `source_file`, lazy after `R3D.Init`). `ApplyRenderState` binds that cubemap; it does **not** own/unload it. **Sun is a process-wide R3D dir light** (`static` on `ImpScene`) — R3D's registry is global, so a per-scene handle left the editor host's sun enabled next to the play scene's and the Game/Scene views rendered ~2× bright vs standalone. Sun shadows: `sun_shadow_range` is the **camera-far used to fit the dir ortho** (not a world radius) — 20 m default; 40+ makes huge texels. `sun_shadow_softness` is PCF in texels (1.5). `sun_shadow_depth_bias` / `sun_shadow_slope_bias` are NDC; R3D's 0.001 on a ~150 m dir far-plane is ~15 cm of peter-panning (defaults 0.0001 / 0.0002). Softness/bias applied **after** `EnableShadow`. Update mode is Continuous so the texel-snapped frustum follows the camera. `C3_Mesh` with `cast_shadows` uses `ShadowCastMode.OnBackSide` so the ground does not self-shadow and contact can sit on the mesh. |
 
 Ctor always creates a bound default root. Replacing root is how the editor boots (`ImpScene.current.root = new Scene_Editor()`).
 
 `root` is **not** ImpVar. File_JSON special-cases ImpScene: `vars.root` is `{ _class, name, vars, children }` via `Comp_ToJson` / `Comp_FromJson`. Comp vars are ImpVar fields (skips `name` — stored at the node). Comp class from `ImpComp.Type_FromName`. ImpComp-typed ImpVar fields (object refs like `look_target`, or `ImpScene.starting_camera`) serialize as `{ "comp_path": "Name#occurrence/Name#occurrence/…" }` — a name+occurrence chain from the tree root, resolved back to the same node on load (deferred until the whole tree exists, so forward references across branches work). Root-relative, so a ref pointing outside the tree being written silently becomes `null`.
 
-**SceneDrop** — `Instantiate()` of this asset (packed instance, not a flattened copy). Ghost on `view.overlay`. Viewport drop parents the instance under `scene.root` (not the mesh under the cursor — Ground would always win). Outliner drop of a `Type` still parents under that row. Undo via `ImpUndo.Comp_Moved`. Selection after drop is `PNL_SceneView`.
+**SceneDrop** — `Instantiate()` of this asset (packed instance, not a flattened copy). Ghost on `view.overlay`. Viewport drop parents the instance under `scene.root` (not the mesh under the cursor — Ground would always win). Outliner drop of a `Type` still parents under that row. Undo via `ImpUndo.Comp_Moved`. Selection after drop is `PNL_SceneView`. `WouldCycleInto(dest)` refuses A-into-A and A-into-B when A already instances B (transitively via packed roots); Enter skips the ghost, DropOnComp no-ops.
 
 Test asset: `Projects/Test/Content/Scenes/boxes_3.ImpScene` — root `Boxes3` (`ImpComp3D` group pivot) + `Box_A/B/C` (`C3_Mesh` / `GEO_CUBE`) at x = -2, 0, 2.
 
@@ -200,6 +213,33 @@ JSON-backed asset. Cache keyed by resolved full path. Builtins are `builtin:Type
 - `File_IsValid` — path exists on disk (or builtin). `File_CanWrite` — real disk path, not builtin / not untitled.
 - `File_Write` writes in place and binds `_loaded`. `File_SaveTo(path)` rekeys the cache then writes (Save As).
 - `SaveAllDirty` writes cached dirty assets that already `File_CanWrite`. Untitled ones need `DLG_SaveFile`.
+
+## Class-specific asset editors (`WND_Asset` / `EdAssetEditor`)
+
+`EdAssetEditor.Create(asset)` picks a subclass. Unknown types stay inspector-only (`Rebuild` = one `C2_Inspector` filling the tab). Known types call `Layout_Split`: inspector on the left (280px, `size_min` 180, draggable `C2_Seperator`), extra pane on the right (`TLayout2.FULL`).
+
+| Asset | Editor | Extra pane |
+|---|---|---|
+| `A_Texture` (incl. HDR) | `EdAssetEditor_Texture` | `EdAssetPreview_Texture`: checkerboard, `ui_layout`, live `pixel_format` conversion (GPU copy, does not mutate the asset texture), HSB shader (`hue` degrees add, `saturation` / `brightness` multiply). Identity sat/brightness is **1**. |
+| `A_Mesh` | `EdAssetEditor_Mesh` | `EdAssetPreview_3D`: `C2_Viewport3D` of a `C3_Mesh` bound to the asset (empty overrides → asset materials, same as a scene drop). `ENVI_DAY`. LMB orbit, MMB pan, wheel zoom. |
+| `A_Material` | `EdAssetEditor_Material` | Same 3D preview with the material as a `C3_Mesh.materials` override. Toolbar `C2_EnumOption` (`EMaterialPreviewMesh`: Sphere / Cube / Plane) swaps `GEO_SPHERE` / `GEO_CUBE` / `GEO_PLANE`. |
+
+`EdAssetPreview_3D` is a detached `ImpScene` (never `is_running`, physics off). `ApplyRenderState` uses that scene so the sky/sun match. Frame fits the mesh AABB. Previews are `IsVisibleInTree()`-gated so a hidden Assets tab does not steal camera input from Scene.
+
+`A_Mesh.GEO_SPHERE` — `R3D.GenMeshSphere(0.5, 32, 48)`, `builtin:A_Mesh.GEO_SPHERE`, proto-tile default like cube/plane.
+
+## ImpFile (`Engine/ImpFile.cs`) / Create Asset
+
+Source files (png/glb/hdr/ttf/…). Cache keyed by resolved full path. Parser from extension (`File_PNG`, `File_GLB`, `File_HDR`, …).
+
+- `source_file` on an ImpAsset points here. Many assets can share one ImpFile.
+- `Reimport` loads GPU resources. Models use `LoadModelEx(RetainMeshNames)` and pull unique non-default material textures into `src_textures`.
+- `Editor_ListCreateableAssets` — what the Create Asset dialog can write. Default: one offer of `default_asset_type` named after the file. `File_GLB` lists the whole model as `A_Mesh`, embedded textures as `A_Texture`, each `Mat_Object` (`material_1`…), a skeleton if skinned, and each clip as `A_Animation`. `Mat_Object.Source_OnReload` fills `commons` from `Model.Materials[source_index]`. `A_Mesh.Source_OnReload` uses a matching saved `Mat_Object` (same source file + index) when one exists, else an inline unique.
+- `Editor_WriteAsset(type, name, source_index)` writes next to the source (`name.ImpAsset`, `_1` / `_2` on collision), sets `source_file` + `source_index`, reimports, `Source_OnReload`, `File_Write`.
+- `Editor_CreateAsset()` is the silent path (folder **Import Sources as Assets**): first offer of `default_asset_type`.
+- File-browser **Create Asset** opens `DLG_CreateAssetFromFile` via `ImpFile.Editor_OnCreateAssetFromFile` (wired in `Scene_Editor`). Standalone with no callback writes the default silently.
+
+**`DLG_CreateAssetFromFile`** (`Editor/Dialog`): tree grouped by type (`A_Texture` → `texture_1`…, `A_Mesh` → the model, `A_Animation` → clip names). Checkbox on each leaf and on the type row (toggles every child of that type). All / None, search, rename the selected leaf. Create writes every checked offer and refreshes browsers. One asset → `Editor_OnOpenAsset`; several → just refresh.
 
 ## TTag / TTagSet (`Engine/Structs/ST_Tags.cs`)
 
@@ -311,7 +351,7 @@ Supported TOML values: bool / string / numbers / enum (name) / `Vector2-4` / `Co
 
 Default impls are empty. `ImpScene` instances the hierarchy. `A_Mesh` spawns a `C3_Mesh` on a 3D viewport. File-browser payload is a **path string** → `ImpAsset.Load`.
 
-`A_Mesh.GEO_CUBE` / `GEO_PLANE` set `filepath` to `builtin:A_Mesh.GEO_*` so they survive JSON. `A_CameraConfig.CAM_THIRDPERSON` / `CAM_FIRSTPERSON` / `CAM_TOPDOWN` same (`builtin:A_CameraConfig.CAM_*`).
+`A_Mesh.GEO_CUBE` / `GEO_PLANE` / `GEO_SPHERE` set `filepath` to `builtin:A_Mesh.GEO_*` so they survive JSON. `A_CameraConfig.CAM_THIRDPERSON` / `CAM_FIRSTPERSON` / `CAM_TOPDOWN` same (`builtin:A_CameraConfig.CAM_*`).
 
 ## File_JSON (`Engine/Files/File_JSON.cs`)
 
@@ -343,9 +383,15 @@ Inner `tabs_view` pages: **Scene** (`view_root` — toolbar + 3D/2D viewports), 
 
 Play binds PIE into Game and selects that tab.
 
+`ImpApp` window 3D (`R3D.Begin` / `ApplyRenderState` / `Draw(…, 0)`) runs only for a **standalone** running scene. Host editor chrome (`root` type name `Scene_Editor`) is `is_running` so UI ticks, but 3D is `C2_Viewport3D` only — a window pass stacked a second sun and drew empty sky behind the editor.
+
+**R3D internal resolution.** `R3D.Init` / `SetResolution` size the deferred framebuffer. `R3D.End` nearest-upscales into the window (or the viewport RT) when that target is larger — maximize looked like blocky pixels because Init used `GetScreenWidth` (logical, pre-`MaximizeWindow`) and never resized. `Imp3D.Resolution_Track` records the Init size; `Resolution_Sync(w,h)` calls `SetResolution` only when it changes (realloc stalls). Standalone: Init + each window-3D pass use `GetRenderWidth/Height` (HiDPI framebuffer). `C2_Viewport3D` syncs to its RT before `BeginPro`.
+
 ## PNL_GameView (`Editor/Panel/PNL_GameView.cs`)
 
 Play-in-Editor tab (`EdPanel`, tab name `Game`) inside `PNL_SceneView.tabs_view`. Owns `C2_GameView`. `Play(game, cam3)` binds the session and focuses the widget; `Stop()` unbinds. The play scene ticks from `C2_GameView.OnUpdate` even while the Game tab is hidden (`ImpComp.Update` does not skip `is_visible`). Draw only happens on the selected tab.
+
+PIE HUD (`C2_Viewport2D` with `clear_background`/`draw_canvas` off) layouts against the **Game tab size** (same as standalone vs the window), camera zoom 1, and `SceneDraw_Begin(cam, view, dim.position)` so view-local coords land in the tab. Letterboxing a 1920×1080 canvas into the tab, or drawing at window origin, put the HUD in the wrong place relative to the 3D blit.
 
 ## PNL_ScriptGraph (`Editor/Panel/PNL_ScriptGraph.cs`)
 
@@ -477,6 +523,7 @@ Chrome (`C2_DialogHost` / `C2_DialogShade`) is hidden. The panel is a later sibl
 | `DLG_ChooseComp` | `Run(on_picked, title?)` |
 | `DLG_ConfirmDelete` | `Run(message, on_yes, on_no?)` — Confirm with Delete / Cancel |
 | `DLG_NewScene` / `DLG_NewAsset` | `Run(folder?)` |
+| `DLG_CreateAssetFromFile` | `Run(ImpFile)` — pick resources inside a source file |
 | `DLG_SaveFile` | `Run(asset, on_save, folder?)` |
 
 `Dialog_ClassPicker` hosts `C2_Tree.Tree_Populate_FromClasses` plus a search bar (`Tree_FilterClasses`). Scene tree rows use `C2_Tree.Class_Icon`. `DLG_ChooseComp` roots at `typeof(ImpComp)` and lists every concrete descendant. Skips the Editor assembly. `[ImpClass(Hidden = true)]` on a type hides it **and** every subclass (`C2_Tree.Class_IsHidden` walks bases). Labels strip `C1_` / `C2_` / `C3_` (`Class_DisplayName`). Icons autoload `{engine}/Icons/type/{Name}.png` then `Icons/Types/`, walking bases, then `ICO_COMP*`. Abstract classes stay in the tree as grey `is_disabled` rows (grouping only — click expands, no select/confirm). Confirm via OK or double-click. Shade / Cancel closes. Inspector `TClass<T>` rows open this with `allow_none: true` (a **None** row at the top) and pre-select the current type — do not use the old `C2_Picker` dropdown.
@@ -552,7 +599,7 @@ Do **not** try AssemblyLoadContext or a second process for PIE. Shared GPU asset
 
 Dumb display widgets. Each takes `view_scene` and/or `root` (root wins) plus optional `overlay` (drop ghost, not in the tree). Do **not** name the viewed scene `scene` — that hides `ImpComp.scene` (the editor chrome tree). `transpose_traces` (default true) remaps mouse picks through the widget camera / rect (`Trace_Ray` / `Trace_Pick` / `Trace_World`). Standalone default `cursor_filter = Hit`. Editor sets `Pass` so `PNL_SceneView` receives clicks.
 
-- 3D: R3D into a render texture, blit. Camera is on the widget (`camera`); editor writes it. Optional `view_camera` (`Imp3D`, e.g. `C3_Camera`) overrides that with `Camera_GetData()` for draw and traces — PIE Game view sets this from `ImpScene.starting_camera`.
+- 3D: R3D into a render texture, blit. `Imp3D.Resolution_Sync` to the RT size before `BeginPro` so a maximized Game/Scene panel is not an upscale of the Init framebuffer. Camera is on the widget (`camera`); editor writes it. Optional `view_camera` (`Imp3D`, e.g. `C3_Camera`) overrides that with `Camera_GetData()` for draw and traces — PIE Game view sets this from `ImpScene.starting_camera`.
 - 2D: canvas fill + `SceneLayout_Set` / `SceneDraw_*` of 2D comps. `clear_background` / `draw_canvas` (default true) — Game view turns both off so 2D HUD composites over the 3D blit.
 - `draw_flags`: forwarded into `src.Draw` / `overlay.Draw`. Scene view sets `Editor`; Game view leaves `None` so play does not draw editor helpers.
 
@@ -603,6 +650,7 @@ Inspects `[ImpVar]` fields/properties on the selected object(s). Categories are 
 - Target may be a `Type` (`InspectType`): inspect that type's members instead of `System.Type`. `TPropertyBind.Member` binds statics via `GetValue(null)` / `SetValue(null, …)` and pulls revert defaults from `ImpConfig.Default_TryGet`.
 - Comp inspector: pinned **Components** pane above the vars (`C2_Expandable` + `C2_Tree` + `C2_Seperator`). Independent scroll and splitter; stays visible while vars scroll. `Tree_Populate_Components` only when the outliner host changes — clicking a row is `Tree_SelectData` + property rebuild so the pane scroll does not jump to the top. `on_component_click` retargets vars / gizmo. Host is `ImpComp.OutlinerHost`. No reorder. Hidden when the host has no owned/instance kids. Scene / asset / config inspectors never show it.
 - `[ImpVar]` fields whose type is `ImpComp` (or a subclass — `C3_Camera.look_target`, `C1_Creature.creature_root`, …) use `C2_Picker`. Click opens `Dialog_CompPicker` on the inspected comp’s `scene` (the edited level, not editor chrome). Accepted types only; instance natives / packed-foreign rows are yellow (`C2_Tree.COLOR_INSTANCE`). Clear × sets null. These ImpVars are **object refs**, not owned natives — `OwnedFields` skips `[ImpVar]` ImpComp slots. Round-trips through save/reload via `File_JSON`'s `comp_path` scheme (see File_JSON section) — same mechanism whether the field lives on a comp in the tree or on the `ImpScene` asset itself.
+- **Collections** (`C2_CollectionEdit`): `List<T>`, `T[]` (1D), and `Dictionary<TKey,TValue>` get an expandable header (`Name (N)` + Add / Clear) and per-item rows (index or Key/Value + ×). Add/remove/clear clone the container then `Value_Set` so undo restores the previous instance. Element edits bind by index / key and reuse the normal property widgets (asset slots, enums, nested structs, nested collections). `TLabel` dict keys edit as text. Enum dicts hide Add once every value is used. `Span<T>` / `ReadOnlySpan<T>` cannot be boxed through `TPropertyBind`, so those rows stay a read-only `(span)` label — store a `List<T>` or `T[]` to edit.
 
 ## C2_TabBox (`Engine/Comps/2D/C2_TabBox.cs`)
 
