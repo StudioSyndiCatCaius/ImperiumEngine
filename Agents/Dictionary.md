@@ -50,20 +50,43 @@ Runtime (not ImpVar): `velocity`, `is_grounded`.
 
 ### C3_Camera / A_CameraConfig
 
-All lens / look / input flags live on `A_CameraConfig` (`Engine/Assets/A_CameraConfig.cs`, ext `ImpCameraConfig`). The comp holds `config` (inline unique by default) and `look_target`. Eye = pivot minus local forward (`-Z`) × `boom_distance`. `Camera_GetData` uses config fov / `ECameraViewMode` (ortho fovy = vertical world size).
+All lens / look / input flags live on `A_CameraConfig` (`Engine/Assets/A_CameraConfig.cs`, ext `ImpCameraConfig`). The comp holds `config` (inline unique by default) and `look_target`. Eye = pivot minus local forward (`-Z`) × `boom_distance`. `boom_uses_collision` (on by default on `CAM_THIRDPERSON`) raycasts that boom against world bodies and shortens it so the eye sits 15 cm in front of the hit. The pawn and its descendants are skipped (`ImpPhys.Trace_Line` walks past rejected hits). `Camera_GetData` uses config fov / `ECameraViewMode` (ortho fovy = vertical world size).
 
-Runtime: if this is `ImpApp.view_target`, apply `starting_rotation` once. `look_target` aims the pivot at that node (yaw/pitch from Δ, converted to local if parented). Camera does **not** claim `input_owner` itself — the game mode / possess path assigns it. `_Rotate` (mouse + right stick) yaws/pitches `_aim` when no look target; `look_lerp` slerps toward it. Stick axes (|axis| ≤ 2) are analog (`180 * dt`). Pitch clamped ±89.9°. `enable_move`: `_Move` → `player.pawn.Phys_MoveByRot` (yaw only, remap `(Z, Y, -X)`); `_Jump` → `player.pawn.Phys_Launch` if grounded. Null pawn is a no-op.
+Runtime: if this is `ImpApp.view_target`, apply `starting_rotation` once, then snap the pivot to the first player's pawn (capsule center when the pawn is a `C3_Collider`) so the boom stays behind the character without inheriting pawn yaw. `look_target` aims the pivot at that node (yaw/pitch from Δ, converted to local if parented). Camera does **not** claim `input_owner` itself — the game mode / possess path assigns it (`sys_Explore` forwards input). `_Rotate` (mouse + right stick) yaws/pitches `_aim` when no look target; yaw subtracts mouse X (mouse right looks right); pitch subtracts mouse Y (mouse down looks down); `look_lerp` slerps toward it. Stick axes (|axis| ≤ 2) are analog (`180 * dt`). Pitch clamped ±89.9°. `enable_move`: `_Move` → `player.pawn.Phys_MoveByRot` (yaw only, remap `(Z, Y, -X)`); `_Jump` → `player.pawn.Phys_Launch` if grounded. Null pawn is a no-op.
 
 Builtins (filepath `builtin:A_CameraConfig.CAM_*`):
 
 | Preset | Lens | Boom | Start rot | Input |
 |---|---|---|---|---|
-| `CAM_THIRDPERSON` | persp 70 | 4 m | pitch -15 | move + look HV |
+| `CAM_THIRDPERSON` | persp 70 | 4 m, collision | pitch -15 | move + look HV |
 | `CAM_FIRSTPERSON` | persp 90 | 0 | 0 | move + look HV |
 | `CAM_TOPDOWN` | ortho 18 m | 20 m | pitch -90 | move only |
 
-Do not assign a builtin as the default `config` field — share-mutates the preset. Pick it in the asset slot, or leave the inline unique.
+Do not assign a builtin as the default `config` field — share-mutates the preset. Pick it in the asset slot, or leave the inline unique. `GM_Gameplay` clones `CAM_THIRDPERSON` onto `default_camera_config` and onto each spawned camera.
 
+## Gameplay framework (`C1_GameMode` / `C1_GameSystem`)
+
+`ImpGame.game_mode` is the live session mode. `ImpScene.RBegin` calls `ImpGame.GameMode_Ensure()` before `root.OnBegin`. Host editor chrome (`root` type name `Scene_Editor`) is skipped. PIE / standalone spawn `ImpGame.default_game_mode` (config, default `GM_Gameplay`) under the scene root, or reuse an authored `C1_GameMode` already in the tree. `REnd` / `Play_Stop` null the pointer.
+
+**`C1_GameMode.OnBegin`**
+1. For each `ImpPlayer`: instantiate `default_pawn` (`C3_Character`), place at `C3_PlayerStart` (transit link to `scene_previous` first, else first start matching player index), `Child_Add` + `OnBegin` (physics). Instantiate `default_camera` (`C3_Camera`), clone `default_camera_config` onto it (never share a builtin), set `scene.starting_camera` + `ImpApp.view_target`.
+2. Activate `systems_preload`.
+3. Activate `system_load` with a finished-callback, or run the callback immediately if unset.
+4. Callback: activate `systems_postload` then `systems_persistent`. `GM_Gameplay` puts `sys_Explore` on persistent, so explore starts once the mode has loaded.
+
+`OnUpdate` re-activates `systems_persistent` every `persistent_system_frequency` (0.2s). A blocking system that shuts down also calls `Persistent_TryActivate` immediately so explore comes back the same frame pause closes.
+
+**`C1_GameSystem`**
+- `Activate(TClass, on_shutdown)` — `CreateInstance`, refuse if that type is already active or an active system's `blocked_systems` matches this instance's `system_tags`. Register on `active_states` **before** shutting down blocked systems, then `Child_Add` + `OnBegin`. Empty/null class fires `on_shutdown` and returns (used as “no load screen”).
+- `blocked_systems` — `ShutdownByTags` destroys every active system whose `system_tags` match. Those types cannot `Activate` while the blocker lives.
+- `OnDestroy` removes from `active_states`, fires `on_shutdown`, then `Persistent_TryActivate` if the scene is still running. `Shutdown` is just `Destroy` of the active instance.
+
+| System | Tags | Input |
+|---|---|---|
+| `sys_Explore` | `System.Explore` | Claims player 0, hides/locks the cursor (`DisableCursor`). Forwards `_Move` / `_Rotate` / `_Jump` to `ImpApp.view_target`. `_Pause` (Escape) activates `sys_Pause`. OnEnd/OnDestroy shows the cursor again. |
+| `sys_Pause` | `System.Pause`, blocks `System.Explore` | Claims player 0. `_Pause` (Escape) `Destroy`s itself (explore was shut down + blocked while open; persistent resume restarts it). |
+
+`C3_PlayerStart.GetFirst(scene, player_index)` walks the live tree (exact index, else first any). `GetFirstOfSceneLink` finds a start whose `linked_scene` matches the previous scene (transit).
 
 ## ImpComp (`Engine/ImpComp.cs`)
 
@@ -523,7 +546,7 @@ Not covered: PIE comps are not cursor targets (`Update_Cursor` traces only the e
 
 `A_Texture.ICO_STOP` = `{engine}/Icons/ico_editor_stop.png` (same mint as play).
 
-Do **not** try AssemblyLoadContext or a second process for PIE. Shared GPU assets stay on `ImpAsset` cache. Physics is already per-game (`ImpGame.phys`). Per-game later: `C1_GameMode.current`, transit, play-local players.
+Do **not** try AssemblyLoadContext or a second process for PIE. Shared GPU assets stay on `ImpAsset` cache. Physics is already per-game (`ImpGame.phys`). Game mode is per-`ImpGame` (`game_mode` / `GameMode_Ensure`). Still later: transit, play-local players.
 
 ## C2_Viewport3D / C2_Viewport2D (`Engine/Comps/2D/`)
 

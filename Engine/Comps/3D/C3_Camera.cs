@@ -1,6 +1,7 @@
 ﻿using System.Numerics;
 using ImperiumEngine;
 using ImperiumEngine.Assets;
+using ImperiumEngine.Enums;
 using ImperiumEngine.Structs;
 using R3D_cs;
 using Raylib_cs;
@@ -36,7 +37,78 @@ public class C3_Camera : Imp3D
         {
             Quaternion rot = ImpMath.Euler_2_Quat(w.rotation);
             Vector3 forward = Vector3.Transform(-Vector3.UnitZ, rot);
-            w.position = w.position - forward * boom;
+            Vector3 pivot = w.position;
+            if (cfg.boom_uses_collision)
+            {
+                Imp3D pawn = null;
+                for (int i = 0; i < ImpPlayer.players.Count; i++)
+                {
+                    if (ImpPlayer.players[i].pawn != null)
+                    {
+                        pawn = ImpPlayer.players[i].pawn;
+                        break;
+                    }
+                }
+                float skin = 0.15f;
+                float start_d = 0.05f;
+                if (pawn is C3_Collider col)
+                {
+                    float rad = col.extents.X;
+                    if (col.extents.Z > rad)
+                    {
+                        rad = col.extents.Z;
+                    }
+                    start_d = rad + 0.05f;
+                }
+                if (start_d >= boom)
+                {
+                    start_d = boom * 0.25f;
+                }
+                Vector3 ray_start = pivot - forward * start_d;
+                Vector3 ray_end = pivot - forward * boom;
+                ImpPhys phys = null;
+                if (game_owner != null)
+                {
+                    phys = game_owner.phys;
+                }
+                TTraceResult3D hit;
+                if (phys != null)
+                {
+                    hit = phys.Trace_Line(ray_start, ray_end, ECollisionChannel.World, c =>
+                    {
+                        if (c == null)
+                        {
+                            return true;
+                        }
+                        if (c == this || c == pawn)
+                        {
+                            return false;
+                        }
+                        if (pawn != null && c.IsDescendantOf(pawn))
+                        {
+                            return false;
+                        }
+                        return true;
+                    });
+                }
+                else
+                {
+                    hit = default;
+                }
+                if (hit.hit)
+                {
+                    float dist = Vector3.Distance(pivot, hit.hit_position) - skin;
+                    if (dist < 0.05f)
+                    {
+                        dist = 0.05f;
+                    }
+                    if (dist < boom)
+                    {
+                        boom = dist;
+                    }
+                }
+            }
+            w.position = pivot - forward * boom;
         }
         return w;
     }
@@ -62,6 +134,31 @@ public class C3_Camera : Imp3D
         if (!is_view)
         {
             _start_applied = false;
+        }
+
+        if (is_view)
+        {
+            Imp3D pawn = null;
+            for (int i = 0; i < ImpPlayer.players.Count; i++)
+            {
+                if (ImpPlayer.players[i].pawn != null)
+                {
+                    pawn = ImpPlayer.players[i].pawn;
+                    break;
+                }
+            }
+            if (pawn != null)
+            {
+                Vector3 pos = pawn.Position_Get(true);
+                if (pawn is C3_Collider col)
+                {
+                    col.Shape_Local(out _, out Vector3 center);
+                    TTransform3 pw = pawn.Transform_Get(true);
+                    Quaternion q = ImpMath.Euler_2_Quat(pw.rotation);
+                    pos = pos + Vector3.Transform(center * pw.scale, q);
+                }
+                Position_Set(pos, true);
+            }
         }
 
         if (look_target != null)
@@ -134,7 +231,7 @@ public class C3_Camera : Imp3D
             }
             if (cfg.enable_rotate_H)
             {
-                _aim.Y += axis.Y * scale;
+                _aim.Y -= axis.Y * scale;
             }
             if (cfg.enable_rotate_V)
             {

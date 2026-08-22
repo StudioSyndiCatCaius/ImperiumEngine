@@ -14,6 +14,7 @@ public class A_CameraConfig : ImpAsset
     [ImpVar][Category("Camera")] public double fov = 60;
     [ImpVar][Category("Camera")] public ECameraViewMode view_mode = ECameraViewMode.Perspective;
     [ImpVar][Category("Camera")] public double boom_distance;
+    [ImpVar][Category("Camera")] public bool boom_uses_collision;
     [ImpVar][Category("Camera")] public Vector3 starting_rotation;
 
     [ImpVar][Category("Look")] public double look_lerp = 0.5;
@@ -33,6 +34,7 @@ public class A_CameraConfig : ImpAsset
         fov = 70,
         view_mode = ECameraViewMode.Perspective,
         boom_distance = 4,
+        boom_uses_collision = true,
         starting_rotation = new Vector3(-15f, 0f, 0f),
         look_lerp = 0.5,
         look_speed = 0.2,

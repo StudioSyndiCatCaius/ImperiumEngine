@@ -1,4 +1,4 @@
-saved_at = "2026-08-21T23:20:26.9815253Z"
+saved_at = "2026-08-22T00:28:22.6176126Z"
 
 [window]
 main_tab = "Scene"
@@ -28,17 +28,17 @@ expanded = ["{game}", "{game}/Assets", "{game}/Assets/Textures", "{game}/Assets/
 
 [[open_scenes]]
 path = "{game}/Scenes/lvl_test.ImpScene"
-edit_mode = "Mode_2D"
+edit_mode = "Mode_3D"
 gizmo_mode = "Translate"
 gizmo_space = "Local"
 snap_translate = 0.25
 snap_translate_2d = 8
-cam3_position = [-6.74940395, 3.93349957, 4.81212425]
-cam3_target = [2.15225315, 0.150784731, -1.26664019]
+cam3_position = [-3.00906682, 3.33378911, -5.98407698]
+cam3_target = [-0.347383738, -0.834439039, 4.31355047]
 cam3_fovy = 50
 cam2_position = [688.675354, 435.595001]
 cam2_zoom = 0.696199715
-selected = ["Panel"]
+selected = ["PlayerStart"]
 
 [[open_flows]]
 path = "{game}/Assets/Dialoges/d_test.ImpFlow"

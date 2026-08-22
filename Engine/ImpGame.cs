@@ -1,5 +1,6 @@
 using ImperiumEngine.Assets.Flow;
 using ImperiumEngine.Comps._1D;
+using ImperiumEngine.Comps._1D.Modes;
 using ImperiumEngine.Structs;
 
 namespace ImperiumEngine;
@@ -15,7 +16,7 @@ public class ImpGame
     // #################################################################################
     
     [Category("Game")][ImpVar][Config] public static TRef<ImpScene> starting_scene;
-    [Category("Game")][ImpVar][Config] public static TClass<C1_GameMode> default_game_mode;
+    [Category("Game")][ImpVar][Config] public static TClass<C1_GameMode> default_game_mode = new(typeof(GM_Gameplay));
     
     [Category("Save")][ImpVar][Config] public static TRef<Save_Game> save_game_type;
     [Category("Save")][ImpVar][Config] public static string save_game_prefex="save_";
@@ -30,6 +31,58 @@ public class ImpGame
 
     public C1_GameMode game_mode;
     public ImpPhys phys;
+
+    public void GameMode_Ensure()
+    {
+        if (scene == null || scene.root == null)
+        {
+            return;
+        }
+        if (id == ID_HOST && scene.root.GetType().Name == "Scene_Editor")
+        {
+            return;
+        }
+        if (game_mode != null)
+        {
+            return;
+        }
+
+        C1_GameMode found = null;
+        void Walk(ImpComp n)
+        {
+            if (found != null || n == null)
+            {
+                return;
+            }
+            if (n is C1_GameMode m)
+            {
+                found = m;
+                return;
+            }
+            for (int i = 0; i < n.children.Count; i++)
+            {
+                Walk(n.children[i]);
+            }
+        }
+        Walk(scene.root);
+        if (found != null)
+        {
+            game_mode = found;
+            return;
+        }
+
+        Type t = default_game_mode.Get();
+        if (t == null || t.IsAbstract || !typeof(C1_GameMode).IsAssignableFrom(t))
+        {
+            t = typeof(GM_Gameplay);
+        }
+        game_mode = Activator.CreateInstance(t) as C1_GameMode;
+        if (game_mode == null)
+        {
+            return;
+        }
+        scene.root.Child_Add(game_mode);
+    }
 
     public ImpPhys Phys_Get()
     {
@@ -115,6 +168,7 @@ public class ImpGame
             {
                 ImpPlayer.players[i].target_game = null;
             }
+            ImpPlayer.players[i].pawn = null;
         }
         if (current == dying)
         {
@@ -134,6 +188,7 @@ public class ImpGame
                 s.root.Destroy();
             }
             dying.Phys_Dispose();
+            dying.game_mode = null;
             Bind(prev ?? Get(ID_HOST));
         }
         _games[ID_PLAY] = null;

@@ -342,30 +342,44 @@ public class ImpPhys
         {
             return result;
         }
-        Vector3 delta = end - start;
-        float len = delta.Length();
-        if (len < 1e-6f)
+        Vector3 cur = start;
+        Vector3 full_end = end;
+        for (int step = 0; step < 8; step++)
         {
+            Vector3 delta = full_end - cur;
+            float len = delta.Length();
+            if (len < 1e-6f)
+            {
+                return result;
+            }
+            JoltPhysicsSharp.Ray ray = new(cur, delta);
+            if (!_system.NarrowPhaseQuery.CastRay(ray, out RayCastResult hit))
+            {
+                return result;
+            }
+            Imp3D hit_comp = null;
+            if (_body_to_comp.TryGetValue(hit.BodyID.ID, out Imp3D mapped))
+            {
+                hit_comp = mapped;
+            }
+            Vector3 hit_pos = cur + delta * hit.Fraction;
+            if (filter != null && (hit_comp == null || !filter(hit_comp)))
+            {
+                Vector3 dir = delta / len;
+                Vector3 next = hit_pos + dir * 0.02f;
+                if (Vector3.Dot(next - cur, delta) <= 0f)
+                {
+                    return result;
+                }
+                cur = next;
+                continue;
+            }
+            result.hit = true;
+            result.hit_comp = hit_comp;
+            result.hit_position = hit_pos;
+            result.hit_normal = Vector3.Zero;
             return result;
         }
-        JoltPhysicsSharp.Ray ray = new(start, delta);
-        if (!_system.NarrowPhaseQuery.CastRay(ray, out RayCastResult hit))
-        {
-            return result;
-        }
-        Imp3D hit_comp = null;
-        if (_body_to_comp.TryGetValue(hit.BodyID.ID, out Imp3D mapped))
-        {
-            hit_comp = mapped;
-        }
-        if (filter != null && (hit_comp == null || !filter(hit_comp)))
-        {
-            return result;
-        }
-        result.hit = true;
-        result.hit_comp = hit_comp;
-        result.hit_position = start + delta * hit.Fraction;
-        result.hit_normal = Vector3.Zero;
         return result;
     }
 }

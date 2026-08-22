@@ -343,6 +343,10 @@ public class ImpScene : ImpAsset
 
     public void RBegin()
     {
+        if (_game != null)
+        {
+            _game.GameMode_Ensure();
+        }
         root.OnBegin();
 
         ImpApp.view_target = starting_camera;
@@ -380,6 +384,7 @@ public class ImpScene : ImpAsset
         if (_game != null)
         {
             _game.Phys_Dispose();
+            _game.game_mode = null;
         }
     }
 

@@ -11,7 +11,7 @@ public class C3_Character : C3_Collider
     public C3_Mesh mesh=new()
     {
         mesh = A_Mesh.SK_MANNEQUIN,
-        transform={rotation = new(0, 0, 0)}
+        transform={rotation = new(0, 180, 0)}
     };
     public C3_Skeleton skeleton=new();
     public C1_Creature creature=new();

@@ -385,7 +385,10 @@ public class PNL_SceneView : C2_Box
         }
         if (ImpPlayer.Key_IsPressed(EInputKey.Key_Escape))
         {
-            gizmo_data.Selection_Clear();
+            if (ImpPlayer.TargetGame_IsHost())
+            {
+                gizmo_data.Selection_Clear();
+            }
         }
         if (!IsCameraBusy && ImpPlayer.Key_IsPressed(EInputKey.Key_G))
         {
