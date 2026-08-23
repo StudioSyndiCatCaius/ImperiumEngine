@@ -1,5 +1,6 @@
 ﻿using ImperiumEngine.Assets.General;
 using ImperiumEngine.Enums;
+using ImperiumEngine.Interfaces;
 using ImperiumEngine.Structs;
 
 namespace ImperiumEngine.Comps._1D;
@@ -9,7 +10,9 @@ public class C1_Creature : ImpComp
 {
     [ImpVar] public Imp3D creature_root; // intended to be the rootmost comp of this scene.
     
+    private List<C1_Aura> _auras;
     private List<C1_Ability> _abilities;
+    public List<Object> _modifiers;
     public A_CreatureConfig config;
     public AG_Faction faction;
 
@@ -21,6 +24,30 @@ public class C1_Creature : ImpComp
     }
 
     // ---------------------------------------------------------------------------------
+    // Modifiers
+    // ---------------------------------------------------------------------------------
+    public void Modifier_Register(Object modifier, bool registered)
+    {
+        if(registered && !_modifiers.Contains(modifier) && modifier is I_Creature)
+        {
+            _modifiers.Add(modifier);
+        }
+        else if(!registered && _modifiers.Contains(modifier))
+        {
+            _modifiers.Remove(modifier);
+        }
+    }
+
+    public List<Object> Modifiers_GetAll()
+    {
+        List<Object> output=_modifiers;
+        output.Append(_abilities);
+        output.Append(_auras);
+        output.Append(Equipment_GetList());
+        return output;
+    }
+    
+    // ---------------------------------------------------------------------------------
     // Abilities
     // ---------------------------------------------------------------------------------
     
@@ -29,22 +56,62 @@ public class C1_Creature : ImpComp
 
     public void Ability_SetGranted(TClass<C1_Ability> ability, bool granted)
     {
-        
+        if (Ability_IsGranted(ability) != granted)
+        {
+            if (granted)
+            {
+                C1_Ability ab = null; // code to make ability
+                _abilities.Add(ab);
+            }
+            else
+            {
+                C1_Ability a = Ability_Get(ability);
+                _abilities.Remove(a);
+                a.Destroy();
+            }
+        }
+    }
+    
+    public bool Ability_IsGranted(TClass<C1_Ability> ability)
+    {
+        foreach (var a in _abilities)
+        {
+            if (a.GetType() == ability.Get())
+            {
+                return true;
+            }
+        }
+        return false;
     }
     
     public void Ability_Activate(TClass<C1_Ability> ability, object context)
     {
-        
+        C1_Ability a = Ability_Get(ability);
+        if (a != null)
+        {
+            a.Ability_Activate(context);
+        }
     }
     
-    public void Ability_Stop(TClass<C1_Ability> ability)
+    public C1_Ability Ability_Get(TClass<C1_Ability> ability)
     {
-        
-    }
-
-    public C1_Ability? Ability_Get(TClass<C1_Ability> ability)
-    {
+        foreach (var a in _abilities)
+        {
+            if (a.GetType() == ability.Get())
+            {
+                return a;
+            }
+        }
         return null;
+    }
+    
+    public void Ability_Stop(TClass<C1_Ability> ability, bool cancelled)
+    {
+        C1_Ability a = Ability_Get(ability);
+        if (a != null)
+        {
+            a.Ability_Stop(cancelled);
+        }
     }
     
     // ---------------------------------------------------------------------------------
@@ -54,7 +121,7 @@ public class C1_Creature : ImpComp
     //self, attribute, amount, instigator
     public Action<C1_Creature, AG_Attribute, float, C1_Creature> on_attribute_damage;
     
-    public void Attribute_Damage(AG_Attribute attribute, float amount, C1_Creature instigator)
+    public void Attribute_Damage(AG_Attribute attribute, float amount, C1_Creature instigator,AG_DamageType damageType)
     {
         
     }
@@ -72,6 +139,15 @@ public class C1_Creature : ImpComp
     public float Attribute_Get_Percent(AG_Attribute attribute)
     {
         return 0f;
+    }
+
+    public bool Attributes_HasMinimum(Dictionary<AG_Attribute, float> minimums)
+    {
+        foreach (var (attr, min) in minimums)
+        {
+            if(Attribute_Get_Current(attr) < min) { return false;}
+        }
+        return true;
     }
         
     // ---------------------------------------------------------------------------------
@@ -101,6 +177,11 @@ public class C1_Creature : ImpComp
     public ImpAsset Equipment_Get(ImpAsset slot)
     {
         return config.equipment.TryGetValue(slot, out ImpAsset item) ? item : null;
+    }
+
+    public List<ImpAsset> Equipment_GetList()
+    {
+        return config.equipment.Values.ToList();
     }
     
         
@@ -149,6 +230,63 @@ public class C1_Creature : ImpComp
     {
         return config.leveling.TryGetValue(level, out float xp) ? xp : 0f;
     }
+    
+    // ---------------------------------------------------------------------------------
+    // Aura
+    // ---------------------------------------------------------------------------------
+    public C1_Aura Aura_Add(TClass<C1_Aura> aura, C1_Creature instigator, object context)
+    {
+        return null;
+    }
+
+    public void Aura_Remove(C1_Aura aura)
+    {
+        if (_auras.Contains(aura))
+        {
+            _auras.Remove(aura);
+            aura.Destroy();
+        }
+    }
+    
+    public void Aura_Remove_OfClass(TClass<C1_Aura> aura, bool all=true)
+    {
+        foreach (var a in _auras)
+        {
+            if (a.GetType() == aura.Get())
+            {
+                Aura_Remove(a);
+            }
+        }
+    }
+
+    public void Aura_Remove_AllOfTag(TTagSet tags)
+    {
+        foreach (var a in _auras)
+        {
+            if (a.tags.HasAny(tags))
+            {
+                Aura_Remove(a);
+            }
+        }
+    }
+    
+    public bool Aura_Has_OfTag(TTag tag)
+    {
+        foreach (var a in _auras)
+        {
+            if(a.tags.HasTag(tag)) { return true;}
+        }
+        return false;
+    }
+    
+    public void Aura_Remove_All()
+    {
+        foreach (var a in _auras)
+        {
+            Aura_Remove(a);
+        }
+    }
+    
     
     // ---------------------------------------------------------------------------------
     // Faction
