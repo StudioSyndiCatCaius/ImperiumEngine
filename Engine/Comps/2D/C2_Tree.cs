@@ -267,6 +267,11 @@ public class C2_Tree : Imp2D
 
     public void Tree_Populate_FromClasses(Type type)
     {
+        Tree_Populate_FromClasses(type, null);
+    }
+
+    public void Tree_Populate_FromClasses(Type type, Func<Type, bool> include)
+    {
         _class_root = type;
         _class_query = "";
         _class_kids = new Dictionary<Type, List<Type>>();
@@ -280,20 +285,47 @@ public class C2_Tree : Imp2D
         List<Type> types = new();
         foreach (Assembly asm in AppDomain.CurrentDomain.GetAssemblies())
         {
-            if (IsEditorAssembly(asm)) continue;
+            if (IsEditorAssembly(asm))
+            {
+                continue;
+            }
             Type[] found;
-            try { found = asm.GetTypes(); }
-            catch (ReflectionTypeLoadException ex) { found = ex.Types.Where(t => t != null).ToArray()!; }
+            try
+            {
+                found = asm.GetTypes();
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                found = ex.Types.Where(t => t != null).ToArray()!;
+            }
             foreach (Type t in found)
             {
-                if (t == null || !t.IsClass || t.ContainsGenericParameters) continue;
-                if (!type.IsAssignableFrom(t)) continue;
-                if (Class_IsHidden(t)) continue;
+                if (t == null || !t.IsClass || t.ContainsGenericParameters)
+                {
+                    continue;
+                }
+                if (!type.IsAssignableFrom(t))
+                {
+                    continue;
+                }
+                if (Class_IsHidden(t))
+                {
+                    continue;
+                }
+                if (include != null && !include(t))
+                {
+                    continue;
+                }
                 types.Add(t);
             }
         }
         if (type.IsClass && !Class_IsHidden(type) && !IsEditorAssembly(type.Assembly) && !types.Contains(type))
-            types.Add(type);
+        {
+            if (include == null || include(type))
+            {
+                types.Add(type);
+            }
+        }
 
         Comparison<Type> by_name = (a, b) => string.Compare(Class_DisplayName(a), Class_DisplayName(b), StringComparison.OrdinalIgnoreCase);
         types.Sort(by_name);

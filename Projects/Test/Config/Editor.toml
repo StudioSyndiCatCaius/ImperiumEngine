@@ -1,47 +1,81 @@
-saved_at = "2026-08-22T04:55:12.2296697Z"
+saved_at = "2026-08-23T03:56:14.1508104Z"
 
 [window]
-main_tab = "Assets"
+main_tab = "Scene"
 play_mode = "PlayInEditor"
-inspector_tab = 0
+inspector_tab = 1
 outliner_tab = 0
-panel_width = 322
-browser_width = 341
+panel_width = 349
+browser_width = 293
 outliner_stretch = 0.410051554
 inspector_stretch = 0.589948416
 
 [tabs]
 active_scene = 0
-active_asset = 0
+active_asset = 1
 active_flow = 0
 
 [file_browser]
-current_dir = "{engine}/Meshes/Character/Mannequin"
+current_dir = "{engine}/Meshes/Nature"
 dir_tab = 1
 search = ""
-show_source_files = true
+show_source_files = false
 show_file_extensions = false
 show_engine_content = true
 row_height = 22
 settings_open = true
-expanded = ["{game}", "{game}/Assets", "{game}/Assets/Textures", "{game}/Assets/Modes", "{game}/Scenes/actors", "{game}/Scenes/roots", "{game}/Scenes/cameras", "{game}/Scenes", "{game}/Assets/Dialoges", "{engine}", "{engine}/Meshes/Character", "{engine}/Textures/HDRI", "{engine}/Textures/UI", "{engine}/Textures/Surface", "{engine}/Meshes/Nature", "{engine}/Meshes/Util", "{engine}/Scenes/PFB", "{engine}/Meshes/Character/Mannequin", "{engine}/Meshes"]
+expanded = ["{game}", "{game}/Assets", "{game}/Assets/Textures", "{game}/Assets/Modes", "{game}/Scenes/actors", "{game}/Scenes/roots", "{game}/Scenes/cameras", "{game}/Scenes", "{game}/Assets/Dialoges", "{engine}", "{engine}/Textures/Surface/Grass", "{engine}/Textures/HDRI", "{engine}/Textures/UI", "{engine}/Textures/Surface", "{engine}/Materials", "{engine}/Meshes/Util", "{engine}/Scenes/PFB", "{engine}/Meshes/Character/Mannequin", "{engine}/Scenes", "{engine}/Meshes", "{engine}/Textures/Surface/Rock", "{engine}/Textures", "{engine}/Materials/Surface", "{engine}/Meshes/Nature", "{engine}/Meshes/Character"]
 
 [[open_scenes]]
 path = "{game}/Scenes/lvl_test.ImpScene"
-edit_mode = "Mode_3D"
-gizmo_mode = "Translate"
+view_mode = "Mode_3D"
+scene_edit_mode = "Comps"
+gizmo_mode = "Scale"
 gizmo_space = "Local"
 snap_translate = 0.25
 snap_translate_2d = 8
-cam3_position = [-3.03494, 2.38755727, 4.04702854]
-cam3_target = [-9.56254673, -5.03274107, -24.5847569]
+cam3_position = [-2.96052074, 5.38849926, -9.70109844]
+cam3_target = [72.5220337, -53.0435486, 47.2560806]
 cam3_fovy = 50
-cam2_position = [453.584473, 202.48764]
-cam2_zoom = 1.1438781
+cam2_position = [653.081604, 341.108154]
+cam2_zoom = 0.589999557
 selected = []
+
+[[open_scenes]]
+path = "{engine}/Scenes/PFB/PFB_ed_trees_A.ImpScene"
+view_mode = "Mode_3D"
+scene_edit_mode = "Comps"
+gizmo_mode = "Rotate"
+gizmo_space = "Local"
+snap_translate = 0.25
+snap_translate_2d = 8
+cam3_position = [6.82614565, 5.84515381, 14.04142]
+cam3_target = [1.56450891, 3.0218637, 4.30262089]
+cam3_fovy = 50
+cam2_position = [960, 540]
+cam2_zoom = 0.5
+selected = []
+
+[[open_assets]]
+path = "{game}/m_s2_rock-grass.ImpMaterial"
+
+[[open_assets]]
+path = "{engine}/Meshes/Nature/sm_edtior_tree_a.ImpAsset"
 
 [[open_flows]]
 path = "{game}/Assets/Dialoges/d_test.ImpFlow"
+
+[[folder_colors]]
+path = "{engine}/Meshes"
+color = "132,219,132,255"
+
+[[folder_colors]]
+path = "{engine}/Scenes"
+color = "255,214,96,255"
+
+[[folder_colors]]
+path = "{engine}/Textures"
+color = "255,118,118,255"
 
 [[folder_colors]]
 path = "{game}/Assets/Textures"

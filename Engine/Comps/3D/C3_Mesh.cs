@@ -64,6 +64,107 @@ public class C3_Mesh : Imp3D
         {
             return new BoxShape(new Vector3(s.X * 0.5f, MathF.Max(0.02f, s.Y * 0.02f), s.Z * 0.5f));
         }
-        return new BoxShape(s * 0.5f);
+
+        Shape Box()
+        {
+            return new BoxShape(s * 0.5f);
+        }
+
+        Shape Convex_From(List<Vector3> src)
+        {
+            if (src == null || src.Count < 4)
+            {
+                return Box();
+            }
+            if (src.Count > 256)
+            {
+                return Box();
+            }
+            Vector3[] points = new Vector3[src.Count];
+            for (int i = 0; i < points.Length; i++)
+            {
+                Vector3 p = src[i];
+                points[i] = new Vector3(p.X * s.X, p.Y * s.Y, p.Z * s.Z);
+            }
+            try
+            {
+                ConvexHullShapeSettings hull = new(points);
+                Shape shape = hull.Create();
+                if (shape != null)
+                {
+                    return shape;
+                }
+            }
+            catch
+            {
+            }
+            return Box();
+        }
+
+        if (mesh == null)
+        {
+            return Box();
+        }
+        if (mesh.collision_type == EMeshCollision.Box)
+        {
+            return Box();
+        }
+        if (mesh.collision_type == EMeshCollision.Triangle && !movement_enabled)
+        {
+            List<Vector3> src_pts = mesh.collision_points;
+            if (src_pts != null && src_pts.Count >= 3)
+            {
+                Vector3[] verts = new Vector3[src_pts.Count];
+                for (int i = 0; i < verts.Length; i++)
+                {
+                    Vector3 p = src_pts[i];
+                    verts[i] = new Vector3(p.X * s.X, p.Y * s.Y, p.Z * s.Z);
+                }
+                List<uint> idx = mesh.collision_indices;
+                IndexedTriangle[] tris;
+                if (idx != null && idx.Count >= 3)
+                {
+                    int tri_n = idx.Count / 3;
+                    tris = new IndexedTriangle[tri_n];
+                    for (int t = 0; t < tri_n; t++)
+                    {
+                        tris[t] = new IndexedTriangle(idx[t * 3], idx[t * 3 + 1], idx[t * 3 + 2]);
+                    }
+                }
+                else
+                {
+                    int tri_n = verts.Length / 3;
+                    tris = new IndexedTriangle[tri_n];
+                    for (int t = 0; t < tri_n; t++)
+                    {
+                        int b = t * 3;
+                        tris[t] = new IndexedTriangle((uint)b, (uint)(b + 1), (uint)(b + 2));
+                    }
+                }
+                if (tris.Length > 0)
+                {
+                    try
+                    {
+                        MeshShapeSettings mesh_shape = new(verts, tris);
+                        mesh_shape.Sanitize();
+                        Shape created = mesh_shape.Create();
+                        if (created != null)
+                        {
+                            return created;
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+        }
+
+        List<Vector3> hull_src = mesh.collision_hull;
+        if (hull_src == null || hull_src.Count < 4)
+        {
+            hull_src = mesh.collision_points;
+        }
+        return Convex_From(hull_src);
     }
 }

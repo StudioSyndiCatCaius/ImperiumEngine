@@ -87,7 +87,7 @@ public class DLG_NewScene : Dialog_ClassPicker
             return;
         }
 
-        ImpComp root = Activator.CreateInstance(type) as ImpComp;
+        ImpComp root = ImpComp.Create(type);
         if (root == null)
         {
             stay_open = true;

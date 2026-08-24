@@ -116,7 +116,12 @@ public class TPropertyBind
         else
         {
             Type owner_type = C2_Inspector.InspectType(target);
-            Default_Read(get, C2_Inspector.Default_Instance(owner_type), out has_def, out def);
+            object def_src = C2_Inspector.Default_Instance(owner_type);
+            if (ImpClassDefaults.IsPrototype(target))
+            {
+                def_src = ImpClassDefaults.CodeDefault(owner_type);
+            }
+            Default_Read(get, def_src, out has_def, out def);
         }
 
         return new TPropertyBind(m.Name, type, () => get(owner), v => set(owner, v), locked, attr, has_def, def);
@@ -282,6 +287,7 @@ public class C2_Inspector : Imp2D
     [ImpVar] public bool declared_only;
     [ImpVar] public bool show_header = true;
     [ImpVar] public bool show_search = true;
+    [ImpVar] public bool show_components = true;
 
     // When set, a member is listed only if this returns true. Nested group rows
     // do not use it — pass apply_filter: false from Members_Filter for those.
@@ -508,7 +514,7 @@ public class C2_Inspector : Imp2D
                 host = picked;
             }
         }
-        bool show_tree = host != null && CompTree_HasAny(host);
+        bool show_tree = show_components && host != null && CompTree_HasAny(host);
         _comp_pane.is_visible = show_tree;
         _comp_sep.is_visible = show_tree;
         if (show_tree)
@@ -586,8 +592,11 @@ public class C2_Inspector : Imp2D
         {
             foreach (MemberInfo m in members)
             {
-                C2_InspectorProperty row = Row_Build(targets, m);
-                if (row != null) AddRow(row);
+                Imp2D row = MemberRow(targets, m);
+                if (row != null)
+                {
+                    AddRow(row);
+                }
             }
             return;
         }
@@ -616,8 +625,11 @@ public class C2_Inspector : Imp2D
             float h = box.bar_height;
             foreach (MemberInfo m in list)
             {
-                C2_InspectorProperty row = Row_Build(targets, m);
-                if (row == null) continue;
+                Imp2D row = MemberRow(targets, m);
+                if (row == null)
+                {
+                    continue;
+                }
                 box.Child_Add(row);
                 h += row.layout.size.Y + 2;
             }
@@ -664,6 +676,82 @@ public class C2_Inspector : Imp2D
     {
         if (list_properties.scroll_box != null) list_properties.scroll_box.Child_Add(row);
         else list_properties.Child_Add(row);
+    }
+
+    Imp2D MemberRow(List<object> targets, MemberInfo m)
+    {
+        if (m is MethodInfo method)
+        {
+            return Button_Build(targets, method);
+        }
+        return Row_Build(targets, m);
+    }
+
+    Imp2D Button_Build(List<object> targets, MethodInfo method)
+    {
+        if (!Method_IsCallInEditor(method))
+        {
+            return null;
+        }
+        TitleAttribute title_attr = method.GetCustomAttribute<TitleAttribute>();
+        string label;
+        if (title_attr != null && !string.IsNullOrEmpty(title_attr.Name))
+        {
+            label = title_attr.Name;
+        }
+        else
+        {
+            label = Name_Pretty(method.Name);
+        }
+        List<object> call_targets = new List<object>(targets);
+        C2_Button btn = new()
+        {
+            text = label,
+            layout = new TLayout2
+            {
+                orient_H = EUIViewportAlignment.Fill,
+                size = new Vector2(0, 26),
+                size_min = new Vector2(0, 26),
+            },
+        };
+        btn.on_click = () =>
+        {
+            for (int i = 0; i < call_targets.Count; i++)
+            {
+                object t = call_targets[i];
+                if (t == null)
+                {
+                    continue;
+                }
+                MethodInfo call = Member_On(InspectType(t), method, include_static) as MethodInfo;
+                if (call == null)
+                {
+                    call = method;
+                }
+                object owner;
+                if (call.IsStatic)
+                {
+                    owner = null;
+                }
+                else if (t is Type)
+                {
+                    continue;
+                }
+                else
+                {
+                    owner = t;
+                }
+                try
+                {
+                    call.Invoke(owner, null);
+                }
+                catch
+                {
+                }
+            }
+            Properties_Rebuild();
+        };
+        return btn;
     }
 
     C2_InspectorProperty Row_Build(List<object> targets, MemberInfo m)
@@ -745,6 +833,16 @@ public class C2_Inspector : Imp2D
         if (Name_Pretty(m.Name).Contains(q, StringComparison.OrdinalIgnoreCase))
         {
             return true;
+        }
+        TitleAttribute title = m.GetCustomAttribute<TitleAttribute>();
+        if (title != null && !string.IsNullOrEmpty(title.Name)
+            && title.Name.Contains(q, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+        if (m is MethodInfo)
+        {
+            return false;
         }
         if (depth == 0)
         {
@@ -975,6 +1073,13 @@ public class C2_Inspector : Imp2D
                 if (f.GetCustomAttribute<ImpVarAttribute>() != null) list.Add(f);
             foreach (PropertyInfo p in cur.GetProperties(flags))
                 if (p.GetCustomAttribute<ImpVarAttribute>() != null) list.Add(p);
+            foreach (MethodInfo method in cur.GetMethods(flags | BindingFlags.NonPublic))
+            {
+                if (Method_IsCallInEditor(method))
+                {
+                    list.Add(method);
+                }
+            }
         }
         _member_cache[t] = list;
         return list;
@@ -1014,6 +1119,13 @@ public class C2_Inspector : Imp2D
                     list.Add(p);
                 }
             }
+            foreach (MethodInfo method in cur.GetMethods(flags | BindingFlags.NonPublic))
+            {
+                if (Method_IsCallInEditor(method))
+                {
+                    list.Add(method);
+                }
+            }
         }
         _static_member_cache[t] = list;
         return list;
@@ -1035,8 +1147,30 @@ public class C2_Inspector : Imp2D
     {
         FieldInfo f => f.FieldType,
         PropertyInfo p => p.PropertyType,
+        MethodInfo method => method.ReturnType,
         _ => typeof(object),
     };
+
+    public static bool Method_IsCallInEditor(MethodInfo m)
+    {
+        if (m == null || m.IsAbstract || m.IsGenericMethod || m.ContainsGenericParameters)
+        {
+            return false;
+        }
+        if (m.IsSpecialName)
+        {
+            return false;
+        }
+        if (m.GetCustomAttribute<CallInEditorAttribute>() == null)
+        {
+            return false;
+        }
+        if (m.GetParameters().Length != 0)
+        {
+            return false;
+        }
+        return true;
+    }
 
     public static bool Type_IsSpan(Type t)
     {
@@ -1173,6 +1307,27 @@ public class C2_Inspector : Imp2D
     /// field initialisers and constructor left in a member is what the revert button puts back.
     /// Types without a usable parameterless constructor give null, and those rows never offer revert.
     /// </summary>
+    public static void Default_Invalidate(Type type = null)
+    {
+        if (type == null)
+        {
+            _default_instances.Clear();
+            return;
+        }
+        List<Type> drop = new();
+        foreach (KeyValuePair<Type, object> kv in _default_instances)
+        {
+            if (kv.Key == type)
+            {
+                drop.Add(kv.Key);
+            }
+        }
+        for (int i = 0; i < drop.Count; i++)
+        {
+            _default_instances.Remove(drop[i]);
+        }
+    }
+
     internal static object Default_Instance(Type t)
     {
         if (_default_instances.TryGetValue(t, out object hit)) return hit;
@@ -1196,12 +1351,25 @@ public class C2_Inspector : Imp2D
 
     internal static I_Property Prototype(Type t)
     {
-        if (_prototypes.TryGetValue(t, out I_Property hit)) return hit;
-        I_Property made = null;
-        if (!t.IsAbstract)
+        if (_prototypes.TryGetValue(t, out I_Property hit))
         {
-            try { made = Activator.CreateInstance(t) as I_Property; }
-            catch { }
+            return hit;
+        }
+        I_Property made = null;
+        Type cur = t;
+        while (cur != null && made == null)
+        {
+            if (typeof(I_Property).IsAssignableFrom(cur) && !cur.IsAbstract && !cur.IsInterface)
+            {
+                try
+                {
+                    made = Activator.CreateInstance(cur) as I_Property;
+                }
+                catch
+                {
+                }
+            }
+            cur = cur.BaseType;
         }
         _prototypes[t] = made;
         return made;

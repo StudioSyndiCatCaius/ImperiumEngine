@@ -76,7 +76,7 @@ public class ImpGame
         {
             t = typeof(GM_Gameplay);
         }
-        game_mode = Activator.CreateInstance(t) as C1_GameMode;
+        game_mode = ImpComp.Create(t) as C1_GameMode;
         if (game_mode == null)
         {
             return;
@@ -169,6 +169,7 @@ public class ImpGame
                 ImpPlayer.players[i].target_game = null;
             }
             ImpPlayer.players[i].pawn = null;
+            ImpPlayer.players[i].target_view = null;
         }
         if (current == dying)
         {

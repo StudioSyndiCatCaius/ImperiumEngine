@@ -23,7 +23,24 @@ public class ImpApp
     
     public static ImpApp app;
 
-    public static Imp3D view_target;
+    public static Imp3D view_target
+    {
+        get
+        {
+            if (ImpPlayer.players.Count > 0)
+            {
+                return ImpPlayer.players[0].target_view;
+            }
+            return null;
+        }
+        set
+        {
+            if (ImpPlayer.players.Count > 0)
+            {
+                ImpPlayer.players[0].target_view = value;
+            }
+        }
+    }
 
     // Setup camera
     public Camera3D default_camera = new Camera3D() {
@@ -46,6 +63,7 @@ public class ImpApp
         
         on_pre_init?.Invoke();
         ImpConfig.LoadAll();
+        ImpClassDefaults.LoadAll();
         
         // ---- Raylib
         Raylib.SetConfigFlags(ConfigFlags.Msaa4xHint | 
@@ -58,7 +76,9 @@ public class ImpApp
         Raylib.SetExitKey(KeyboardKey.Null);
         
         // ---- R3D
-        R3D.SetHint(Hint.ShadowDirSize,2048);
+        // R3D has no cascades: the sun gets one ortho map, so map size and sun_shadow_range
+        // together are the only lever on texel size. 4096 halves the texel for ~64 MB of depth.
+        R3D.SetHint(Hint.ShadowDirSize,4096);
 
         // Internal R3D framebuffer. Use the HiDPI render size, not GetScreenWidth
         // (logical). MaximizeWindow in on_post_init happens after this, so the

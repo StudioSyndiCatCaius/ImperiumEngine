@@ -45,7 +45,7 @@ public abstract class C1_GameMode : ImpComp
             {
                 pawn_t = typeof(C3_Character);
             }
-            Imp3D pawn = Activator.CreateInstance(pawn_t) as Imp3D;
+            Imp3D pawn = ImpComp.Create(pawn_t) as Imp3D;
             ply.pawn = pawn;
             if (pawn == null)
             {
@@ -81,7 +81,7 @@ public abstract class C1_GameMode : ImpComp
             {
                 cam_t = typeof(C3_Camera);
             }
-            C3_Camera cam = Activator.CreateInstance(cam_t) as C3_Camera;
+            C3_Camera cam = ImpComp.Create(cam_t) as C3_Camera;
             if (cam == null)
             {
                 continue;
@@ -109,7 +109,7 @@ public abstract class C1_GameMode : ImpComp
             {
                 live.starting_camera = cam;
             }
-            ImpApp.view_target = cam;
+            ply.target_view = cam;
         }
 
         void Load_Finished()

@@ -56,6 +56,59 @@ public class ImpComp
         }
         return null;
     }
+
+    static ImpComp Make(Type type)
+    {
+        if (type == null || type.IsAbstract || !typeof(ImpComp).IsAssignableFrom(type))
+        {
+            return null;
+        }
+        try
+        {
+            return Activator.CreateInstance(type) as ImpComp;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Construct with C# field initialisers only — no class-default overlay.
+    /// Scene load and Clone use this so authored values are not replaced.
+    /// </summary>
+    public static ImpComp CreateBare(Type type)
+    {
+        ImpClassDefaults.Skip_Begin();
+        try
+        {
+            return Make(type);
+        }
+        finally
+        {
+            ImpClassDefaults.Skip_End();
+        }
+    }
+
+    /// <summary>
+    /// Construct and apply saved class defaults. Spawn / `new` after the full ctor
+    /// chain so derived ctor bodies cannot wipe the overlay.
+    /// </summary>
+    public static ImpComp Create(Type type)
+    {
+        ImpComp inst = Make(type);
+        if (inst == null)
+        {
+            return null;
+        }
+        ImpClassDefaults.Apply(inst);
+        return inst;
+    }
+
+    public static T Create<T>() where T : ImpComp
+    {
+        return Create(typeof(T)) as T;
+    }
     
     
     // #################################################################################
@@ -264,6 +317,7 @@ public class ImpComp
             script_builtin = new A_Script();
         }
         script_builtin.parent_type = new TClass<Object>(GetType());
+        ImpClassDefaults.Apply(this);
     }
 
     /// <summary>
@@ -451,7 +505,7 @@ public class ImpComp
 
     public ImpComp Clone(ImpScene skip_self = null)
     {
-        if (Activator.CreateInstance(GetType()) is not ImpComp copy) return null;
+        if (CreateBare(GetType()) is not ImpComp copy) return null;
         Owned_Bind();
         copy.Owned_Bind();
         Clone_Into(copy, skip_self);

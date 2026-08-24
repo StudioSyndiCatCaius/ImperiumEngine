@@ -270,7 +270,7 @@ public class ImpFile : I_File
                 src_sounds.Add(_snd);
                 break;
             case EFileType.Model:
-                src_models.Add(R3D.LoadModelEx(filepath, ImportFlags.RetainMeshNames));
+                src_models.Add(R3D.LoadModelEx(filepath, ImportFlags.RetainMeshNames | ImportFlags.RetainMeshData));
                 if (src_models.Count > 0)
                 {
                     Textures_CollectFromModel(src_models[0]);

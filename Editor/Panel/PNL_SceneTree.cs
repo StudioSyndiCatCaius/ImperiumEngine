@@ -195,7 +195,7 @@ public class PNL_SceneTree : EdPanel
         if (parent == null || type == null) return;
         if (parent.IsPackedForeign || parent.IsInstanceRoot || parent.IsOwned) return;
         if (!typeof(ImpComp).IsAssignableFrom(type) || type.IsAbstract) return;
-        if (Activator.CreateInstance(type) is not ImpComp n) return;
+        if (ImpComp.Create(type) is not ImpComp n) return;
         n.name = ImpComp.Name_Unique(parent, type.Name);
         parent.Child_Add(n);
         ImpUndo.Comp_Moved(n, default, "Add Comp");
@@ -208,7 +208,7 @@ public class PNL_SceneTree : EdPanel
         if (src == null || type == null || type == src.GetType()) return;
         if (src.IsInstanceRoot || src.IsPackedForeign || src.IsOwned) return;
         if (!typeof(ImpComp).IsAssignableFrom(type) || type.IsAbstract) return;
-        if (Activator.CreateInstance(type) is not ImpComp dst) return;
+        if (ImpComp.Create(type) is not ImpComp dst) return;
 
         CopyCompat(src, dst);
         dst.name = src.name;

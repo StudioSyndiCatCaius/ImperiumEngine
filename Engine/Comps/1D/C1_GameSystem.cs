@@ -69,7 +69,7 @@ public abstract class C1_GameSystem : ImpComp
             mode.active_states = new List<C1_GameSystem>();
         }
 
-        C1_GameSystem sys = Activator.CreateInstance(t) as C1_GameSystem;
+        C1_GameSystem sys = ImpComp.Create(t) as C1_GameSystem;
         if (sys == null)
         {
             return null;

@@ -21,6 +21,7 @@ public class C2_CollectionEdit : Imp2D
     public C2_List c_rows;
 
     string _fp = "\0";
+    bool _drop_hover;
 
     public C2_CollectionEdit()
     {
@@ -153,8 +154,13 @@ public class C2_CollectionEdit : Imp2D
             is_expanded = true;
             return;
         }
+        Append(C2_Inspector.Value_Default(C2_Inspector.Type_Element(t)));
+    }
+
+    void Append(object item)
+    {
+        Type t = ColType;
         Type eT = C2_Inspector.Type_Element(t);
-        object item = C2_Inspector.Value_Default(eT);
         if (IsArray)
         {
             MutateEach(cur =>
@@ -187,6 +193,31 @@ public class C2_CollectionEdit : Imp2D
             return next;
         });
         is_expanded = true;
+    }
+
+    bool Drop_TryAsset(string path, out ImpAsset asset)
+    {
+        asset = null;
+        if (Locked || IsDict)
+        {
+            return false;
+        }
+        Type eT = C2_Inspector.Type_Element(ColType);
+        if (eT == null || !typeof(ImpAsset).IsAssignableFrom(eT))
+        {
+            return false;
+        }
+        if (string.IsNullOrEmpty(path))
+        {
+            return false;
+        }
+        ImpAsset loaded = ImpAsset.Load(path);
+        if (loaded == null || !eT.IsAssignableFrom(loaded.GetType()))
+        {
+            return false;
+        }
+        asset = loaded;
+        return true;
     }
 
     void Clear()
@@ -480,6 +511,13 @@ public class C2_CollectionEdit : Imp2D
                 0, ETextWrap.None, EUIPositionAlignment.Center, EUIPositionAlignment.Start);
         }
 
+        if (_drop_hover)
+        {
+            Raylib.DrawRectangleLinesEx(
+                new Rectangle(dim.position.X, dim.position.Y, dim.size.X, HeadH), 2f,
+                new Color(90, 220, 140, 255));
+        }
+
         base.OnDraw2D(dt, flags);
     }
 
@@ -500,6 +538,30 @@ public class C2_CollectionEdit : Imp2D
             return;
         }
         is_expanded = !is_expanded;
+    }
+
+    public override void _Notify_OnGrabDrop(ImpPlayer player, ENotifyGrabTarget notify, ImpComp other, double dt)
+    {
+        base._Notify_OnGrabDrop(player, notify, other, dt);
+        string path = other?.CursorGrab_Payload() as string;
+        ImpAsset asset;
+        bool ok = Drop_TryAsset(path, out asset);
+        if (notify == ENotifyGrabTarget.Hover_AsInstigator_Start)
+        {
+            _drop_hover = ok;
+        }
+        else if (notify == ENotifyGrabTarget.Hover_AsInstigator_End)
+        {
+            _drop_hover = false;
+        }
+        else if (notify == ENotifyGrabTarget.Drop_AsInstigator)
+        {
+            _drop_hover = false;
+            if (ok)
+            {
+                Append(asset);
+            }
+        }
     }
 
     public static object Collection_Clone(object src, Type declared)

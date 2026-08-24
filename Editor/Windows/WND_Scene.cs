@@ -95,7 +95,12 @@ public class WND_Scene : EdWindow
 
     public WND_Scene()
     {
+        if (active != null && active != this)
+        {
+            ImpScene.on_instance_replaced -= active.OnInstanceReplaced;
+        }
         active = this;
+        ImpScene.on_instance_replaced += OnInstanceReplaced;
         name = "Scene";
         layout.orient_H = EUIViewportAlignment.Fill;
         layout.orient_V = EUIViewportAlignment.Fill;
@@ -141,8 +146,8 @@ public class WND_Scene : EdWindow
             pnl.gizmo_data.on_selection_changed = null;
             pnl.gizmo_data.Selection_Set(new[] { comp });
             pnl.gizmo_data.on_selection_changed = OnGizmoSelection;
-            if (comp is Imp2D) pnl.edit_mode = ESceneEditorMode.Mode_2D;
-            else if (comp is Imp3D) pnl.edit_mode = ESceneEditorMode.Mode_3D;
+            if (comp is Imp2D) pnl.view_mode = ESceneEditView.Mode_2D;
+            else if (comp is Imp3D) pnl.view_mode = ESceneEditView.Mode_3D;
         };
         tab_outliners.tab_width = 88;
         tab_outliners.Child_Add(scene_tree);
@@ -280,87 +285,24 @@ public class WND_Scene : EdWindow
         inspector_comp.Properties_Rebuild();
     }
 
-    static List<ImpComp> SelectionRoots(List<ImpComp> comps)
-    {
-        List<ImpComp> roots = new();
-        if (comps == null) return roots;
-        for (int i = 0; i < comps.Count; i++)
-        {
-            ImpComp c = comps[i];
-            if (c == null) continue;
-            bool nested = false;
-            for (ImpComp p = c.parent; p != null; p = p.parent)
-            {
-                if (comps.Contains(p)) { nested = true; break; }
-            }
-            if (!nested) roots.Add(c);
-        }
-        return roots;
-    }
-
     void DuplicateSelected()
     {
         PNL_SceneView pnl = ActiveEdScene();
-        if (pnl?.scene?.root == null) return;
-        List<ImpComp> src = SelectionRoots(pnl.gizmo_data.selected_comps);
-        List<ImpComp> was_selected = new(pnl.gizmo_data.selected_comps);
-        List<ImpComp> copies = new();
-        ImpUndo.Group_Begin("Duplicate");
-        for (int i = 0; i < src.Count; i++)
+        if (pnl?.mode == null)
         {
-            ImpComp s = src[i];
-            if (s == null || s == pnl.scene.root || s.parent == null || s.IsPackedForeign || s.IsOwned) continue;
-            ImpComp copy = s.Clone();
-            if (copy == null) continue;
-            // Named before the insert below, so the scan never sees the copy itself. The source
-            // is still in there under its own name, so the desired name always collides and
-            // always picks up a number: mesh -> mesh1 -> mesh2.
-            copy.name = ImpComp.Name_Unique(s.parent, string.IsNullOrEmpty(s.name) ? copy.GetType().Name : s.name);
-            int idx = s.parent.children.IndexOf(s);
-            s.parent.Child_Insert(idx + 1, copy);
-            if (copy is Imp3D c3) c3.Position_Set(c3.Position_Get(false) + new Vector3(0.5f, 0f, 0f), false);
-            if (copy is Imp2D c2) c2.Position_Set(c2.Position_Get(false) + new Vector2(16f, 16f), false);
-            copies.Add(copy);
-            // Nothing to come back from - undo takes the copy back out of the camera.
-            ImpUndo.Comp_Moved(copy, default, "Duplicate");
+            return;
         }
-        if (copies.Count > 0)
-        {
-            SelectionUndo(pnl, was_selected, copies);
-            pnl.gizmo_data.Selection_Set(copies);
-        }
-        ImpUndo.Group_End();
+        pnl.mode.DuplicateSelected();
     }
 
     void DeleteSelected()
     {
         PNL_SceneView pnl = ActiveEdScene();
-        if (pnl?.scene?.root == null) return;
-        List<ImpComp> src = SelectionRoots(pnl.gizmo_data.selected_comps);
-        List<ImpComp> was_selected = new(pnl.gizmo_data.selected_comps);
-        ImpUndo.Group_Begin("Delete");
-        for (int i = 0; i < src.Count; i++)
+        if (pnl?.mode == null)
         {
-            ImpComp s = src[i];
-            if (s == null || s == pnl.scene.root || s.IsPackedForeign || s.IsOwned) continue;
-            // Detach rather than Destroy: Destroy tears the subtree apart child by child, and
-            // undo needs the comp to come back with everything under it still attached.
-            TCompPlace from = ImpUndo.Place_Get(s);
-            s.Detach();
-            ImpUndo.Comp_Moved(s, from, "Delete");
+            return;
         }
-        SelectionUndo(pnl, was_selected, new List<ImpComp>());
-        pnl.gizmo_data.Selection_Clear();
-        ImpUndo.Group_End();
-    }
-
-    // Selection is part of the edit: undoing a delete should hand back what was deleted, and
-    // undoing a duplicate must not leave the gizmo driving comps that are no longer in the camera.
-    static void SelectionUndo(PNL_SceneView pnl, List<ImpComp> before, List<ImpComp> after)
-    {
-        ImpUndo.Push("Selection",
-            () => pnl.gizmo_data.Selection_Set(before),
-            () => pnl.gizmo_data.Selection_Set(after));
+        pnl.mode.DeleteSelected();
     }
     
     // -------------------------------------------------------------------
@@ -513,7 +455,8 @@ public class WND_Scene : EdWindow
             }
             EdStateScene s = new();
             s.path = EdState.Path_Store(path);
-            s.edit_mode = ed.edit_mode.ToString();
+            s.edit_mode = ed.view_mode.ToString();
+            s.scene_edit_mode = ed.edit_mode.ToString();
             s.gizmo_mode = ed.gizmo_mode.ToString();
             s.gizmo_space = ed.gizmo_orientation.ToString();
             s.snap_translate = ed.gizmo_data.snap_translate;
@@ -582,9 +525,13 @@ public class WND_Scene : EdWindow
             {
                 continue;
             }
-            if (Enum.TryParse(s.edit_mode, out ESceneEditorMode mode))
+            if (Enum.TryParse(s.edit_mode, out ESceneEditView mode))
             {
-                pnl.edit_mode = mode;
+                pnl.view_mode = mode;
+            }
+            if (Enum.TryParse(s.scene_edit_mode, out ESceneEditMode tool))
+            {
+                pnl.EditMode_Set(tool);
             }
             if (Enum.TryParse(s.gizmo_mode, out EGizmoMode giz))
             {
@@ -771,11 +718,11 @@ public class WND_Scene : EdWindow
         scene_tree.Select(host);
         if (comp is Imp2D)
         {
-            pnl.edit_mode = ESceneEditorMode.Mode_2D;
+            pnl.view_mode = ESceneEditView.Mode_2D;
         }
         else if (comp is Imp3D)
         {
-            pnl.edit_mode = ESceneEditorMode.Mode_3D;
+            pnl.view_mode = ESceneEditView.Mode_3D;
         }
     }
 
@@ -816,6 +763,69 @@ public class WND_Scene : EdWindow
             page++;
         }
         return null;
+    }
+
+    void OnInstanceReplaced(ImpComp old, ImpComp neu)
+    {
+        if (old == null || neu == null)
+        {
+            return;
+        }
+        for (int i = 0; i < tab_scenes.children.Count; i++)
+        {
+            if (tab_scenes.children[i] is not PNL_SceneView pnl)
+            {
+                continue;
+            }
+            TGizmoData g = pnl.gizmo_data;
+            if (g == null)
+            {
+                continue;
+            }
+            bool changed = false;
+            List<ImpComp> next = new();
+            for (int s = 0; s < g.selected_comps.Count; s++)
+            {
+                ImpComp c = g.selected_comps[s];
+                if (c == null)
+                {
+                    continue;
+                }
+                if (c == old || c.IsDescendantOf(old))
+                {
+                    if (!next.Contains(neu))
+                    {
+                        next.Add(neu);
+                    }
+                    changed = true;
+                }
+                else
+                {
+                    next.Add(c);
+                }
+            }
+            if (!changed)
+            {
+                continue;
+            }
+            Action prev = g.on_selection_changed;
+            g.on_selection_changed = null;
+            g.Selection_Set(next);
+            g.on_selection_changed = prev;
+            if (pnl == ActiveEdScene())
+            {
+                OnGizmoSelection();
+            }
+        }
+        if (_bound_scene != null && neu.scene == _bound_scene)
+        {
+            scene_tree.Refresh(true);
+        }
+        if (_selected_comp == old || (_selected_comp != null && _selected_comp.IsDescendantOf(old)))
+        {
+            _selected_comp = neu;
+            inspector_comp.Objects_Add(new List<object> { neu }, true);
+        }
     }
 
     void BindScene(ImpScene scene)

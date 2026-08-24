@@ -3,15 +3,16 @@ using ImperiumEngine.Comps._1D.Systems;
 using ImperiumEngine.Structs;
 using Raylib_cs;
 
-namespace ImperiumEngine.Comps._1D.States;
+namespace ImperiumEngine.Comps._1D.Systems;
+
 
 public class sys_Explore : C1_GameSystem
 {
-    [ImpVar][Category("Camera")] public Vector3 camera_init_rotation;
-    [ImpVar][Category("Camera")] public bool camera_enable_rotate_H;
-    [ImpVar][Category("Camera")] public bool camera_enable_rotate_V;
+    [ImpVar][Config][Category("Camera")] public Vector3 camera_init_rotation;
+    [ImpVar][Config][Category("Camera")] public bool camera_enable_rotate_H;
+    [ImpVar][Config][Category("Camera")] public bool camera_enable_rotate_V;
 
-    [ImpVar][Category("States")] public TClass<C1_GameSystem> system_pause;
+    [ImpVar][Config][Category("States")] public TClass<C1_GameSystem> system_pause;
 
     public sys_Explore()
     {
@@ -53,9 +54,9 @@ public class sys_Explore : C1_GameSystem
     public override void Input_Update(ImpPlayer player, TLabel iaction, double dt, Vector3 axis)
     {
         base.Input_Update(player, iaction, dt, axis);
-        if (ImpApp.view_target != null)
+        if (player.target_view != null)
         {
-            ImpApp.view_target.Input_Update(player, iaction, dt, axis);
+            player.target_view.Input_Update(player, iaction, dt, axis);
         }
     }
 
@@ -67,18 +68,18 @@ public class sys_Explore : C1_GameSystem
             C1_GameSystem.Activate(system_pause);
             return;
         }
-        if (ImpApp.view_target != null)
+        if (player.target_view != null)
         {
-            ImpApp.view_target.Input_Pressed(player, iaction, axis);
+            player.target_view.Input_Pressed(player, iaction, axis);
         }
     }
 
     public override void Input_Released(ImpPlayer player, TLabel iaction, Vector3 axis)
     {
         base.Input_Released(player, iaction, axis);
-        if (ImpApp.view_target != null)
+        if (player.target_view != null)
         {
-            ImpApp.view_target.Input_Released(player, iaction, axis);
+            player.target_view.Input_Released(player, iaction, axis);
         }
     }
 }

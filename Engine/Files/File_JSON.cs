@@ -92,6 +92,85 @@ public class File_JSON : ImpFile
             .Where(f => f.IsDefined(typeof(ImpVarAttribute), true));
     }
 
+    static bool ImpVar_IsClassDefault(FieldInfo f)
+    {
+        if (f == null || !f.IsPublic || f.IsStatic || f.IsLiteral)
+        {
+            return false;
+        }
+        ImpVarAttribute attr = f.GetCustomAttribute<ImpVarAttribute>();
+        if (attr == null || attr.Hidden)
+        {
+            return false;
+        }
+        if (f.GetCustomAttribute<ConfigAttribute>() == null)
+        {
+            return false;
+        }
+        if (f.Name == "name")
+        {
+            return false;
+        }
+        if (typeof(ImpComp).IsAssignableFrom(f.FieldType))
+        {
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Instance [ImpVar][Config] fields that class defaults may store.
+    /// Visible, public, not static, not `name`, not ImpComp object refs.
+    /// </summary>
+    public static JsonObject ImpVars_ToJson(object target)
+    {
+        JsonObject vars = new();
+        if (target == null)
+        {
+            return vars;
+        }
+        HashSet<object> visiting = new(ReferenceEqualityComparer.Instance);
+        visiting.Add(target);
+        foreach (FieldInfo f in ImpVarFields(target.GetType()))
+        {
+            if (!ImpVar_IsClassDefault(f))
+            {
+                continue;
+            }
+            ImpVarAttribute attr = f.GetCustomAttribute<ImpVarAttribute>()!;
+            string key = string.IsNullOrEmpty(attr.Name) ? f.Name : attr.Name;
+            vars[key] = ToJson(f.GetValue(target), visiting);
+        }
+        visiting.Remove(target);
+        return vars;
+    }
+
+    public static void ImpVars_Apply(object target, JsonObject vars, string? path_context = null)
+    {
+        if (target == null || vars == null)
+        {
+            return;
+        }
+        foreach (FieldInfo f in ImpVarFields(target.GetType()))
+        {
+            if (!ImpVar_IsClassDefault(f))
+            {
+                continue;
+            }
+            ImpVarAttribute attr = f.GetCustomAttribute<ImpVarAttribute>()!;
+            string key = string.IsNullOrEmpty(attr.Name) ? f.Name : attr.Name;
+            if (!vars.ContainsKey(key))
+            {
+                continue;
+            }
+            object? val = FromJson(vars[key], f.FieldType, path_context);
+            if (val != null || !f.FieldType.IsValueType)
+            {
+                f.SetValue(target, val);
+            }
+        }
+    }
+
     static FieldInfo[] PublicFields(Type type)
     {
         return type.GetFields(BindingFlags.Public | BindingFlags.Instance);
@@ -715,7 +794,8 @@ public class File_JSON : ImpFile
             {
                 string? cls = obj["_class"]?.GetValue<string>();
                 Type type = ImpComp.Type_FromName(cls) ?? typeof(ImpComp);
-                if (type.IsAbstract || Activator.CreateInstance(type) is not ImpComp placeholder)
+                ImpComp placeholder = ImpComp.CreateBare(type);
+                if (placeholder == null)
                     return null;
                 placeholder.packed = new TRef<ImpScene>(instance_path);
                 placeholder.packed_from = placeholder;
@@ -726,7 +806,8 @@ public class File_JSON : ImpFile
         {
             string? cls = obj["_class"]?.GetValue<string>();
             Type type = ImpComp.Type_FromName(cls) ?? typeof(ImpComp);
-            if (type.IsAbstract || Activator.CreateInstance(type) is not ImpComp created)
+            ImpComp created = ImpComp.CreateBare(type);
+            if (created == null)
                 return null;
             comp = created;
         }

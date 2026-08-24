@@ -23,7 +23,7 @@ public sealed class ImpVarAttribute : Attribute
     public ImpVarAttribute(string? name = null) => Name = name;
 }
 
-[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
+[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property | AttributeTargets.Method)]
 public sealed class CategoryAttribute : Attribute
 {
     //sorts into a custom editor category. if none given, the category is the name of the owning class

@@ -1,5 +1,5 @@
 ﻿using ImperiumEngine.Assets;
-using ImperiumEngine.Comps._1D.States;
+using ImperiumEngine.Comps._1D.Systems;
 using ImperiumEngine.Comps._3D;
 using ImperiumEngine.Structs;
 

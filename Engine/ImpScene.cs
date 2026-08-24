@@ -332,7 +332,10 @@ public class ImpScene : ImpAsset
         }
         root.OnBegin();
 
-        ImpApp.view_target = starting_camera;
+        if (ImpPlayer.players.Count > 0)
+        {
+            ImpPlayer.players[0].target_view = starting_camera;
+        }
 
         impScriptVm = null;
         A_Script s = Script_Get();
@@ -352,7 +355,10 @@ public class ImpScene : ImpAsset
 
     public void REnd()
     {
-        ImpApp.view_target = null;
+        for (int i = 0; i < ImpPlayer.players.Count; i++)
+        {
+            ImpPlayer.players[i].target_view = null;
+        }
         if (impScriptVm != null)
         {
             impScriptVm.Event_Run("OnEnd", null);
@@ -462,6 +468,149 @@ public class ImpScene : ImpAsset
     public override string File_GetExtension() { return "ImpScene"; }
 
     public override string Editor_GetTypeLabel() { return "Scene"; }
+
+    public override bool File_Write()
+    {
+        if (!base.File_Write())
+        {
+            return false;
+        }
+        Instances_Refresh();
+        return true;
+    }
+
+    public static Action<ImpComp, ImpComp> on_instance_replaced;
+
+    public void Instances_Refresh()
+    {
+        if (string.IsNullOrEmpty(filepath))
+        {
+            return;
+        }
+        List<ImpAsset> loaded = new List<ImpAsset>(ImpAsset.Loaded_GetAll());
+        for (int i = 0; i < loaded.Count; i++)
+        {
+            if (loaded[i] is not ImpScene host)
+            {
+                continue;
+            }
+            if (ReferenceEquals(host, this))
+            {
+                continue;
+            }
+            if (ScenePath_Equals(host.filepath, filepath))
+            {
+                continue;
+            }
+            if (host.root == null)
+            {
+                continue;
+            }
+            RefreshTree(host.root, host);
+        }
+
+        void RefreshTree(ImpComp n, ImpScene host)
+        {
+            if (n == null)
+            {
+                return;
+            }
+            if (IsSelfInstance(n, this))
+            {
+                ReplaceInstance(n, host);
+                return;
+            }
+            List<ImpComp> kids = new List<ImpComp>(n.children);
+            for (int k = 0; k < kids.Count; k++)
+            {
+                RefreshTree(kids[k], host);
+            }
+        }
+
+        void ReplaceInstance(ImpComp old, ImpScene host)
+        {
+            if (old == null || host == null)
+            {
+                return;
+            }
+            ImpComp fresh = Instantiate();
+            if (fresh == null)
+            {
+                return;
+            }
+
+            string name = old.name;
+            bool vis = old.is_visible;
+            bool has3 = false;
+            TTransform3 local3 = default;
+            bool has2 = false;
+            TTransform2 local2 = default;
+            if (old is Imp3D o3)
+            {
+                local3 = o3.Transform_Get(false);
+                has3 = true;
+            }
+            if (old is Imp2D o2)
+            {
+                local2 = o2.Transform_Get(false);
+                has2 = true;
+            }
+
+            fresh.name = name;
+            fresh.is_visible = vis;
+
+            bool running = host.is_running;
+            if (running)
+            {
+                old.OnEnd();
+            }
+
+            ImpComp parent = old.parent;
+            if (parent == null)
+            {
+                if (host.root != old)
+                {
+                    fresh.Destroy();
+                    return;
+                }
+                host.root = fresh;
+            }
+            else
+            {
+                int idx = parent.children.IndexOf(old);
+                parent.children.Remove(old);
+                old.parent = null;
+                if (idx < 0 || idx > parent.children.Count)
+                {
+                    idx = parent.children.Count;
+                }
+                parent.children.Insert(idx, fresh);
+                fresh.parent = parent;
+                fresh.scene = parent.scene;
+                fresh.game_owner = parent.game_owner;
+            }
+
+            if (has3 && fresh is Imp3D n3)
+            {
+                n3.Transform_Set(local3, false);
+            }
+            if (has2 && fresh is Imp2D n2)
+            {
+                n2.Transform_Set(local2, false);
+            }
+
+            Imp2D.Layout_Invalidate();
+            Imp3D.Cache_Invalidate();
+
+            if (running)
+            {
+                fresh.OnBegin();
+            }
+
+            on_instance_replaced?.Invoke(old, fresh);
+            old.Destroy();
+        }
+    }
 
     [ThreadStatic] static HashSet<string> _instantiating;
 

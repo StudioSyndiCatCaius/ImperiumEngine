@@ -1,7 +1,7 @@
 using System.Numerics;
+using Editor.EditMode;
 using ImperiumEngine;
 using ImperiumEngine.Comps._2D;
-using ImperiumEngine.Comps._3D;
 using ImperiumEngine.Enums;
 using ImperiumEngine.Structs;
 using Raylib_cs;
@@ -18,8 +18,13 @@ public class PNL_SceneView : C2_Box
     //one history per camera tab, so undo in one camera never reaches into another
     public ImpUndo undo = new();
 
-    public ESceneEditorMode edit_mode = ESceneEditorMode.Mode_3D;
-    public TGizmoData gizmo_data = new() { space = EGizmoSpace.Local };
+    public ESceneEditView view_mode = ESceneEditView.Mode_3D;
+    public ESceneEditMode edit_mode = ESceneEditMode.Comps;
+    public EditMode_Comp mode_comp = new();
+    public EditMode_Landscape mode_land = new();
+    public EdEditMode mode;
+
+    public TGizmoData gizmo_data => mode_comp.gizmo_data;
     public EGizmoMode gizmo_mode
     {
         get => gizmo_data.mode;
@@ -30,9 +35,6 @@ public class PNL_SceneView : C2_Box
         get => gizmo_data.space;
         set => gizmo_data.space = value;
     }
-
-    C3_Gizmo gizmo_3d = new();
-    C2_Gizmo gizmo_2d = new();
 
     public C2_Viewport3D viewport3D = new()
     {
@@ -69,10 +71,15 @@ public class PNL_SceneView : C2_Box
     //draw flags — Editor helpers on by default; G toggles
     bool view_is_debug = true;
     
-    C2_EnumOption opt_edit;
+    C2_EnumOption opt_view;
+    C2_EnumOption opt_mode;
     C2_EnumOption opt_gizmo;
     C2_EnumOption opt_space;
     C2_Slider snap_slider;
+    C2_Text snap_label;
+    C2_Seperator sep_gizmo;
+    C2_Seperator sep_space;
+    C2_Seperator sep_snap;
 
     enum ECaptureDrag { None, Look, Pan, Orbit, Dolly, Walk }
     ECaptureDrag drag;
@@ -82,32 +89,29 @@ public class PNL_SceneView : C2_Box
     bool drag_captured;
     bool skip_wrap_delta;
 
-    bool marquee;
-    bool marquee_add;
-    Vector2 marquee_a, marquee_b;
-    const float marquee_min = 4f;
-
-    ImpAsset _drop_asset;
-    ImpComp _drop_comp;
-    Type _drop_type;
-    ImpComp _drop_type_ghost;
-
     public bool IsCameraBusy => drag != ECaptureDrag.None;
 
     public PNL_SceneView()
     {
         cursor_filter = ECursorFilter.Hit;
-        gizmo_3d.gizmo_data = gizmo_data;
-        gizmo_2d.gizmo_data = gizmo_data;
+        mode_comp.view = this;
+        mode_land.view = this;
+        mode = mode_comp;
+        mode.OnBegin();
         look_dist = Vector3.Distance(viewport3D.camera.Position, viewport3D.camera.Target);
 
-        opt_edit = EnumOpt(typeof(ESceneEditorMode), edit_mode, e => edit_mode = (ESceneEditorMode)e);
+        opt_view = EnumOpt(typeof(ESceneEditView), view_mode, e => view_mode = (ESceneEditView)e);
         toolbar.Child_Add(ToolSep());
+        opt_mode = EnumOpt(typeof(ESceneEditMode), edit_mode, e => EditMode_Set((ESceneEditMode)e));
+        sep_gizmo = ToolSep();
+        toolbar.Child_Add(sep_gizmo);
         opt_gizmo = EnumOpt(typeof(EGizmoMode), gizmo_mode, e => gizmo_mode = (EGizmoMode)e);
-        toolbar.Child_Add(ToolSep());
+        sep_space = ToolSep();
+        toolbar.Child_Add(sep_space);
         opt_space = EnumOpt(typeof(EGizmoSpace), gizmo_orientation, e => gizmo_orientation = (EGizmoSpace)e);
-        toolbar.Child_Add(ToolSep());
-        toolbar.Child_Add(new C2_Text
+        sep_snap = ToolSep();
+        toolbar.Child_Add(sep_snap);
+        snap_label = new C2_Text
         {
             text = "Snap",
             style = UI_Text.MUTED,
@@ -120,7 +124,8 @@ public class PNL_SceneView : C2_Box
                 size_min = new(32, 22),
                 orient_V = EUIViewportAlignment.Center,
             },
-        });
+        };
+        toolbar.Child_Add(snap_label);
         snap_slider = new C2_Slider
         {
             is_spinner = true,
@@ -139,7 +144,7 @@ public class PNL_SceneView : C2_Box
         snap_slider.on_changed = s =>
         {
             float v = MathF.Max(0.001f, s.value);
-            if (edit_mode == ESceneEditorMode.Mode_2D)
+            if (view_mode == ESceneEditView.Mode_2D)
             {
                 gizmo_data.snap_translate_2d = v;
             }
@@ -198,6 +203,59 @@ public class PNL_SceneView : C2_Box
         }
     }
 
+    public void Camera3_Frame(Vector3 center, float radius)
+    {
+        float half_fov = viewport3D.camera.FovY * 0.5f * (MathF.PI / 180f);
+        float sin = MathF.Max(0.05f, MathF.Sin(half_fov));
+        look_dist = Math.Clamp(radius / sin * 1.2f, 0.5f, 10000f);
+        viewport3D.camera.Target = center;
+        viewport3D.camera.Position = center - CamFwd() * look_dist;
+    }
+
+    public void Camera2_Frame(Vector2 min, Vector2 max)
+    {
+        TDimensions2 vp = ActiveViewDim();
+        Vector2 span = Vector2.Max(max - min, new Vector2(16f)) * 1.15f;
+        viewport2D.camera.position = (min + max) * 0.5f;
+        float zoom = MathF.Min(
+            MathF.Max(1f, vp.size.X) / span.X,
+            MathF.Max(1f, vp.size.Y) / span.Y);
+        viewport2D.camera.zoom = Math.Clamp(zoom, 0.05f, 32f);
+    }
+
+    public void Camera_BeginWalk(ImpPlayer player)
+    {
+        BeginDrag(player, ECaptureDrag.Walk, true);
+    }
+
+    public void EditMode_Set(ESceneEditMode next)
+    {
+        EdEditMode next_mode = mode_comp;
+        if (next == ESceneEditMode.Landscape)
+        {
+            next_mode = mode_land;
+        }
+        if (edit_mode == next && mode == next_mode)
+        {
+            return;
+        }
+        edit_mode = next;
+        if (mode == next_mode)
+        {
+            return;
+        }
+        if (mode != null)
+        {
+            mode.OnEnd();
+        }
+        mode = next_mode;
+        if (mode != null)
+        {
+            mode.view = this;
+            mode.OnBegin();
+        }
+    }
+
     // ---------------------------------------------------------------------------------------------------------
     // Update
     // ---------------------------------------------------------------------------------------------------------
@@ -220,20 +278,47 @@ public class PNL_SceneView : C2_Box
         }
 
         toolbar.is_visible = true;
-        viewport3D.is_visible = edit_mode == ESceneEditorMode.Mode_3D;
-        viewport2D.is_visible = edit_mode == ESceneEditorMode.Mode_2D;
-        opt_edit.selected_enum = edit_mode;
+        viewport3D.is_visible = view_mode == ESceneEditView.Mode_3D;
+        viewport2D.is_visible = view_mode == ESceneEditView.Mode_2D;
+        if (opt_view != null)
+        {
+            opt_view.selected_enum = view_mode;
+        }
+        if (opt_mode != null)
+        {
+            opt_mode.selected_enum = edit_mode;
+        }
         opt_gizmo.selected_enum = gizmo_mode;
         opt_space.selected_enum = gizmo_orientation;
+        bool comps = edit_mode == ESceneEditMode.Comps;
+        if (sep_gizmo != null)
+        {
+            sep_gizmo.is_visible = comps;
+        }
+        opt_gizmo.is_visible = comps;
+        if (sep_space != null)
+        {
+            sep_space.is_visible = comps;
+        }
+        opt_space.is_visible = comps;
+        if (sep_snap != null)
+        {
+            sep_snap.is_visible = comps;
+        }
+        if (snap_label != null)
+        {
+            snap_label.is_visible = comps;
+        }
+        snap_slider.is_visible = comps;
 
-        if (edit_mode == ESceneEditorMode.Mode_2D && viewport2D.Root_Get() != null)
+        if (view_mode == ESceneEditView.Mode_2D && viewport2D.Root_Get() != null)
         {
             Imp2D.SceneLayout_Set(viewport2D.Root_Get(), viewport2D.CanvasSize());
         }
 
         if (snap_slider != null && !snap_slider.IsBusy)
         {
-            bool two = edit_mode == ESceneEditorMode.Mode_2D;
+            bool two = view_mode == ESceneEditView.Mode_2D;
             snap_slider.value_text_decimals = two ? 0 : 2;
             snap_slider.step = two ? 1f : 0f;
             snap_slider.drag_sensitivity = two ? 0.2f : 0.05f;
@@ -262,20 +347,12 @@ public class PNL_SceneView : C2_Box
                 {
                     EndDrag(script_player);
                 }
-                if (marquee)
+                if (mode != null)
                 {
-                    marquee = false;
-                    if (script_player.input_hog == this)
-                    {
-                        script_player.input_hog = null;
-                    }
+                    mode.OnHidden();
                 }
                 if (hidden_tab)
                 {
-                    if (_drop_asset != null)
-                    {
-                        Drop_Bind(null, script_player);
-                    }
                     if (script_player.input_hog == this)
                     {
                         script_player.input_hog = null;
@@ -305,7 +382,6 @@ public class PNL_SceneView : C2_Box
         bool rmb = ImpPlayer.Key_IsHeld(EInputKey.Mouse_Right);
         bool mmb = ImpPlayer.Key_IsHeld(EInputKey.Mouse_Middle);
         bool alt = ImpPlayer.Key_IsHeld(EInputKey.Key_LeftAlt) || ImpPlayer.Key_IsHeld(EInputKey.Key_RightAlt);
-        bool shift = ImpPlayer.Key_IsHeld(EInputKey.Key_LeftShift) || ImpPlayer.Key_IsHeld(EInputKey.Key_RightShift);
         bool lmb_p = ImpPlayer.Key_IsPressed(EInputKey.Mouse_Left);
         bool rmb_p = ImpPlayer.Key_IsPressed(EInputKey.Mouse_Right);
         bool mmb_p = ImpPlayer.Key_IsPressed(EInputKey.Mouse_Middle);
@@ -325,70 +401,30 @@ public class PNL_SceneView : C2_Box
         }
 
         bool hogged = player.input_hog != null && player.input_hog != this;
-        bool giz_drag = gizmo_3d.is_dragging || gizmo_2d.is_dragging;
-        if (hogged && drag == ECaptureDrag.None && !giz_drag)
+        bool mode_busy = mode != null && mode.IsBusy;
+        if (hogged && drag == ECaptureDrag.None && !mode_busy)
         {
             return;
         }
 
-        gizmo_data.snap_active = ImpPlayer.Key_IsHeld(EInputKey.Key_LeftControl)
-            || ImpPlayer.Key_IsHeld(EInputKey.Key_RightControl);
-
-        if (!IsCameraBusy)
-        {
-            if (ImpPlayer.Key_IsPressed(EInputKey.Key_W))
-            {
-                gizmo_mode = EGizmoMode.Translate;
-            }
-            if (ImpPlayer.Key_IsPressed(EInputKey.Key_E))
-            {
-                gizmo_mode = EGizmoMode.Rotate;
-            }
-            if (ImpPlayer.Key_IsPressed(EInputKey.Key_R))
-            {
-                gizmo_mode = EGizmoMode.Scale;
-            }
-        }
-        if (!IsCameraBusy && ImpPlayer.Key_IsPressed(EInputKey.Key_F))
-        {
-            Focus_Selection();
-        }
-        if (ImpPlayer.Key_IsPressed(EInputKey.Key_T))
-        {
-            if (gizmo_orientation == EGizmoSpace.Local)
-            {
-                gizmo_orientation = EGizmoSpace.World;
-            }
-            else
-            {
-                gizmo_orientation = EGizmoSpace.Local;
-            }
-        }
         if (ImpPlayer.Key_IsPressed(EInputKey.Key_Tab))
         {
-            if (edit_mode == ESceneEditorMode.Mode_3D)
+            if (view_mode == ESceneEditView.Mode_3D)
             {
-                edit_mode = ESceneEditorMode.Mode_2D;
+                view_mode = ESceneEditView.Mode_2D;
             }
             else
             {
-                edit_mode = ESceneEditorMode.Mode_3D;
+                view_mode = ESceneEditView.Mode_3D;
             }
         }
         if (ImpPlayer.Key_IsPressed(EInputKey.Key_1))
         {
-            edit_mode = ESceneEditorMode.Mode_3D;
+            view_mode = ESceneEditView.Mode_3D;
         }
         if (ImpPlayer.Key_IsPressed(EInputKey.Key_2))
         {
-            edit_mode = ESceneEditorMode.Mode_2D;
-        }
-        if (ImpPlayer.Key_IsPressed(EInputKey.Key_Escape))
-        {
-            if (ImpPlayer.TargetGame_IsHost())
-            {
-                gizmo_data.Selection_Clear();
-            }
+            view_mode = ESceneEditView.Mode_2D;
         }
         if (!IsCameraBusy && ImpPlayer.Key_IsPressed(EInputKey.Key_G))
         {
@@ -410,7 +446,7 @@ public class PNL_SceneView : C2_Box
         }
         else if (drag == ECaptureDrag.Pan)
         {
-            bool pan_held = mmb || (edit_mode == ESceneEditorMode.Mode_2D && (rmb || (alt && lmb)));
+            bool pan_held = mmb || (view_mode == ESceneEditView.Mode_2D && (rmb || (alt && lmb)));
             if (!pan_held)
             {
                 EndDrag(player);
@@ -435,59 +471,20 @@ public class PNL_SceneView : C2_Box
             return;
         }
 
-        TDimensions2 vp = ActiveViewDim();
-        bool allow_gizmo = over && ours && !alt && !ui_block;
-        bool giz_busy = false;
-        if (edit_mode == ESceneEditorMode.Mode_3D)
+        if (mode != null)
         {
-            giz_busy = gizmo_3d.Interact(viewport3D.camera, vp, player, this, allow_gizmo);
+            mode.OnUpdate(dt);
         }
-        else
+        if (drag != ECaptureDrag.None)
         {
-            giz_busy = gizmo_2d.Interact(viewport2D.camera, vp, player, this, allow_gizmo);
-        }
-
-        if (marquee)
-        {
-            marquee_b = player.cursor.position;
-            if (edit_mode == ESceneEditorMode.Mode_3D && rmb)
-            {
-                marquee = false;
-                BeginDrag(player, ECaptureDrag.Walk, true);
-                return;
-            }
-            if (!lmb)
-            {
-                marquee = false;
-                if (player.input_hog == this)
-                {
-                    player.input_hog = null;
-                }
-                if (Vector2.Distance(marquee_a, marquee_b) < marquee_min)
-                {
-                    PickAt(marquee_b, marquee_add);
-                }
-                else
-                {
-                    PickRect(vp, marquee_a, marquee_b, marquee_add);
-                }
-            }
+            UpdateCamera(dt, player);
             return;
         }
 
-        if (!giz_busy && over && ours && lmb_p && !alt && !ui_block)
+        bool block_cam = mode != null && mode.BlocksCamera;
+        if (!block_cam && ours && over && !hogged && !ui_block)
         {
-            marquee = true;
-            marquee_add = shift;
-            marquee_a = player.cursor.position;
-            marquee_b = marquee_a;
-            player.input_hog = this;
-            return;
-        }
-
-        if (!giz_busy && ours && over && !hogged && !ui_block)
-        {
-            if (edit_mode == ESceneEditorMode.Mode_3D)
+            if (view_mode == ESceneEditView.Mode_3D)
             {
                 if (alt && lmb_p)
                 {
@@ -519,18 +516,13 @@ public class PNL_SceneView : C2_Box
             }
         }
 
-        if (player.grab_is_active && over)
-        {
-            Drop_Tick(player, (float)dt);
-            TypeDrop_Tick(player);
-        }
-
-        if (drag == ECaptureDrag.None && over && !hogged && !ui_block)
+        bool block_wheel = mode != null && mode.BlocksWheel;
+        if (drag == ECaptureDrag.None && over && !hogged && !ui_block && !block_wheel)
         {
             float wheel = Raylib.GetMouseWheelMove();
             if (wheel != 0f)
             {
-                if (edit_mode == ESceneEditorMode.Mode_3D)
+                if (view_mode == ESceneEditView.Mode_3D)
                 {
                     Vector3 fwd = CamFwd();
                     look_dist = Math.Clamp(look_dist * MathF.Pow(0.85f, wheel), 0.2f, 10000f);
@@ -538,6 +530,7 @@ public class PNL_SceneView : C2_Box
                 }
                 else
                 {
+                    TDimensions2 vp = ActiveViewDim();
                     Vector2 before = ImpGizmo.ScreenToWorld(player.cursor.position, viewport2D.camera, vp);
                     viewport2D.camera.zoom = Math.Clamp(viewport2D.camera.zoom * MathF.Pow(1.18f, wheel), 0.05f, 32f);
                     Vector2 after = ImpGizmo.ScreenToWorld(player.cursor.position, viewport2D.camera, vp);
@@ -550,53 +543,18 @@ public class PNL_SceneView : C2_Box
     public override void _Notify_AsCursorTarget(ImpPlayer player, ENotifyGeneric notify, double dt)
     {
         base._Notify_AsCursorTarget(player, notify, dt);
-        if (notify == ENotifyGeneric.Update)
+        if (notify == ENotifyGeneric.Update && mode != null)
         {
-            Drop_Tick(player, (float)dt);
-            TypeDrop_Tick(player);
+            mode.OnCursorUpdate(player, dt);
         }
     }
 
     public override void _Notify_OnGrabDrop(ImpPlayer player, ENotifyGrabTarget notify, ImpComp other, double dt)
     {
         base._Notify_OnGrabDrop(player, notify, other, dt);
-        if (notify == ENotifyGrabTarget.Hover_AsInstigator_Start)
+        if (mode != null)
         {
-            Drop_Bind(Drop_AssetOf(other), player);
-            TypeDrop_Bind(Drop_TypeOf(other), player);
-        }
-        else if (notify == ENotifyGrabTarget.Hover_AsInstigator_End)
-        {
-            Drop_Bind(null, player);
-            TypeDrop_Bind(null, player);
-        }
-        else if (notify == ENotifyGrabTarget.Drop_AsInstigator)
-        {
-            if (_drop_asset == null)
-            {
-                _drop_asset = Drop_AssetOf(other);
-            }
-            if (_drop_asset != null)
-            {
-                ImpComp spawned = _drop_asset.SceneDrop_DropOnComp(scene?.root, player);
-                if (spawned != null)
-                {
-                    gizmo_data.Selection_Set(new[] { spawned });
-                }
-                Drop_Bind(null, player);
-                TypeDrop_Bind(null, player);
-                return;
-            }
-            if (_drop_type == null)
-            {
-                TypeDrop_Bind(Drop_TypeOf(other), player);
-            }
-            ImpComp made = TypeDrop_Commit(player);
-            if (made != null)
-            {
-                gizmo_data.Selection_Set(new[] { made });
-            }
-            TypeDrop_Bind(null, player);
+            mode.OnGrabDrop(player, notify, other, dt);
         }
     }
 
@@ -618,199 +576,17 @@ public class PNL_SceneView : C2_Box
         }
 
         Clip_Push(vp);
-        if (edit_mode == ESceneEditorMode.Mode_2D)
+        if (view_mode == ESceneEditView.Mode_2D)
         {
             DrawGrid2D(vp);
             DrawCanvasEdge(vp);
         }
 
-        double t_giz = ImpProfiler.enabled ? ImpProfiler.Now_Ms : 0;
-        if (edit_mode == ESceneEditorMode.Mode_3D)
+        if (mode != null)
         {
-            gizmo_3d.Draw(viewport3D.camera, vp, viewport3D.Root_Get());
-        }
-        else
-        {
-            gizmo_2d.Draw(viewport2D.camera, vp);
-        }
-        if (ImpProfiler.enabled)
-        {
-            ImpProfiler.sv_gizmo += ImpProfiler.Now_Ms - t_giz;
-        }
-
-        if (marquee && Vector2.Distance(marquee_a, marquee_b) >= marquee_min)
-        {
-            Vector2 min = Vector2.Min(marquee_a, marquee_b);
-            Vector2 size = Vector2.Max(marquee_a, marquee_b) - min;
-            Raylib.DrawRectangleV(min, size, new Color(70, 160, 255, 40));
-            Raylib.DrawRectangleLinesEx(new Rectangle(min.X, min.Y, size.X, size.Y), 1f, new Color(120, 200, 255, 220));
+            mode.OnDraw2DForeground(dt, flags);
         }
         Clip_Pop();
-    }
-
-    // ---------------------------------------------------------------------------------------------------------
-    // Pick / focus
-    // ---------------------------------------------------------------------------------------------------------
-
-    void PickAt(Vector2 screen, bool additive)
-    {
-        if (scene?.root == null)
-        {
-            return;
-        }
-        ImpComp hit;
-        if (edit_mode == ESceneEditorMode.Mode_3D)
-        {
-            hit = Imp3D.Select(viewport3D.Root_Get(), viewport3D.Trace_Ray(screen), out _);
-        }
-        else
-        {
-            hit = viewport2D.Trace_Pick(screen);
-        }
-
-        hit = ImpComp.OutlinerHost(hit);
-        if (hit == null)
-        {
-            if (!additive)
-            {
-                gizmo_data.Selection_Clear();
-            }
-            return;
-        }
-        if (additive)
-        {
-            gizmo_data.Selection_Toggle(hit);
-        }
-        else
-        {
-            gizmo_data.Selection_Set(new[] { hit });
-        }
-    }
-
-    void PickRect(TDimensions2 vp, Vector2 a, Vector2 b, bool additive)
-    {
-        if (scene?.root == null)
-        {
-            return;
-        }
-        Vector2 min = Vector2.Min(a, b);
-        Vector2 max = Vector2.Max(a, b);
-        List<ImpComp> hits = new();
-        if (edit_mode == ESceneEditorMode.Mode_3D)
-        {
-            C3_Gizmo.PickRect(scene.root, viewport3D.camera, vp, min, max, hits);
-        }
-        else
-        {
-            C2_Gizmo.PickRect(scene.root, viewport2D.camera, vp, min, max, hits);
-        }
-
-        List<ImpComp> hosts = new();
-        for (int i = 0; i < hits.Count; i++)
-        {
-            ImpComp h = ImpComp.OutlinerHost(hits[i]);
-            if (h == null)
-            {
-                continue;
-            }
-            bool already = false;
-            for (int j = 0; j < hosts.Count; j++)
-            {
-                if (hosts[j] == h)
-                {
-                    already = true;
-                    break;
-                }
-            }
-            if (!already)
-            {
-                hosts.Add(h);
-            }
-        }
-
-        if (additive)
-        {
-            gizmo_data.Selection_Add(hosts);
-        }
-        else
-        {
-            gizmo_data.Selection_Set(hosts);
-        }
-    }
-
-    public void Focus_Selection()
-    {
-        List<ImpComp> sel = gizmo_data.selected_comps;
-        TDimensions2 vp = ActiveViewDim();
-
-        if (edit_mode == ESceneEditorMode.Mode_3D)
-        {
-            Vector3 min = new(float.MaxValue);
-            Vector3 max = new(float.MinValue);
-            Vector3[] corners = new Vector3[8];
-            int count = 0;
-            for (int i = 0; i < sel.Count; i++)
-            {
-                if (sel[i] is not Imp3D c3)
-                {
-                    continue;
-                }
-                TBounds3 b = c3.Bounds_Get();
-                if (b.IsEmpty)
-                {
-                    continue;
-                }
-                b.Corners(corners);
-                for (int k = 0; k < 8; k++)
-                {
-                    min = Vector3.Min(min, corners[k]);
-                    max = Vector3.Max(max, corners[k]);
-                }
-                count++;
-            }
-            if (count == 0)
-            {
-                return;
-            }
-            Vector3 center = (min + max) * 0.5f;
-            float radius = MathF.Max(0.25f, Vector3.Distance(max, min) * 0.5f);
-            float half_fov = viewport3D.camera.FovY * 0.5f * (MathF.PI / 180f);
-            float sin = MathF.Max(0.05f, MathF.Sin(half_fov));
-            look_dist = Math.Clamp(radius / sin * 1.2f, 0.5f, 10000f);
-            viewport3D.camera.Target = center;
-            viewport3D.camera.Position = center - CamFwd() * look_dist;
-            return;
-        }
-
-        Vector2 min2 = new(float.MaxValue);
-        Vector2 max2 = new(float.MinValue);
-        Vector2[] corners2 = new Vector2[4];
-        int count2 = 0;
-        for (int i = 0; i < sel.Count; i++)
-        {
-            if (sel[i] is not Imp2D c2 || c2 is C2_Gizmo)
-            {
-                continue;
-            }
-            C2_Gizmo.CompCorners(c2, corners2);
-            for (int k = 0; k < 4; k++)
-            {
-                min2 = Vector2.Min(min2, corners2[k]);
-                max2 = Vector2.Max(max2, corners2[k]);
-            }
-            count2++;
-        }
-        if (count2 == 0)
-        {
-            min2 = Vector2.Zero;
-            max2 = viewport2D.CanvasSize();
-        }
-        Vector2 span = Vector2.Max(max2 - min2, new Vector2(16f)) * 1.15f;
-        viewport2D.camera.position = (min2 + max2) * 0.5f;
-        float zoom = MathF.Min(
-            MathF.Max(1f, vp.size.X) / span.X,
-            MathF.Max(1f, vp.size.Y) / span.Y);
-        viewport2D.camera.zoom = Math.Clamp(zoom, 0.05f, 32f);
     }
 
     // ---------------------------------------------------------------------------------------------------------
@@ -831,7 +607,7 @@ public class PNL_SceneView : C2_Box
         }
         skip_wrap_delta = false;
 
-        if (edit_mode == ESceneEditorMode.Mode_2D)
+        if (view_mode == ESceneEditView.Mode_2D)
         {
             float z = viewport2D.camera.zoom;
             if (z <= 1e-6f)
@@ -893,7 +669,8 @@ public class PNL_SceneView : C2_Box
             {
                 speed *= 4f;
             }
-            Vector3 delta = (fwd * move.X + right * move.Z + Vector3.UnitY * vert) * speed * (float)dt;
+
+            Vector3 delta = (fwd * -move.Z + right * move.X + Vector3.UnitY * vert) * speed * (float)dt;
             viewport3D.camera.Position += delta;
             viewport3D.camera.Target += delta;
 
@@ -997,257 +774,29 @@ public class PNL_SceneView : C2_Box
         skip_wrap_delta = true;
     }
 
-    // ---------------------------------------------------------------------------------------------------------
-    // Drop
-    // ---------------------------------------------------------------------------------------------------------
-
-    ImpComp Drop_Pick(ImpPlayer player)
+    public Imp2D Drop_View()
     {
-        if (scene?.root == null)
-        {
-            return null;
-        }
-        if (edit_mode == ESceneEditorMode.Mode_3D)
-        {
-            viewport3D.Trace_World(player.cursor.position, out _, out Imp3D hit);
-            return hit;
-        }
-        return viewport2D.Trace_Pick(player.cursor.position);
-    }
-
-    Imp2D Drop_View()
-    {
-        if (edit_mode == ESceneEditorMode.Mode_2D)
+        if (view_mode == ESceneEditView.Mode_2D)
         {
             return viewport2D;
         }
         return viewport3D;
     }
 
-    static ImpAsset Drop_AssetOf(ImpComp dropped)
-    {
-        object payload = dropped?.CursorGrab_Payload();
-        if (payload is ImpAsset asset)
-        {
-            return asset;
-        }
-        if (payload is string path)
-        {
-            return ImpAsset.Load(path);
-        }
-        return null;
-    }
-
-    void Drop_Bind(ImpAsset asset, ImpPlayer player)
-    {
-        if (_drop_asset == asset)
-        {
-            return;
-        }
-        Imp2D view = Drop_View();
-        if (_drop_asset != null)
-        {
-            if (_drop_comp != null)
-            {
-                _drop_asset.SceneDrop_CompExit(_drop_comp, player);
-                _drop_comp = null;
-            }
-            _drop_asset.SceneDrop_Exit(view, player);
-        }
-        _drop_asset = asset;
-        if (_drop_asset != null)
-        {
-            _drop_asset.SceneDrop_Enter(view, player);
-        }
-    }
-
-    void Drop_Tick(ImpPlayer player, float dt)
-    {
-        if (_drop_asset == null || !player.grab_is_active)
-        {
-            return;
-        }
-        Imp2D view = Drop_View();
-        ImpComp hit = Drop_Pick(player);
-        if (hit != _drop_comp)
-        {
-            if (_drop_comp != null)
-            {
-                _drop_asset.SceneDrop_CompExit(_drop_comp, player);
-            }
-            _drop_comp = hit;
-            if (_drop_comp != null)
-            {
-                _drop_asset.SceneDrop_CompEnter(_drop_comp, player);
-            }
-        }
-        _drop_asset.SceneDrop_Update(view, dt, player);
-    }
-
-    static Type Drop_TypeOf(ImpComp dropped)
-    {
-        object payload = dropped?.CursorGrab_Payload();
-        if (payload is Type t && typeof(ImpComp).IsAssignableFrom(t) && !t.IsAbstract)
-        {
-            return t;
-        }
-        return null;
-    }
-
-    void TypeDrop_Bind(Type type, ImpPlayer player)
-    {
-        if (_drop_type == type && (type == null || _drop_type_ghost != null))
-        {
-            return;
-        }
-        TypeDrop_Clear();
-        _drop_type = type;
-        if (type == null || scene == null)
-        {
-            return;
-        }
-        ImpComp ghost;
-        try
-        {
-            ghost = Activator.CreateInstance(type) as ImpComp;
-        }
-        catch
-        {
-            ghost = null;
-        }
-        if (ghost == null)
-        {
-            return;
-        }
-        ghost.name = C2_Tree.Class_DisplayName(type);
-        if (ghost is Imp2D)
-        {
-            edit_mode = ESceneEditorMode.Mode_2D;
-        }
-        else if (ghost is Imp3D)
-        {
-            edit_mode = ESceneEditorMode.Mode_3D;
-        }
-        _drop_type_ghost = ghost;
-        ghost.scene = scene;
-        Imp2D view = Drop_View();
-        if (view is C2_Viewport3D v3)
-        {
-            v3.overlay = ghost;
-        }
-        else if (view is C2_Viewport2D v2)
-        {
-            v2.overlay = ghost;
-        }
-        TypeDrop_Tick(player);
-    }
-
-    void TypeDrop_Clear()
-    {
-        Imp2D view = Drop_View();
-        if (view is C2_Viewport3D v3 && v3.overlay == _drop_type_ghost)
-        {
-            v3.overlay = null;
-        }
-        if (view is C2_Viewport2D v2 && v2.overlay == _drop_type_ghost)
-        {
-            v2.overlay = null;
-        }
-        _drop_type_ghost?.Destroy();
-        _drop_type_ghost = null;
-        _drop_type = null;
-    }
-
-    void TypeDrop_Tick(ImpPlayer player)
-    {
-        if (_drop_type_ghost == null || player == null)
-        {
-            return;
-        }
-        Imp2D view = Drop_View();
-        if (_drop_type_ghost is Imp3D g3 && view is C2_Viewport3D v3)
-        {
-            if (v3.Trace_World(player.cursor.position, out Vector3 pos, out _))
-            {
-                g3.Position_Set(pos, true);
-            }
-        }
-        else if (_drop_type_ghost is Imp2D g2 && view is C2_Viewport2D v2)
-        {
-            g2.Position_Set(v2.Trace_World(player.cursor.position), true);
-        }
-    }
-
-    ImpComp TypeDrop_Commit(ImpPlayer player)
-    {
-        if (_drop_type_ghost == null)
-        {
-            return null;
-        }
-        ImpComp dest = scene?.root;
-        if (dest == null || dest == _drop_type_ghost || _drop_type_ghost.IsAncestorOf(dest))
-        {
-            TypeDrop_Clear();
-            return null;
-        }
-        if (dest.IsPackedForeign || dest.IsInstanceRoot)
-        {
-            TypeDrop_Clear();
-            return null;
-        }
-
-        TTransform3? w3 = null;
-        TTransform2? w2 = null;
-        if (_drop_type_ghost is Imp3D c3)
-        {
-            w3 = c3.Transform_Get(true);
-        }
-        if (_drop_type_ghost is Imp2D c2)
-        {
-            w2 = c2.Transform_Get(true);
-        }
-
-        Imp2D view = Drop_View();
-        if (view is C2_Viewport3D v3 && v3.overlay == _drop_type_ghost)
-        {
-            v3.overlay = null;
-        }
-        if (view is C2_Viewport2D v2 && v2.overlay == _drop_type_ghost)
-        {
-            v2.overlay = null;
-        }
-
-        ImpComp spawned = _drop_type_ghost;
-        _drop_type_ghost = null;
-        _drop_type = null;
-        spawned.name = ImpComp.Name_Unique(dest, spawned.name ?? spawned.GetType().Name);
-        dest.Child_Add(spawned);
-        if (w3.HasValue && spawned is Imp3D a3)
-        {
-            a3.Transform_Set(w3.Value, true);
-        }
-        if (w2.HasValue && spawned is Imp2D a2)
-        {
-            a2.Transform_Set(w2.Value, true);
-        }
-        ImpUndo.Comp_Moved(spawned, default, "Add " + spawned.name);
-        return spawned;
-    }
-
     // ---------------------------------------------------------------------------------------------------------
     // Overlay helpers
     // ---------------------------------------------------------------------------------------------------------
 
-    TDimensions2 ActiveViewDim()
+    public TDimensions2 ActiveViewDim()
     {
-        if (edit_mode == ESceneEditorMode.Mode_2D)
+        if (view_mode == ESceneEditView.Mode_2D)
         {
             return viewport2D.Dimensions_Get();
         }
         return viewport3D.Dimensions_Get();
     }
 
-    bool IsChildFocus(ImpComp focus)
+    public bool IsChildFocus(ImpComp focus)
     {
         ImpComp n = focus;
         while (n != null)

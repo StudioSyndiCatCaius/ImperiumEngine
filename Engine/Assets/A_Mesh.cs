@@ -3,9 +3,17 @@ using ImperiumEngine.Assets.Materials;
 using ImperiumEngine.Comps._2D;
 using ImperiumEngine.Comps._3D;
 using ImperiumEngine.Structs;
+using JoltPhysicsSharp;
 using R3D_cs;
 
 namespace ImperiumEngine.Assets;
+
+public enum EMeshCollision : byte
+{
+    Box,
+    Convex,    // default for imports
+    Triangle,  // static only
+}
 
 public class A_Mesh : ImpAsset
 {
@@ -17,7 +25,12 @@ public class A_Mesh : ImpAsset
     public List<Mesh> meshes = new();
     public List<int> mesh_materials = new();
     [ImpVar] public List<A_Material> materials = new();
+    [ImpVar][Category("Physics")] public EMeshCollision collision_type = EMeshCollision.Convex;
 
+    public List<Vector3> collision_points = new();
+    public List<uint> collision_indices = new();
+    public List<Vector3> collision_hull = new();
+    
     public override void Source_OnReload(ImpFile file)
     {
         base.Source_OnReload(file);
@@ -138,6 +151,194 @@ public class A_Mesh : ImpAsset
             {
             }
             return string.Equals(p, source_path, StringComparison.OrdinalIgnoreCase);
+        }
+        
+        collision_points.Clear();
+        collision_indices.Clear();
+        collision_hull.Clear();
+        Span<MeshData> cpu = mdl.MeshData;
+        for (int m = 0; m < mesh_count; m++)
+        {
+            if (m >= cpu.Length)
+            {
+                break;
+            }
+            MeshData _data = cpu[m];
+            if (_data.VertexCount <= 0)
+            {
+                continue;
+            }
+
+            uint vbase = (uint)collision_points.Count;
+            Span<Vertex> verts = _data.Vertices;
+            int vcount = _data.VertexCount;
+            if (vcount > verts.Length)
+            {
+                vcount = verts.Length;
+            }
+            for (int v = 0; v < vcount; v++)
+            {
+                collision_points.Add(verts[v].Position);
+            }
+
+            if (_data.IndexCount <= 0)
+            {
+                continue;
+            }
+            Span<uint> idx = _data.Indices;
+            int icount = _data.IndexCount;
+            if (icount > idx.Length)
+            {
+                icount = idx.Length;
+            }
+            for (int n = 0; n < icount; n++)
+            {
+                collision_indices.Add(idx[n] + vbase);
+            }
+        }
+        Collision_Cook();
+    }
+
+    public void Collision_Cook()
+    {
+        collision_hull.Clear();
+        if (collision_points == null || collision_points.Count < 4)
+        {
+            return;
+        }
+
+        const int weld_scale = 1000;
+        const int hull_budget = 64;
+        HashSet<(int, int, int)> seen = new();
+        List<Vector3> unique = new();
+        for (int i = 0; i < collision_points.Count; i++)
+        {
+            Vector3 p = collision_points[i];
+            if (!float.IsFinite(p.X) || !float.IsFinite(p.Y) || !float.IsFinite(p.Z))
+            {
+                continue;
+            }
+            (int, int, int) key = (
+                (int)MathF.Round(p.X * weld_scale),
+                (int)MathF.Round(p.Y * weld_scale),
+                (int)MathF.Round(p.Z * weld_scale));
+            if (!seen.Add(key))
+            {
+                continue;
+            }
+            unique.Add(p);
+        }
+        if (unique.Count < 4)
+        {
+            return;
+        }
+
+        List<Vector3> input = unique;
+        if (unique.Count > hull_budget)
+        {
+            int i_min_x = 0;
+            int i_max_x = 0;
+            int i_min_y = 0;
+            int i_max_y = 0;
+            int i_min_z = 0;
+            int i_max_z = 0;
+            for (int i = 1; i < unique.Count; i++)
+            {
+                Vector3 p = unique[i];
+                if (p.X < unique[i_min_x].X)
+                {
+                    i_min_x = i;
+                }
+                if (p.X > unique[i_max_x].X)
+                {
+                    i_max_x = i;
+                }
+                if (p.Y < unique[i_min_y].Y)
+                {
+                    i_min_y = i;
+                }
+                if (p.Y > unique[i_max_y].Y)
+                {
+                    i_max_y = i;
+                }
+                if (p.Z < unique[i_min_z].Z)
+                {
+                    i_min_z = i;
+                }
+                if (p.Z > unique[i_max_z].Z)
+                {
+                    i_max_z = i;
+                }
+            }
+
+            HashSet<int> pick = new();
+            pick.Add(i_min_x);
+            pick.Add(i_max_x);
+            pick.Add(i_min_y);
+            pick.Add(i_max_y);
+            pick.Add(i_min_z);
+            pick.Add(i_max_z);
+
+            int step = unique.Count / hull_budget;
+            if (step < 1)
+            {
+                step = 1;
+            }
+            for (int i = 0; i < unique.Count && pick.Count < hull_budget; i += step)
+            {
+                pick.Add(i);
+            }
+            for (int i = 0; i < unique.Count && pick.Count < hull_budget; i++)
+            {
+                pick.Add(i);
+            }
+
+            input = new List<Vector3>(pick.Count);
+            foreach (int i in pick)
+            {
+                input.Add(unique[i]);
+            }
+        }
+
+        for (int i = 0; i < input.Count; i++)
+        {
+            collision_hull.Add(input[i]);
+        }
+        if (collision_hull.Count < 4)
+        {
+            return;
+        }
+
+        Shape cooked = null;
+        try
+        {
+            Vector3[] pts = new Vector3[collision_hull.Count];
+            for (int i = 0; i < collision_hull.Count; i++)
+            {
+                pts[i] = collision_hull[i];
+            }
+            ConvexHullShapeSettings settings = new(pts);
+            cooked = settings.Create();
+            ConvexHullShape hull_shape = cooked as ConvexHullShape;
+            if (hull_shape != null)
+            {
+                uint n = hull_shape.GetNumPoints();
+                if (n >= 4)
+                {
+                    collision_hull.Clear();
+                    for (uint i = 0; i < n; i++)
+                    {
+                        collision_hull.Add(hull_shape.GetPoint(i));
+                    }
+                }
+            }
+        }
+        catch
+        {
+        }
+        if (cooked != null)
+        {
+            cooked.Dispose();
         }
     }
 
@@ -341,18 +542,21 @@ public class A_Mesh : ImpAsset
     {
         mesh = R3D.GenMeshCube(1f, 1f, 1f),
         filepath = BuiltinPrefix + "A_Mesh.GEO_CUBE",
+        collision_type = EMeshCollision.Box,
         materials = [ Mat_Surface.PROTO_TILE_WHITE]
     };
     public static A_Mesh GEO_PLANE => _geo_plane ??= new A_Mesh
     {
         mesh = R3D.GenMeshPlane(1f, 1f, 1, 1),
         filepath = BuiltinPrefix + "A_Mesh.GEO_PLANE",
+        collision_type = EMeshCollision.Box,
         materials = [ Mat_Surface.PROTO_TILE_WHITE]
     };
     public static A_Mesh GEO_SPHERE => _geo_sphere ??= new A_Mesh
     {
         mesh = R3D.GenMeshSphere(0.5f, 32, 48),
         filepath = BuiltinPrefix + "A_Mesh.GEO_SPHERE",
+        collision_type = EMeshCollision.Box,
         materials = [ Mat_Surface.PROTO_TILE_WHITE]
     };
     

@@ -1,0 +1,12 @@
+{
+  "_class": "A_Texture",
+  "vars": {
+    "pixel_format": "0",
+    "hue": 0,
+    "saturation": 1,
+    "brightness": 1,
+    "ui_layout": "Stretch",
+    "source_file": "T_editor_S_grass2_N.png",
+    "source_index": 0
+  }
+}

@@ -1,4 +1,4 @@
-﻿using System.Numerics;
+using System.Numerics;
 using ImperiumEngine;
 using ImperiumEngine.Assets;
 using ImperiumEngine.Enums;
@@ -13,13 +13,18 @@ public class C3_Camera : Imp3D
 {
     [ImpVar] public A_CameraConfig config = new();
     [ImpVar] public Imp3D look_target;
-    [ImpVar] public bool follow_pawn_when_view_target; //when this camera is the view target, set this camera position to the pawn position
+    [ImpVar] public bool follow_pawn_when_view_target = true;
+
+    public C3_SpringArm camera_boom = new();
 
     static A_Mesh _cam_mesh = A_Mesh.UTIL_CAMERA;
+    
 
-    Vector3 _aim;
-    bool _start_applied;
-    bool _boom_snap;
+    public C3_Camera()
+    {
+        physics_enabled = false;
+        Child_Add(camera_boom);
+    }
 
     public A_CameraConfig Config_Get()
     {
@@ -32,289 +37,106 @@ public class C3_Camera : Imp3D
 
     public TTransform3 Transform_GetForCamera()
     {
-        TTransform3 w = Transform_Get(true);
-        A_CameraConfig cfg = Config_Get();
-        float boom = (float)cfg.boom_distance;
-        if (boom > 0.001f)
+        Boom_ApplyConfig();
+        if (camera_boom != null)
         {
-            Quaternion rot = ImpMath.Euler_2_Quat(w.rotation);
-            Vector3 forward = Vector3.Transform(-Vector3.UnitZ, rot);
-            Vector3 pivot = w.position;
-            if (cfg.boom_uses_collision)
-            {
-                Imp3D pawn = null;
-                for (int i = 0; i < ImpPlayer.players.Count; i++)
-                {
-                    if (ImpPlayer.players[i].pawn != null)
-                    {
-                        pawn = ImpPlayer.players[i].pawn;
-                        break;
-                    }
-                }
-                float skin = 0.15f;
-                float start_d = 0.05f;
-                if (pawn is C3_Collider col)
-                {
-                    float rad = col.extents.X;
-                    if (col.extents.Z > rad)
-                    {
-                        rad = col.extents.Z;
-                    }
-                    start_d = rad + 0.05f;
-                }
-                if (start_d >= boom)
-                {
-                    start_d = boom * 0.25f;
-                }
-                Vector3 ray_start = pivot - forward * start_d;
-                Vector3 ray_end = pivot - forward * boom;
-                ImpPhys phys = null;
-                if (game_owner != null)
-                {
-                    phys = game_owner.phys;
-                }
-                TTraceResult3D hit;
-                if (phys != null)
-                {
-                    hit = phys.Trace_Line(ray_start, ray_end, ECollisionChannel.World, c =>
-                    {
-                        if (c == null)
-                        {
-                            return true;
-                        }
-                        if (c == this || c == pawn)
-                        {
-                            return false;
-                        }
-                        if (pawn != null && c.IsDescendantOf(pawn))
-                        {
-                            return false;
-                        }
-                        return true;
-                    });
-                }
-                else
-                {
-                    hit = default;
-                }
-                if (hit.hit)
-                {
-                    float dist = Vector3.Distance(pivot, hit.hit_position) - skin;
-                    if (dist < 0.05f)
-                    {
-                        dist = 0.05f;
-                    }
-                    if (dist < boom)
-                    {
-                        boom = dist;
-                    }
-                }
-            }
-            w.position = pivot - forward * boom;
+            return camera_boom.Socket_WorldTransform();
         }
-        return w;
+        return Transform_Get(true);
     }
 
     public override void OnBegin()
     {
         base.OnBegin();
-        _aim = transform.rotation;
-        _start_applied = false;
-        _boom_snap = true;
+        Boom_ApplyConfig();
+        if (camera_boom != null)
+        {
+            camera_boom.ResetLag();
+        }
     }
 
     public override void OnUpdate(double dt)
     {
         base.OnUpdate(dt);
-        A_CameraConfig cfg = Config_Get();
-        bool is_view = ImpApp.view_target == this;
-        if (is_view && !_start_applied)
+        
+        //look to target
+        if(look_target != null)
         {
-            _aim = cfg.starting_rotation;
-            Rotation_Set(_aim, false);
-            _start_applied = true;
-            _boom_snap = true;
+            Vector3 _targ=ImpMath.V3_Interp(global_transform.position, look_target.global_transform.position, dt, config.look_speed);
+            Rotation_Set(_targ, true);
         }
-        if (!is_view)
-        {
-            _start_applied = false;
-            _boom_snap = true;
-        }
-
-        if (is_view)
-        {
-            Imp3D pawn = null;
-            for (int i = 0; i < ImpPlayer.players.Count; i++)
-            {
-                if (ImpPlayer.players[i].pawn != null)
-                {
-                    pawn = ImpPlayer.players[i].pawn;
-                    break;
-                }
-            }
-            if (pawn != null)
-            {
-                Vector3 want = pawn.Position_Get(true);
-                if (pawn is C3_Collider col)
-                {
-                    col.Shape_Local(out _, out Vector3 center);
-                    TTransform3 pw = pawn.Transform_Get(true);
-                    Quaternion q = ImpMath.Euler_2_Quat(pw.rotation);
-                    want = want + Vector3.Transform(center * pw.scale, q);
-                }
-                if (cfg.boom_lag_position && !_boom_snap && cfg.boom_lag_position_speed > 0.0001f)
-                {
-                    Vector3 cur = Position_Get(true);
-                    float t = 1f - MathF.Exp(-(float)dt * cfg.boom_lag_position_speed);
-                    Position_Set(Vector3.Lerp(cur, want, t), true);
-                }
-                else
-                {
-                    Position_Set(want, true);
-                }
-                _boom_snap = false;
-            }
-        }
-
-        if (look_target != null)
-        {
-            Vector3 from = Position_Get(true);
-            Vector3 to = look_target.Position_Get(true);
-            Vector3 d = to - from;
-            if (d.LengthSquared() > 1e-8f)
-            {
-                float yaw = MathF.Atan2(d.X, -d.Z) * (180f / MathF.PI);
-                float horiz = MathF.Sqrt(d.X * d.X + d.Z * d.Z);
-                float pitch = MathF.Atan2(d.Y, horiz) * (180f / MathF.PI);
-                if (pitch > 89.9f)
-                {
-                    pitch = 89.9f;
-                }
-                if (pitch < -89.9f)
-                {
-                    pitch = -89.9f;
-                }
-                Vector3 world_aim = new(pitch, yaw, 0f);
-                if (parent is Imp3D p3)
-                {
-                    Vector3 parent_r = p3.Rotation_Get(true);
-                    Quaternion local_q = Quaternion.Inverse(ImpMath.Euler_2_Quat(parent_r)) * ImpMath.Euler_2_Quat(world_aim);
-                    _aim = ImpMath.Quat_2_Euler(local_q);
-                }
-                else
-                {
-                    _aim = world_aim;
-                }
-            }
-        }
-
-        if (!is_view && look_target == null && input_owner == null)
-        {
-            return;
-        }
-
-        float rot_k;
-        if (cfg.boom_lag_rotation)
-        {
-            rot_k = cfg.boom_lag_rotation_speed;
-        }
-        else
-        {
-            rot_k = (float)cfg.look_lerp * 12f;
-        }
-        if (rot_k <= 0.0001f)
-        {
-            Rotation_Set(_aim, false);
-            return;
-        }
-        float rot_t = 1f - MathF.Exp(-(float)dt * rot_k);
-        Quaternion cur_q = ImpMath.Euler_2_Quat(Rotation_Get(false));
-        Quaternion want_q = ImpMath.Euler_2_Quat(_aim);
-        Rotation_Set(ImpMath.Quat_2_Euler(Quaternion.Slerp(cur_q, want_q, rot_t)), false);
+        
     }
+
+    public override void _Notify_AsViewTarget(ImpPlayer player, ENotifyGeneric notify, double dt)
+    {
+        base._Notify_AsViewTarget(player, notify, dt);
+        switch (notify)
+        {
+            case ENotifyGeneric.Begin:
+                break;
+            case ENotifyGeneric.End:
+                break;
+            case ENotifyGeneric.Update:
+                if (follow_pawn_when_view_target)
+                {
+                    Imp3D pawn = Pawn_Get();
+                    if (pawn != null)
+                    {
+                        Vector3 _offset=new(0f, 1.5f, 0f);
+                        Position_Set(pawn.global_transform.position+_offset, true);
+                    }
+                }
+                break;
+            
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------------------------
+    // INPUT
+    // ---------------------------------------------------------------------------------------------------------
 
     public override void Input_Update(ImpPlayer player, TLabel iaction, double dt, Vector3 axis)
     {
         base.Input_Update(player, iaction, dt, axis);
         A_CameraConfig cfg = Config_Get();
+        
+        // ----------------------
+        // ROTATE
+        // ----------------------
+        float rotate_sensitivity = 2.5f;
+        float rotate_rate=rotate_sensitivity*(float)dt;
         if (iaction == "_Rotate")
         {
-            if (look_target != null)
+            if ((!cfg.enable_rotate_H && !cfg.enable_rotate_V) || look_target != null)
             {
                 return;
             }
-            if (!cfg.enable_rotate_H && !cfg.enable_rotate_V)
-            {
-                return;
-            }
-            float scale = (float)cfg.look_speed;
-            if (MathF.Abs(axis.X) <= 2f && MathF.Abs(axis.Y) <= 2f)
-            {
-                scale *= 180f * (float)dt;
-            }
+
             if (cfg.enable_rotate_H)
             {
-                _aim.Y -= axis.Y * scale;
+                transform.rotation.X += axis.X * rotate_rate;
             }
             if (cfg.enable_rotate_V)
             {
-                _aim.X -= axis.X * scale;
+                transform.rotation.Y += axis.Y * rotate_rate;
             }
-            if (_aim.X > 89.9f)
-            {
-                _aim.X = 89.9f;
-            }
-            if (_aim.X < -89.9f)
-            {
-                _aim.X = -89.9f;
-            }
+            
             return;
         }
-        if (iaction != "_Move")
-        {
-            return;
-        }
-        if (!cfg.enable_move)
-        {
-            return;
-        }
+        // ----------------------
+        // INPUT
+        // ----------------------
         Imp3D pawn = player.pawn;
-        if (pawn == null)
+        if (pawn == null && iaction=="_Move" && cfg.enable_move)
         {
             return;
         }
-        Vector3 local = new(axis.Z, axis.Y, -axis.X);
-        Vector3 yaw_only = new(0f, Rotation_Get(true).Y, 0f);
-        pawn.Phys_MoveByRot(local, 1, yaw_only);
+        //Vector3 local = new(axis.Z, axis.Y, -axis.X);
+        //Vector3 yaw_only = new(0f, Rotation_Get(true).Y, 0f);
+        pawn.Phys_MoveByRot(axis, 1, global_transform.rotation*Vector3.UnitY);
     }
-
-    public override void Input_Pressed(ImpPlayer player, TLabel iaction, Vector3 axis)
-    {
-        base.Input_Pressed(player, iaction, axis);
-        if (iaction != "_Jump")
-        {
-            return;
-        }
-        if (!Config_Get().enable_move)
-        {
-            return;
-        }
-        Imp3D pawn = player.pawn;
-        if (pawn == null)
-        {
-            return;
-        }
-        if (!pawn.is_grounded)
-        {
-            return;
-        }
-        A_MoveMode mode = pawn.move_mode;
-        if (mode == null)
-        {
-            mode = A_MoveMode.DEFAULT;
-        }
-        pawn.Phys_Launch(Vector3.UnitY, mode.jump_speed, false, true);
-    }
+    
 
     public override void OnDraw3D(double dt, EDrawFlags flags)
     {
@@ -387,6 +209,7 @@ public class C3_Camera : Imp3D
         }
 
         t.position = fin;
+        t.rotation = cam_xf.rotation;
         Imp3D.Draw3D_Mesh(_cam_mesh, t);
     }
 
@@ -425,5 +248,39 @@ public class C3_Camera : Imp3D
     public override bool Camera_IsValid()
     {
         return true;
+    }
+
+    void Boom_ApplyConfig()
+    {
+        if (camera_boom == null)
+        {
+            return;
+        }
+        A_CameraConfig cfg = Config_Get();
+        camera_boom.target_arm_length = (float)cfg.boom_distance;
+        camera_boom.do_collision_test = cfg.boom_uses_collision;
+        camera_boom.enable_camera_lag = cfg.boom_lag_position;
+        camera_boom.camera_lag_speed = cfg.boom_lag_position_speed;
+        camera_boom.enable_camera_rotation_lag = cfg.boom_lag_rotation;
+        camera_boom.camera_rotation_lag_speed = cfg.boom_lag_rotation_speed;
+    }
+
+    Imp3D Pawn_Get()
+    {
+        for (int i = 0; i < ImpPlayer.players.Count; i++)
+        {
+            if (ImpPlayer.players[i].target_view == this)
+            {
+                return ImpPlayer.players[i].pawn;
+            }
+        }
+        for (int i = 0; i < ImpPlayer.players.Count; i++)
+        {
+            if (ImpPlayer.players[i].pawn != null)
+            {
+                return ImpPlayer.players[i].pawn;
+            }
+        }
+        return null;
     }
 }

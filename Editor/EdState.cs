@@ -251,7 +251,8 @@ public static class EdState
             TomlTable t = scenes[i];
             EdStateScene s = new();
             s.path = t.GetString("path");
-            s.edit_mode = t.GetString("edit_mode", "Mode_3D");
+            s.edit_mode = t.GetString("view_mode", "Mode_3D");
+            s.scene_edit_mode = t.GetString("scene_edit_mode", "Comps");
             s.gizmo_mode = t.GetString("gizmo_mode", "Translate");
             s.gizmo_space = t.GetString("gizmo_space", "Local");
             s.snap_translate = t.GetFloat("snap_translate", 0.25f);
@@ -329,7 +330,8 @@ public static class EdState
             EdStateScene s = data.scenes[i];
             TomlTable t = doc.root.AddArrayTable("open_scenes");
             t.Set("path", s.path ?? "");
-            t.Set("edit_mode", s.edit_mode ?? "Mode_3D");
+            t.Set("view_mode", s.edit_mode ?? "Mode_3D");
+            t.Set("scene_edit_mode", s.scene_edit_mode ?? "Comps");
             t.Set("gizmo_mode", s.gizmo_mode ?? "Translate");
             t.Set("gizmo_space", s.gizmo_space ?? "Local");
             t.Set("snap_translate", s.snap_translate);
@@ -492,6 +494,7 @@ public class EdStateScene
 {
     public string path = "";
     public string edit_mode = "Mode_3D";
+    public string scene_edit_mode = "Comps";
     public string gizmo_mode = "Translate";
     public string gizmo_space = "Local";
     public float snap_translate = 0.25f;

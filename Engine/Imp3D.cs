@@ -18,7 +18,7 @@ public class Imp3D : ImpComp
     // #######################################################################################################################
 
     [ImpVar][Config] public static AntiAliasingMode anti_aliasing_mode = AntiAliasingMode.Smaa;
-    [ImpVar][Config] public static AntiAliasingPreset anti_aliasing_preset = AntiAliasingPreset.High;
+    [ImpVar][Config] public static AntiAliasingPreset anti_aliasing_preset = AntiAliasingPreset.Ultra;
 
     static int _r3d_res_w;
     static int _r3d_res_h;
@@ -554,6 +554,8 @@ public class Imp3D : ImpComp
         }
         return false;
     }
+    
+    
 
     // #######################################################################################################################
     // #######################################################################################################################
@@ -564,6 +566,7 @@ public class Imp3D : ImpComp
     [Category("Transform")] [ImpVar] public TTransform3 transform = new();
     public A_CollisionPreset collision_preset = A_CollisionPreset.PRESET_NONE;
 
+    
     public Vector3 velocity;
     public bool is_grounded;
     Vector3 _wish;
@@ -919,6 +922,7 @@ public class Imp3D : ImpComp
         Vector3 world = Vector3.Transform(dir, ImpMath.Euler_2_Quat(rot_axis));
         Phys_Move(world, scale);
     }
+    
 
     public void Phys_Launch(Vector3 axis, double scale, bool force_velocity_h=false, bool force_velocity_v=false)
     {
@@ -1105,5 +1109,5 @@ public class Imp3D : ImpComp
     static Camera _invalid_camera = new();
     public virtual Camera Camera_GetData() { return _invalid_camera; }
     public virtual bool Camera_IsValid() { return false; }
-    
+    public virtual void _Notify_AsViewTarget(ImpPlayer player, ENotifyGeneric notify, double dt) { }
 };

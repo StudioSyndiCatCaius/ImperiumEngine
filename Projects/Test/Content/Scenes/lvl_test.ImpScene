@@ -290,7 +290,11 @@
             "mesh": {
               "path": "builtin:A_Mesh.GEO_PLANE"
             },
-            "materials": null,
+            "materials": [
+              {
+                "path": "{game}/m_s2_rock-grass.ImpMaterial"
+              }
+            ],
             "cast_shadows": true,
             "transform": {
               "position": {
@@ -922,6 +926,164 @@
               "children": []
             }
           }
+        },
+        {
+          "_class": "C3_Mesh",
+          "name": "Mesh",
+          "vars": {
+            "mesh": {
+              "path": "builtin:A_Mesh.GEO_SPHERE"
+            },
+            "materials": [
+              {
+                "path": "{game}/m_s2_rock-grass.ImpMaterial"
+              }
+            ],
+            "cast_shadows": true,
+            "transform": {
+              "position": {
+                "X": -16.504412,
+                "Y": 0.2935083,
+                "Z": -3.3251033
+              },
+              "rotation": {
+                "X": 0,
+                "Y": 0,
+                "Z": 0
+              },
+              "scale": {
+                "X": 9.680333,
+                "Y": 12.318135,
+                "Z": 25.523388
+              }
+            },
+            "physics_enabled": true,
+            "movement_enabled": false,
+            "move_mode": null,
+            "is_visible": true,
+            "is_locked": false,
+            "children_editable": true,
+            "popup_config": null,
+            "script_override": null,
+            "script_builtin": {
+              "_class": "A_Script",
+              "vars": {
+                "parent_type": {
+                  "class_name": "C3_Mesh"
+                },
+                "nodes": [],
+                "connections": [],
+                "vars": [],
+                "source_file": null,
+                "source_index": 0
+              }
+            }
+          },
+          "children": []
+        },
+        {
+          "_class": "C3_Mesh",
+          "name": "Mesh1",
+          "vars": {
+            "mesh": {
+              "path": "builtin:A_Mesh.GEO_SPHERE"
+            },
+            "materials": [
+              {
+                "path": "{game}/m_s2_rock-grass.ImpMaterial"
+              }
+            ],
+            "cast_shadows": true,
+            "transform": {
+              "position": {
+                "X": -20.07208,
+                "Y": 0.2935083,
+                "Z": 9.064952
+              },
+              "rotation": {
+                "X": 0,
+                "Y": -30.000002,
+                "Z": 0
+              },
+              "scale": {
+                "X": 9.680333,
+                "Y": 12.318135,
+                "Z": 25.523388
+              }
+            },
+            "physics_enabled": true,
+            "movement_enabled": false,
+            "move_mode": null,
+            "is_visible": true,
+            "is_locked": false,
+            "children_editable": true,
+            "popup_config": null,
+            "script_override": null,
+            "script_builtin": {
+              "_class": "A_Script",
+              "vars": {
+                "parent_type": {
+                  "class_name": "C3_Mesh"
+                },
+                "nodes": [],
+                "connections": [],
+                "vars": [],
+                "source_file": null,
+                "source_index": 0
+              }
+            }
+          },
+          "children": []
+        },
+        {
+          "_class": "C3_Mesh",
+          "name": "sm_edtior_tree_a",
+          "vars": {
+            "mesh": {
+              "path": "{engine}/Meshes/Nature/sm_edtior_tree_a.ImpAsset"
+            },
+            "materials": [],
+            "cast_shadows": true,
+            "transform": {
+              "position": {
+                "X": -17.485958,
+                "Y": 6.1216044,
+                "Z": 5.4283137
+              },
+              "rotation": {
+                "X": -12.174295,
+                "Y": -0.56980914,
+                "Z": -6.3215027
+              },
+              "scale": {
+                "X": 1,
+                "Y": 1,
+                "Z": 1
+              }
+            },
+            "physics_enabled": true,
+            "movement_enabled": false,
+            "move_mode": null,
+            "is_visible": true,
+            "is_locked": false,
+            "children_editable": true,
+            "popup_config": null,
+            "script_override": null,
+            "script_builtin": {
+              "_class": "A_Script",
+              "vars": {
+                "parent_type": {
+                  "class_name": "C3_Mesh"
+                },
+                "nodes": [],
+                "connections": [],
+                "vars": [],
+                "source_file": null,
+                "source_index": 0
+              }
+            }
+          },
+          "children": []
         }
       ]
     }

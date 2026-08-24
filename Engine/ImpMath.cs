@@ -7,7 +7,7 @@ public static class ImpMath
     // -------------------------------------------------------------------------------------
     // Vector3
     // -------------------------------------------------------------------------------------
-    public static Vector3 V3_Interp(Vector3 current, Vector3 target, double dt, double speed, bool constant)
+    public static Vector3 V3_Interp(Vector3 current, Vector3 target, double dt, double speed, bool constant=false)
     {
         return Vector3.Lerp(current, target, (float)Math.Pow(Math.E, -dt * speed));
     }
@@ -45,7 +45,32 @@ public static class ImpMath
         if(spatial) return new Vector2(v.X, v.Z);
         return new Vector2(v.X, v.Y);
     }
+
+    public static Vector3 V3_Rotate(Vector3 vector, Vector3 rotation)
+    {
+        return Vector3.Transform(vector, Matrix4x4.CreateFromYawPitchRoll(rotation.Y, rotation.X, rotation.Z));
+    }
+
+    public static Vector3 GetRotVector_Forward(Vector3 rotation)
+    {
+        return Vector3.UnitZ;
+    }
     
+    public static Vector3 GetRotVector_Right(Vector3 rotation)
+    {
+        return Vector3.UnitX;
+    }
+    
+    public static Vector3 GetRotVector_Up(Vector3 rotation)
+    {
+        return Vector3.UnitY;
+    }
+ /*   
+    public static void GetRotVectors(Vector3 rotation, out Vector3 forward, out Vector3 right, out Vector3 up, bool x=false, bool y=true, bool z=false)
+    {
+        
+    }
+   */ 
     
     // -------------------------------------------------------------------------------------
     // Vector2

@@ -55,10 +55,10 @@ public class ImpPlayer
         {
             keys =
             {
-                [EInputKey.Key_W]=new TInputKey() { deadzone = DEADZONE_MOVEMENT, axis_scale = new Vector3(1,0,0)},
-                [EInputKey.Key_A]=new TInputKey() { deadzone = DEADZONE_MOVEMENT, axis_scale = new Vector3(0,0,-1)},
-                [EInputKey.Key_S]=new TInputKey() { deadzone = DEADZONE_MOVEMENT, axis_scale = new Vector3(-1,0,0)},
-                [EInputKey.Key_D]=new TInputKey() { deadzone = DEADZONE_MOVEMENT, axis_scale = new Vector3(0,0,1)},
+                [EInputKey.Key_W]=new TInputKey() { deadzone = DEADZONE_MOVEMENT, axis_scale = new Vector3(0,0,-1)},
+                [EInputKey.Key_A]=new TInputKey() { deadzone = DEADZONE_MOVEMENT, axis_scale = new Vector3(-1,0,0)},
+                [EInputKey.Key_S]=new TInputKey() { deadzone = DEADZONE_MOVEMENT, axis_scale = new Vector3(0,0,1)},
+                [EInputKey.Key_D]=new TInputKey() { deadzone = DEADZONE_MOVEMENT, axis_scale = new Vector3(1,0,0)},
                 [EInputKey.Pad_LeftStickX]=new TInputKey() { deadzone = DEADZONE_MOVEMENT, axis_scale = new Vector3(0,0,1)},
                 [EInputKey.Pad_LeftStickY]=new TInputKey() { deadzone = DEADZONE_MOVEMENT, axis_scale = new Vector3(1,0,0)},
             }
@@ -69,8 +69,8 @@ public class ImpPlayer
         {
             keys =
             {
-                [EInputKey.Mouse_MoveX]=new TInputKey() { axis_scale = new Vector3(0,1,0)},
-                [EInputKey.Mouse_MoveY]=new TInputKey() { axis_scale = new Vector3(1,0,0)},
+                [EInputKey.Mouse_MoveX]=new TInputKey() { axis_scale = new Vector3(0,-1,0)},
+                [EInputKey.Mouse_MoveY]=new TInputKey() { axis_scale = new Vector3(-1,0,0)},
                 [EInputKey.Pad_RightStickX]=new TInputKey() { deadzone = DEADZONE_MOVEMENT, axis_scale = new Vector3(0,1,0)},
                 [EInputKey.Pad_RightStickY]=new TInputKey() { deadzone = DEADZONE_MOVEMENT, axis_scale = new Vector3(1,0,0)},
             }
@@ -534,20 +534,48 @@ public class ImpPlayer
         }
     }
     
-    // #################################################################################
+    // #########################################################################################################
+    // #########################################################################################################
     // Class
-    // #################################################################################
-
+    // #########################################################################################################
+    // #########################################################################################################
+    
     public int id;
     public TCursorData cursor;
     //a press only becomes a real drag once the cursor moves past grab_threshold, so a plain click never drops.
     public bool grab_is_active = false;
     public const float grab_threshold = 5f;
     private Vector2 grab_origin;
-
+    public Vector3 control_rotation;
+    
     public Imp3D? pawn = null;
     private ImpComp? last_cursor_target = null;
     private Imp2D? last_focus_target = null;
+    private Imp3D? _target_view = null;
+
+    public Imp3D? target_view
+    {
+        get
+        {
+            return _target_view;
+        }
+        set
+        {
+            if (_target_view == value)
+            {
+                return;
+            }
+            if (_target_view != null)
+            {
+                _target_view._Notify_AsViewTarget(this, ENotifyGeneric.End, 0);
+            }
+            _target_view = value;
+            if (_target_view != null)
+            {
+                _target_view._Notify_AsViewTarget(this, ENotifyGeneric.Begin, 0);
+            }
+        }
+    }
     
     public ImpComp? target_cursor = null;
     public ImpComp? target_grabbed = null;
@@ -776,6 +804,15 @@ public class ImpPlayer
             if (target_cursor != null) { target_cursor._Notify_AsCursorTarget( this,ENotifyGeneric.Update,dt); }
             if (target_focus != null) { target_focus._Notify_AsFocusTarget( this,ENotifyGeneric.Update,dt); }
             if (target_grabbed != null) { target_grabbed._Notify_AsGrabbedTarget( this,ENotifyGeneric.Update,dt); }
+        }
+
+        if (target_view != null && target_view.parent == null && target_view.scene == null)
+        {
+            target_view = null;
+        }
+        if (target_view != null)
+        {
+            target_view._Notify_AsViewTarget(this, ENotifyGeneric.Update, dt);
         }
     }
 
@@ -1104,4 +1141,14 @@ public class ImpPlayer
             _ProcessKey(key, state, axis);
         }
     }
+    
+    // ------------------------------------------------------------------------
+    // Control Rotation
+    // ------------------------------------------------------------------------
+    
+  /*  public void GetControlVectors(out Vector3 forward, out Vector3 right, out Vector3 up, bool x=false, bool y=true, bool z=false)
+    {
+        ImpMath.GetRotVectors(control_rotation, out forward, out right, out up);
+    }
+*/
 }
