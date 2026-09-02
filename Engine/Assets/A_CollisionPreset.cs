@@ -1,6 +1,7 @@
-﻿using ImperiumEngine.Enums;
+﻿using Engine.Core;
+using Engine.Enums;
 
-namespace ImperiumEngine.Assets;
+namespace Engine.Assets;
 
 [AssetColor(90, 180, 110)]
 public class A_CollisionPreset : ImpAsset

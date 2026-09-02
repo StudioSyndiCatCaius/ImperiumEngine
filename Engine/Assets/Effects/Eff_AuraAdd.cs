@@ -1,7 +1,8 @@
-﻿using ImperiumEngine.Comps._1D;
-using ImperiumEngine.Structs;
+﻿using Engine.Comps._1D;
+using Engine.Core;
+using Engine.Structs;
 
-namespace ImperiumEngine.Assets.Effects;
+namespace Engine.Assets.Effects;
 
 public class Eff_AuraAdd : A_Effect
 {

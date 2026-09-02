@@ -1,157 +1,142 @@
 ﻿using System.Numerics;
-using ImperiumEngine.Enums;
-using ImperiumEngine.Structs;
-using R3D_cs;
+using Engine.Core;
+using Engine.Enums;
+using Engine.Structs;
 using Raylib_cs;
 
-namespace ImperiumEngine.Assets;
+namespace Engine.Assets;
 
-[AssetColor(220, 140, 50)]
 public class A_Texture : ImpAsset
 {
-    // #################################################################################
-    // Class
-    // #################################################################################
+    // ==============================================================================================================
+    // STATIC
+    // ==============================================================================================================
+    
+    
+    // ==============================================================================================================
+    // CLASS
+    // ==============================================================================================================
+    
+    [ImpVar] public TextureFilter filter = TextureFilter.Trilinear;
     
     public Texture2D texture;
-    [ImpVar] public PixelFormat pixel_format;
-    [ImpVar] public float hue;
-    [ImpVar] public float saturation=1.0f;
-    [ImpVar] public float brightness=1.0f;
-    [ImpVar] public EImageLayout ui_layout=EImageLayout.Stretch;
+    
+    public static string PATH_SKY_1 = "{engine}/2D/HDR/sky_1.ImpAsset";
+    public static string PATH_SKY_2 = "{engine}/2D/HDR/sky_2.ImpAsset";
 
-    bool _gpu_3d;
-
-    public override void Source_OnReload(ImpFile file)
+    public override void OnReimport(ImpFile src)
     {
-        base.Source_OnReload(file);
-        int i = source_index;
-        if (i < 0 || i >= file.src_textures.Count) return;
-        texture = file.src_textures[i];
-        if (pixel_format != 0) texture.Format = pixel_format;
-        _gpu_3d = false;
+        base.OnReimport(src);
+        texture = src.get_Texture(0);
     }
 
-    public Texture2D Gpu_Bind3D()
+    public void Draw(TBounds2 bounds, TTransform2 offset, EImageLayout layout = EImageLayout.Stretch, 
+        TMargins nine_slice = default, TMargins clip_margins=default, bool clip_margins_as_ratio=false, Color? tint = null)
     {
-        if (texture.Id == 0)
+        if (texture.Id == 0 && !string.IsNullOrEmpty(sourcefile)) Source_Reimport();
+        if (texture.Id == 0 || bounds.IsEmpty) return;
+
+        float x = MathF.Min(bounds.start.X, bounds.end.X);
+        float y = MathF.Min(bounds.start.Y, bounds.end.Y);
+        float dw = MathF.Abs(bounds.end.X - bounds.start.X);
+        float dh = MathF.Abs(bounds.end.Y - bounds.start.Y);
+        if (dw < 1e-4f || dh < 1e-4f) return;
+
+        float cl = clip_margins.left, cr = clip_margins.right, ct = clip_margins.top, cb = clip_margins.bottom;
+        if (clip_margins_as_ratio) { cl *= dw; cr *= dw; ct *= dh; cb *= dh; }
+        if (cl < 0) cl = 0; if (cr < 0) cr = 0; if (ct < 0) ct = 0; if (cb < 0) cb = 0;
+        float vx = x + cl, vy = y + ct, vw = dw - cl - cr, vh = dh - ct - cb;
+        if (vw < 1e-4f || vh < 1e-4f) return;
+
+        float tw = texture.Width;
+        float th = texture.Height;
+        if (tw < 1) tw = 1;
+        if (th < 1) th = 1;
+
+        Vector2 origin = offset.position;
+        Vector2 pivot = new(x + origin.X, y + origin.Y);
+        float rot = (float)offset.rotation;
+        Color draw_tint = tint ?? Color.White;
+
+        void Blit(Rectangle source, float tx, float ty, float w, float h)
         {
-            return texture;
+            if (w < 1e-4f || h < 1e-4f || source.Width < 1e-4f || source.Height < 1e-4f) return;
+            Raylib.DrawTexturePro(texture, source,
+                new Rectangle(pivot.X, pivot.Y, w, h),
+                new Vector2(pivot.X - tx, pivot.Y - ty),
+                rot, draw_tint);
         }
-        if (!_gpu_3d)
+
+        switch (layout)
         {
-            Raylib.SetTextureWrap(texture, TextureWrap.Repeat);
-            Raylib.GenTextureMipmaps(ref texture);
-            Raylib.SetTextureFilter(texture, TextureFilter.Trilinear);
-            _gpu_3d = true;
+            case EImageLayout.Tile:
+            {
+                float sx = offset.scale.X, sy = offset.scale.Y;
+                if (sx <= 0) sx = 1;
+                if (sy <= 0) sy = 1;
+                float tile_w = tw * sx;
+                float tile_h = th * sy;
+                if (tile_w < 2 || tile_h < 2)
+                {
+                    Blit(new Rectangle(cl / dw * tw, ct / dh * th, vw / dw * tw, vh / dh * th), vx, vy, vw, vh);
+                    break;
+                }
+                float end_x = vx + vw, end_y = vy + vh;
+                for (float ty = y + MathF.Floor((vy - y) / tile_h) * tile_h; ty < end_y; ty += tile_h)
+                for (float tx = x + MathF.Floor((vx - x) / tile_w) * tile_w; tx < end_x; tx += tile_w)
+                {
+                    float ix = MathF.Max(tx, vx);
+                    float iy = MathF.Max(ty, vy);
+                    float iw = MathF.Min(tx + tile_w, end_x) - ix;
+                    float ih = MathF.Min(ty + tile_h, end_y) - iy;
+                    Blit(new Rectangle((ix - tx) / sx, (iy - ty) / sy, iw / sx, ih / sy), ix, iy, iw, ih);
+                }
+                break;
+            }
+            case EImageLayout.NineSlice:
+            {
+                NPatchInfo np = new()
+                {
+                    Source = new Rectangle(0, 0, tw, th),
+                    Left = (int)nine_slice.left,
+                    Top = (int)nine_slice.top,
+                    Right = (int)nine_slice.right,
+                    Bottom = (int)nine_slice.bottom,
+                    Layout = NPatchLayout.NinePatch,
+                };
+                Raylib.DrawTextureNPatch(texture, np,
+                    new Rectangle(pivot.X, pivot.Y, vw, vh),
+                    new Vector2(pivot.X - vx, pivot.Y - vy),
+                    rot, draw_tint);
+                break;
+            }
+            case EImageLayout.Retain_Fit:
+            {
+                float s = MathF.Min(dw / tw, dh / th);
+                float w = tw * s, h = th * s;
+                float fx = x + (dw - w) * 0.5f;
+                float fy = y + (dh - h) * 0.5f;
+                float ix = MathF.Max(fx, vx);
+                float iy = MathF.Max(fy, vy);
+                float iw = MathF.Min(fx + w, vx + vw) - ix;
+                float ih = MathF.Min(fy + h, vy + vh) - iy;
+                Blit(new Rectangle((ix - fx) / s, (iy - fy) / s, iw / s, ih / s), ix, iy, iw, ih);
+                break;
+            }
+            case EImageLayout.Retain_Fill:
+            {
+                float s = MathF.Max(dw / tw, dh / th);
+                Blit(new Rectangle((tw - dw / s) * 0.5f + cl / s, (th - dh / s) * 0.5f + ct / s, vw / s, vh / s), vx, vy, vw, vh);
+                break;
+            }
+            default:
+                Blit(new Rectangle(cl / dw * tw, ct / dh * th, vw / dw * tw, vh / dh * th), vx, vy, vw, vh);
+                break;
         }
-        return texture;
     }
     
-    // #################################################################################
-    // Static
-    // #################################################################################
-
-    public static void Draw(A_Texture texture, TLayout2 config)
-    {
-        
-    }
-    
-    // -------------------------------------
-    // Built-ins
-    // -------------------------------------
-    public static A_Texture? PANEL_A = ImpAsset.Import<A_Texture>("{engine}/Textures/UI/UI_Editor_Panel_A.png");
-    public static A_Texture? PANEL_B = ImpAsset.Import<A_Texture>("{engine}/Textures/UI/UI_Editor_Panel_B.png");
-    
-    public static A_Texture? BTN_A = ImpAsset.Import<A_Texture>("{engine}/Textures/UI/UI_Editor_Button_A.png");
-    
-    public static A_Texture? TAB_A = ImpAsset.Import<A_Texture>("{engine}/Textures/UI/UI_Editor_Tab_A.png");
-    
-    public static A_Texture? ICO_SAVE = ImpAsset.Import<A_Texture>("{engine}/Icons/ico_editor_save.png");
-    public static A_Texture? ICO_PLAY = ImpAsset.Import<A_Texture>("{engine}/Icons/ico_editor_play.png");
-    public static A_Texture? ICO_STOP = ImpAsset.Import<A_Texture>("{engine}/Icons/ico_editor_stop.png");
-    public static A_Texture? ICO_SCENE = ImpAsset.Import<A_Texture>("{engine}/Icons/ico_editor_scene.png");
-    public static A_Texture? ICO_ARROW_R = Import<A_Texture>("{engine}/Icons/ico_editor_arrowR.png");
-    public static A_Texture? ICO_ARROW_D = Import<A_Texture>("{engine}/Icons/ico_editor_arrowD.png");
-    
-    public static A_Texture? CHECKBOX_T = Import<A_Texture>("{engine}/Textures/UI/UI_Editor_CheckBox_T.png");
-    public static A_Texture? CHECKBOX_F = Import<A_Texture>("{engine}/Textures/UI/UI_Editor_CheckBox_F.png");
-    
-    public static A_Texture? SEPERATOR_V = ImpAsset.Import<A_Texture>("{engine}/Textures/UI/UI_Editor_SeperatorV.png");
-
-    public static A_Texture? GRAPH_NODE_BODY = Import<A_Texture>("{engine}/Textures/Graph/RegularNode_body.png");
-    public static A_Texture? GRAPH_NODE_SPILL = Import<A_Texture>("{engine}/Textures/Graph/RegularNode_color_spill.png");
-    public static A_Texture? GRAPH_NODE_GLOSS = Import<A_Texture>("{engine}/Textures/Graph/RegularNode_title_gloss.png");
-    public static A_Texture? GRAPH_NODE_HIGHLIGHT = Import<A_Texture>("{engine}/Textures/Graph/RegularNode_title_highlight.png");
-    public static A_Texture? GRAPH_NODE_SHADOW = Import<A_Texture>("{engine}/Textures/Graph/RegularNode_shadow.png");
-    public static A_Texture? GRAPH_NODE_SHADOW_SEL = Import<A_Texture>("{engine}/Textures/Graph/RegularNode_shadow_selected.png");
-    public static A_Texture? GRAPH_VAR_BODY = Import<A_Texture>("{engine}/Textures/Graph/VarNode_body.png");
-    public static A_Texture? GRAPH_VAR_SPILL = Import<A_Texture>("{engine}/Textures/Graph/VarNode_color_spill.png");
-    public static A_Texture? GRAPH_VAR_GLOSS = Import<A_Texture>("{engine}/Textures/Graph/VarNode_gloss.png");
-    public static A_Texture? GRAPH_VAR_SHADOW = Import<A_Texture>("{engine}/Textures/Graph/VarNode_shadow.png");
-    public static A_Texture? GRAPH_VAR_SHADOW_SEL = Import<A_Texture>("{engine}/Textures/Graph/VarNode_shadow_selected.png");
-    
-    public static A_Texture? ICO_COMP = Import<A_Texture>("{engine}/Thumbnails/ImpComp.png");
-    public static A_Texture? ICO_COMP2D = Import<A_Texture>("{engine}/Thumbnails/Imp2D.png");
-    public static A_Texture? ICO_COMP3D = Import<A_Texture>("{engine}/Thumbnails/Imp3D.png");
-    public static A_Texture? THUMB_FILE = ImpAsset.Import<A_Texture>("{engine}/Thumbnails/_file.png");
-    public static A_Texture? THUMB_FOLDER = ImpAsset.Import<A_Texture>("{engine}/Thumbnails/_folder.png");
-    public static A_Texture? THUMB_FOLDER_OPEN = ImpAsset.Import<A_Texture>("{engine}/Thumbnails/_folder_open.png");
-
-    public static A_Texture? S_PROTO_FLOOR=Import<A_Texture>("{engine}/Textures/Surface/Prototype/T_editor_S_proto_floor.png");
-    public static A_Texture? S_PROTO_DOOR=Import<A_Texture>("{engine}/Textures/Surface/Prototype/T_editor_S_proto_door.png");
-    public static A_Texture? S_PROTO_STAIR=Import<A_Texture>("{engine}/Textures/Surface/Prototype/T_editor_S_proto_stair.png");
-    public static A_Texture? S_PROTO_WINDOW=Import<A_Texture>("{engine}/Textures/Surface/Prototype/T_editor_S_proto_window.png");
-
-    public override Texture2D? Editor_GetThumbnail_Texture()
-    {
-        if (texture.Id != 0) return texture;
-        return base.Editor_GetThumbnail_Texture();
-    }
-}
-
-public class A_TextureHDR : A_Texture
-{
-    public Cubemap cubemap;
-    public AmbientMap ambient;
-
-    public override void Source_OnReload(ImpFile file)
-    {
-        if (cubemap.Size > 0)
-        {
-            R3D.UnloadCubemap(cubemap);
-        }
-        if (ambient.Irradiance != 0)
-        {
-            R3D.UnloadAmbientMap(ambient);
-        }
-        cubemap = default;
-        ambient = default;
-        base.Source_OnReload(file);
-    }
-
-    public void Cubemap_Ensure()
-    {
-        if (cubemap.Size > 0)
-        {
-            return;
-        }
-        string path = "";
-        if (source_file != null && !string.IsNullOrEmpty(source_file.filepath))
-        {
-            path = ImpFile.Path_Resolve(source_file.filepath);
-        }
-        if (string.IsNullOrEmpty(path) || !File.Exists(path))
-        {
-            return;
-        }
-        cubemap = R3D.LoadCubemap(path, R3D_cs.CubemapLayout.Panorama);
-        if (cubemap.Size > 0)
-        {
-            ambient = R3D.GenAmbientMap(cubemap, AmbientFlags.Illumination | AmbientFlags.Reflection);
-        }
-    }
-
-    public static A_TextureHDR SKY_DAY_1=Import<A_TextureHDR>("{engine}/Textures/HDRI/sky_1.hdr");
-    public static A_TextureHDR SKY_DAY_2=Import<A_TextureHDR>("{engine}/Textures/HDRI/sky_2.hdr");
+    // ===============================================================================================================
+    // STATICS
+    // ===============================================================================================================
+    [Builtin] public static A_Texture UI_BTN = Imp.Asset_Import<A_Texture>("{engine}/2D/UI/UI_Editor_Button_A.png");
 }

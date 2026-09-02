@@ -1,12 +1,14 @@
-﻿using ImperiumEngine.Assets.General;
-using ImperiumEngine.Enums;
-using ImperiumEngine.Interfaces;
-using ImperiumEngine.Structs;
+﻿using System.Numerics;
+using Engine.Assets;
+using Engine.Assets.General;
+using Engine.Core;
+using Engine.Enums;
+using Engine.Interfaces;
+using Engine.Structs;
 
-namespace ImperiumEngine.Comps._1D;
-
+namespace Engine.Comps._1D;
 // Creature is an advanced component for handling common gameplay functions for an entity (E.G, Attribute, Abilities, Equipment, Inventory, etc.)  
-public class C1_Creature : ImpComp
+public class C1_Creature : Imp1D
 {
     // ================================================================================================================
     // Static
@@ -77,7 +79,7 @@ public class C1_Creature : ImpComp
             {
                 C1_Ability a = Ability_Get(ability);
                 _abilities.Remove(a);
-                a.Destroy();
+                a.Kill();
             }
         }
     }
@@ -254,7 +256,7 @@ public class C1_Creature : ImpComp
         if (_auras.Contains(aura))
         {
             _auras.Remove(aura);
-            aura.Destroy();
+            aura.Kill();
         }
     }
     
@@ -284,7 +286,7 @@ public class C1_Creature : ImpComp
     {
         foreach (var a in _auras)
         {
-            if(a.tags.HasTag(tag)) { return true;}
+            if(a.tags.Has(tag)) { return true;}
         }
         return false;
     }

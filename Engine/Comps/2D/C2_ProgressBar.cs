@@ -1,34 +1,40 @@
-﻿namespace ImperiumEngine.Comps._2D;
+﻿using Engine.Assets;
+using Engine.Core;
+using Engine.Enums;
+using Engine.Structs;
 
-public enum EProgressBarOrientation
+namespace Engine.Comps._2D;
+
+public enum EProgressBarLayout
 {
-    H_LeftToRight,
-    H_RightToLeft,
-    V_TopToBottom,
-    V_BottomToTop,
+    H_Right_2_Left,
+    H_Left_2_Right, 
+    V_Top_2_Bottom, 
+    V_Bottom_2_Top,
 }
 
 public class C2_ProgressBar : Imp2D
 {
+    [ImpVar] public float progress;
+    [ImpVar] public EProgressBarLayout layout;
     [ImpVar] public UI_ProgressBar style;
-    [ImpVar] public EProgressBarOrientation orientation;
-    [ImpVar] public float percent;
-    
-    [ImpVar] public bool use_ghosting = true;
-    [ImpVar] public float ghost_delay = 0f; //time after percent changes before ghost is drawn
-    [ImpVar] public float ghost_time = 0.2f; //time in seconds until the ghost percent matches the current percent
 
+    public override void OnDraw2D(double dt, EDrawFlags flags = EDrawFlags.None)
+    {
+        base.OnDraw2D(dt, flags);
+        TMargins progress_clipping_margins=new(); //calc based on layout and progress
+        
+        style.background_texture.Draw(bounds, global_transform, EImageLayout.Stretch, style.background_nineslice_margins);
+        style.progress_texture.Draw(bounds, global_transform, EImageLayout.Stretch, style.progress_nineslice_margins,progress_clipping_margins, true);
+    }
 }
+
 
 public class UI_ProgressBar : ImpAsset
 {
-    [ImpVar] public UI_Box box_back;
-    [ImpVar] public UI_Box box_fill;
-    [ImpVar] public UI_Box box_ghost; //optional. used for when the progress bar changes, this is the ghost for the previous value
-    [ImpVar] public bool scaled_fill = false; //True= draw as scaled by percent. False= cuts of fill image by percent
-
-    public void Draw(float percent,EProgressBarOrientation orientation)
-    {
-        
-    }
+    [ImpVar] public A_Texture background_texture;
+    [ImpVar] public TMargins background_nineslice_margins;
+    [ImpVar] public A_Texture progress_texture;
+    [ImpVar] public TMargins progress_nineslice_margins;
+    
 }

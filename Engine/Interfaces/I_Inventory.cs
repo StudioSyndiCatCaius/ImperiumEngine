@@ -1,4 +1,4 @@
-﻿namespace ImperiumEngine.Interfaces;
+﻿namespace Engine.Interfaces;
 
 public interface I_Inventory
 {

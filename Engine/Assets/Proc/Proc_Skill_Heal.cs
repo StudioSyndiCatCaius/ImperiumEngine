@@ -1,6 +1,6 @@
-﻿using ImperiumEngine.Interfaces;
+﻿using Engine.Interfaces;
 
-namespace ImperiumEngine.Assets.Proc;
+namespace Engine.Assets.Proc;
 
 public class Proc_Skill_Heal : A_Proc, I_Skill
 {

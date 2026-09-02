@@ -1,12 +1,13 @@
 ﻿using System.Globalization;
 using System.Runtime.CompilerServices;
-using ImperiumEngine.Interfaces;
+using Engine.Interfaces;
+using Engine.Structs;
 
 /// <summary>
 /// Lightweight TText-style text handle for the engine.
 /// Prefer this over raw strings when the text can be localized or formatted.
 /// </summary>
-public readonly struct TText : IEquatable<TText>, IFormattable , I_Property
+public struct TText : IEquatable<TText>, IFormattable , I_Property
 {
     // ------------------------------------------------------------------
     // Storage
@@ -15,6 +16,11 @@ public readonly struct TText : IEquatable<TText>, IFormattable , I_Property
     private readonly string? _key;          // localization key (null = pure string)
     private readonly string? _fallback;     // source / fallback text
     private readonly object[]? _args;       // format arguments (null = no formatting)
+
+    public string? Key => _key;
+    public string Fallback => _fallback ?? string.Empty;
+    public bool IsLocalized => !string.IsNullOrEmpty(_key);
+    public bool IsFormatted => _args is { Length: > 0 };
 
     // ------------------------------------------------------------------
     // Construction
@@ -139,4 +145,36 @@ public readonly struct TText : IEquatable<TText>, IFormattable , I_Property
 
     // Empty instance (like TText::GetEmpty())
     public static readonly TText Empty = new(string.Empty);
+
+    public TText With(string? key, string? fallback)
+        => new(string.IsNullOrEmpty(key) ? null : key, fallback, _args);
+
+    // ------------------------------------------------------------------
+    // I_Property
+    // ------------------------------------------------------------------
+
+    public bool Property_IsCustomParse() => true;
+
+    public void Property_Read(object raw) => this = Parse(raw);
+
+    public object Property_Write()
+    {
+        if (string.IsNullOrEmpty(_key))
+            return _fallback ?? "";
+        TTable table = new();
+        table.Set("key", _key);
+        table.Set("text", _fallback ?? "");
+        return table;
+    }
+
+    public static TText Parse(object raw)
+    {
+        if (raw is TTable table)
+        {
+            string key = table.get_String("key");
+            string text = table.get_String("text");
+            return string.IsNullOrEmpty(key) ? new TText(text) : new TText(key, text);
+        }
+        return new TText(raw as string ?? raw?.ToString() ?? "");
+    }
 }

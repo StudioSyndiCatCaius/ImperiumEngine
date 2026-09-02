@@ -1,6 +1,7 @@
 ﻿using System.Numerics;
+using Engine.Core;
 
-namespace ImperiumEngine.Assets;
+namespace Engine.Assets;
 
 // configuration for an Imp3D's movement mode
 public class A_MoveMode : ImpAsset

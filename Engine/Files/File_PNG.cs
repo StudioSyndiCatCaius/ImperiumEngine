@@ -1,12 +1,9 @@
-﻿using ImperiumEngine.Assets;
+﻿using Engine.Core;
+using Engine.Enums;
 
-namespace ImperiumEngine.Files;
+namespace Engine.Files;
 
 public class File_PNG : ImpFile
 {
-    public File_PNG()
-    {
-        file_type = EFileType.Texture;
-        default_asset_type = typeof(A_Texture);
-    }
+    public File_PNG() { file_type = EFileType.Texture; }
 }

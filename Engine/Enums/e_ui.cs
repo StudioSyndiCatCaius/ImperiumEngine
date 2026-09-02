@@ -1,6 +1,6 @@
-﻿using ImperiumEngine.Interfaces;
+﻿using Engine.Interfaces;
 
-namespace ImperiumEngine.Enums;
+namespace Engine.Enums;
 
 
 public enum EUIOrentation
@@ -18,16 +18,13 @@ public enum EUIPositionAlignment
 }
 
 
+
 public enum EUIViewportAlignment 
 {
     Start, Center, End, Fill,
 }
 
 
-public enum EUISizingPreset
-{
-    Fill, ShrinkBegin, ShrinkCenter, ShrinkEnd,
-}
 
 public enum ECursorFilter
 {

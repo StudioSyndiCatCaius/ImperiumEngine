@@ -1,9 +1,9 @@
-using System.Text.Json.Serialization;
-using ImperiumEngine.Comps._2D;
-using ImperiumEngine.Dialogs;
-using ImperiumEngine.Interfaces;
+﻿using System.Text.Json.Serialization;
 
-namespace ImperiumEngine.Structs;
+using Engine.Core;
+using Engine.Interfaces;
+
+namespace Engine.Structs;
 
 
 // like TSoftObjectPtr in UE
@@ -22,7 +22,7 @@ public struct TRef<T> : I_Property where T : ImpAsset
 
     public TRef(T? asset)
     {
-        path = asset?.filepath ?? "";
+        //path = asset?.filepath ?? "";
         loaded = asset;
     }
 
@@ -33,11 +33,11 @@ public struct TRef<T> : I_Property where T : ImpAsset
         // Empty path keeps `loaded` so an inline unique (C2_AssetSlot clone) still works.
         if (!string.IsNullOrEmpty(path))
         {
-            T resolved = ImpAsset.Load<T>(path);
-            if (resolved != null)
-            {
-                loaded = resolved;
-            }
+            //T resolved = ImpAsset.Asset_Load<T>(path);
+            //if (resolved != null)
+            //{
+           //     loaded = resolved;
+          //  }
             return loaded;
         }
         return loaded;
@@ -45,27 +45,7 @@ public struct TRef<T> : I_Property where T : ImpAsset
 
     public bool Inspector_IsCustom() => true;
 
-    public void Inspector_Rebuild(C2_InspectorProperty ui)
-    {
-        C2_AssetSlot slot = new()
-        {
-            name = ui.name,
-            label = ui.label,
-            asset_type = typeof(T),
-            value_get = () =>
-            {
-                TRef<T> r = ui.Value_Get() is TRef<T> x ? x : default;
-                return r.Get();
-            },
-            value_set = a =>
-            {
-                T asset = a as T;
-                ui.Value_Set(new TRef<T>(asset));
-            },
-            rows_build = ui.Depth_CanNest ? ui.Rows_ForObject : null,
-        };
-        ui.Editor_SetFull(slot);
-    }
+ 
 }
 
 
@@ -144,26 +124,4 @@ public struct TClass<T> : I_Property
         return best;
     }
 
-    public bool Inspector_IsCustom() => true;
-
-    public void Inspector_Rebuild(C2_InspectorProperty ui)
-    {
-        C2_Picker picker = new()
-        {
-            placeholder = "None",
-            text_get = () => ui.Value_Get() is TClass<T> c ? c.class_name ?? "" : "",
-            tint_get = () => ImpAsset.Color_ForType(typeof(T)),
-            on_cleared = () => ui.Value_Set(new TClass<T>((Type)null)),
-            on_open = () =>
-            {
-                TClass<T> c = ui.Value_Get() is TClass<T> x ? x : default;
-                Dialog_ClassPicker.Run(typeof(T),
-                    t => ui.Value_Set(new TClass<T>(t)),
-                    title: "Select " + C2_Tree.Class_DisplayName(typeof(T)),
-                    current: c.Get(),
-                    allow_none: true);
-            },
-        };
-        ui.Editor_Set(picker);
-    }
 }

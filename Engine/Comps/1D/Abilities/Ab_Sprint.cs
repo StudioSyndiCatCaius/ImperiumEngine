@@ -1,6 +1,6 @@
-﻿using ImperiumEngine.Assets;
+﻿using Engine.Assets;
 
-namespace ImperiumEngine.Comps._1D.Abilities;
+namespace Engine.Comps._1D.Abilities;
 
 public class Ab_Sprint : C1_Ability
 {

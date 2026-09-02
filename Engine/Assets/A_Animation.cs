@@ -1,34 +1,14 @@
-﻿using ImperiumEngine;
-using ImperiumEngine.Structs;
+﻿using Engine.Core;
+using Engine.Structs;
 
-namespace ImperiumEngine.Assets;
+namespace Engine.Assets;
 
-public struct TAnimationTrack
+public struct TAnimationPose
 {
-    public TLabel var_name;
-    public List<TAnimationKey> keys;
+    public Dictionary<TLabel,TTransform3> bone_transforms;
 }
 
-public struct TAnimationKey
-{
-    public float time;
-    public object value;
-}
-
-[AssetColor(230, 120, 170)]
 public class A_Animation : ImpAsset
 {
-    [ImpVar] public int fps=60;
-    [ImpVar] public List<TAnimationTrack> tracks;
-    
-    // ---------------------------------------------------------------------------------
-    // Static
-    // ---------------------------------------------------------------------------------
-
-    //creates a new animation of a simple fade effect.
-    public A_Animation New_Fade(Imp2D comp, float duration = 0.5f)
-    {
-        A_Animation anim = new();
-        return anim;
-    }
+    [ImpVar] public int source_id = 0;
 }

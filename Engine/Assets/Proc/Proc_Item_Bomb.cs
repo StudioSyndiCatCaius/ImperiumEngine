@@ -1,6 +1,6 @@
-﻿using ImperiumEngine.Interfaces;
+﻿using Engine.Interfaces;
 
-namespace ImperiumEngine.Assets.Proc;
+namespace Engine.Assets.Proc;
 
 //offensive item that deals elemental damage
 public class Proc_Item_Bomb : A_Proc, I_Skill

@@ -1,7 +1,7 @@
-﻿using ImperiumEngine;
+﻿using Engine;
 using Raylib_cs;
 
-namespace ImperiumEngine.Assets.General;
+namespace Engine.Assets.General;
 
 public class AG_Attribute : A_General
 {

@@ -1,6 +1,7 @@
-﻿using ImperiumEngine.Comps._1D;
+﻿using Engine.Comps._1D;
+using Engine.Core;
 
-namespace ImperiumEngine.Assets;
+namespace Engine.Assets;
 
 //an effect that can be applied to a creature
 public abstract class A_Effect : ImpAsset

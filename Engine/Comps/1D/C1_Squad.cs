@@ -1,13 +1,14 @@
-﻿using ImperiumEngine.Assets;
+﻿using Engine.Assets;
+using Engine.Core;
 
-namespace ImperiumEngine.Comps._1D;
+namespace Engine.Comps._1D;
 
 public struct TSquadMemberData
 {
     public AG_SquadIdentity current_squad;
 }
 
-public class C1_Squad : ImpComp
+public class C1_Squad : Imp1D
 {
     public A_SquadConfig config;
 

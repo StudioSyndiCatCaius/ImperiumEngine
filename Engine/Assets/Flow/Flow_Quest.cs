@@ -1,7 +1,7 @@
-﻿using ImperiumEngine.Interfaces;
-using ImperiumEngine.Structs;
+﻿using Engine.Interfaces;
+using Engine.Structs;
 
-namespace ImperiumEngine.Assets.Flow;
+namespace Engine.Assets.Flow;
 
 public enum EQuestState
 {
@@ -24,8 +24,5 @@ public class Flow_Quest : A_Flow, I_General
     
     [ImpVar][Category("Quest")] public bool is_repeatable;
     
-    public override string Editor_GetTypeLabel()
-    {
-        return "Quest";
-    }
+
 }

@@ -1,6 +1,6 @@
-﻿using ImperiumEngine.Interfaces;
+﻿using Engine.Interfaces;
 
-namespace ImperiumEngine.Assets.Proc;
+namespace Engine.Assets.Proc;
 
 //grants an aura that buffs an attribute
 public class Proc_Skill_Buff : A_Proc, I_Skill

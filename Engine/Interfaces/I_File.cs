@@ -1,31 +1,11 @@
-﻿using ImperiumEngine.Assets;
-using ImperiumEngine.Comps._1D;
-using Raylib_cs;
+﻿using Engine.Assets;
 
-namespace ImperiumEngine.Interfaces;
+namespace Engine.Interfaces;
 
-public class I_File
+// handled by the editor file browser
+public class I_File 
 {
-    //Tirggered when you double click a file in the file browser
-    public virtual void Editor_File_Open()
-    {
-        
-    }
+    public virtual TPopupOption File_GetPopupOptions() { return default; }
     
-    public virtual List<TPopupMenuOption> Editor_File_GetOptions()
-    {
-        return null;
-    }
-
-    public virtual Texture2D? Editor_GetThumbnail_Texture()
-    {
-        // needs support for things like previewing a png
-        return null;
-    }
-    
-    public virtual Color Editor_GetThumbnail_Color()
-    {
-        // needs support for things like previewing a png
-        return Color.White;
-    }
+    public virtual void File_DrawEditor() {}
 }

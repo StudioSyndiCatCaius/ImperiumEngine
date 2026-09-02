@@ -1,134 +1,66 @@
-﻿using System.Numerics;
-using ImperiumEngine.Nodes.Common;
+﻿using Engine.Comps._1D;
+using Engine.Core;
+using Engine.Structs;
 
-namespace ImperiumEngine.Assets;
+namespace Engine.Assets;
+
+
+
+public class TFlowConnection
+{
+    public TGuid32 from_node;
+    public byte from_pin;
+    public TGuid32 to_node;
+    public byte to_pin;
+}
+
+public class TFlowPin
+{
+    public string name;
+    public TGuid32 guid;
+}
 
 public abstract class A_Flow : ImpAsset
 {
-    [ImpVar(Hidden = true)] public TFlowData Flow = new();
-    [ImpVar(Hidden = true)] public Guid guid;
-
+    [ImpVar] TGuid32 guid;
+    [ImpVar] public List<TFlowConnection> connections;
+    
+    public bool is_instance=false; //if this is a playing instance, instead of a asset file
+    public C1_FlowPlayer instance_owner = null;
+    
+    public List<FlowNode> nodes; // will need to custom read/write
+    
     public A_Flow()
     {
-        guid = Guid.NewGuid();
-        Flow = new TFlowData();
-        Node_C_Start start = new Node_C_Start();
-        start.position = new Vector2(80f, 80f);
-        start._owner = this;
-        Flow.nodes.Add(start);
+        guid=TGuid32.New();
+    }
+}
+
+public abstract class FlowNode
+{
+    [ImpVar] public TGuid32 guid;
+    [ImpVar] public List<TFlowPin> inputs;
+    [ImpVar] public List<TFlowPin> outputs;
+    
+    public A_Flow flow_owner;
+
+    public virtual void Node_OnEnter(int pin) { }
+    public virtual void Node_OnExit(int pin) { }
+    public virtual void Node_OnUpdate(double dt) { }
+
+    public void TriggerOutput(int pin, int connection = -1, bool kill_node = true)
+    {
+        //do node stuff
+        if(kill_node) KillNode();
     }
 
-    public override string File_GetExtension()
+    public void KillNode()
     {
-        return "ImpFlow";
+        
     }
-
-    public ImpFlowNode Node_Find(Guid id)
+    
+    public FlowNode()
     {
-        if (Flow.nodes == null)
-        {
-            return null;
-        }
-        for (int i = 0; i < Flow.nodes.Count; i++)
-        {
-            ImpFlowNode n = Flow.nodes[i];
-            if (n != null && n.guid == id)
-            {
-                return n;
-            }
-        }
-        return null;
-    }
-
-    public List<ImpFlowNode> GetNodes_Connected(ImpFlowNode node, bool inputs, bool outputs)
-    {
-        List<ImpFlowNode> result = new();
-        if (node == null || Flow.connections == null)
-        {
-            return result;
-        }
-        Guid id = node.guid;
-        for (int i = 0; i < Flow.connections.Count; i++)
-        {
-            TFlowConnection c = Flow.connections[i];
-            ImpFlowNode found = null;
-            if (outputs && c.from_node == id)
-            {
-                found = Node_Find(c.to_node);
-            }
-            else if (inputs && c.to_node == id)
-            {
-                found = Node_Find(c.from_node);
-            }
-            if (found == null)
-            {
-                continue;
-            }
-            if (!result.Contains(found))
-            {
-                result.Add(found);
-            }
-        }
-        return result;
-    }
-
-    public List<ImpFlowNode> GetNodes_OfType(Type type)
-    {
-        List<ImpFlowNode> result = new();
-        if (type == null || Flow.nodes == null)
-        {
-            return result;
-        }
-        for (int i = 0; i < Flow.nodes.Count; i++)
-        {
-            ImpFlowNode n = Flow.nodes[i];
-            if (n == null)
-            {
-                continue;
-            }
-            if (type.IsAssignableFrom(n.GetType()))
-            {
-                result.Add(n);
-            }
-        }
-        return result;
-    }
-
-    public override ImpAsset Clone()
-    {
-        A_Flow copy = base.Clone() as A_Flow;
-        if (copy == null)
-        {
-            return null;
-        }
-
-        TFlowData data = new TFlowData();
-        if (Flow.nodes != null)
-        {
-            for (int i = 0; i < Flow.nodes.Count; i++)
-            {
-                ImpFlowNode src = Flow.nodes[i];
-                if (src == null)
-                {
-                    continue;
-                }
-                ImpFlowNode n = src.Clone();
-                if (n == null)
-                {
-                    continue;
-                }
-                n._owner = copy;
-                data.nodes.Add(n);
-            }
-        }
-        if (Flow.connections != null)
-        {
-            for (int i = 0; i < Flow.connections.Count; i++)
-            {
-                data.connections.Add(Flow.connections[i]);
-            }
-        }
-        copy.Flow = data;
-        return copy;
+        guid=TGuid32.New();
     }
 }

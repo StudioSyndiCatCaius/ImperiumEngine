@@ -1,6 +1,6 @@
 ﻿using Raylib_cs;
 
-namespace ImperiumEngine.Enums;
+namespace Engine.Enums;
 
 
 

@@ -1,125 +1,137 @@
-﻿using System.Numerics;
-using ImperiumEngine.Assets;
-using ImperiumEngine.Structs;
+using System.Numerics;
+using Engine.Core;
+using Engine.Structs;
+using Engine.Assets;
+using Engine.Enums;
 using Raylib_cs;
 
-namespace ImperiumEngine.Comps._2D;
+namespace Engine.Comps._2D;
 
+public enum EBoxLayout { Stacked, Horizontal, Vertical, }
+
+/*
+ * Generic non-free container for other Imp2D components.
+ */
 [ImpClass(Common = true)]
 public class C2_Box : Imp2D
 {
-    [ImpVar] public UI_Box style=UI_Box.BkgDark;
-    
-    public override void OnDraw2D(double dt, EDrawFlags flags)
+    [ImpVar] public UI_Box style; //if null, blank background
+    [ImpVar] public EBoxLayout layout;
+
+    public override bool ChildLayout_IsFree() { return false; }
+
+    public override TBounds2 ContentBounds()
     {
-        base.OnDraw2D(dt, flags);
-        if (style == null) return;
-        style.Draw(Dimensions_Get());
+        return style != null ? style.ContentBounds(bounds) : bounds;
+    }
+
+    public override void OnDraw2D(double dt, EDrawFlags flags = 0)
+    {
+        if (style != null) style.Draw(bounds, global_transform);
+    }
+
+    public override TBounds2 ChildLayout_MakeBounds(Imp2D child, int index)
+    {
+        Vector2 PrefSize(Imp2D c)
+        {
+            Vector2 size = c.layout.size;
+            if (c.layout.size_max != Vector2.Zero)
+                size = Vector2.Clamp(size, c.layout.size_min, c.layout.size_max);
+            else
+                size = Vector2.Max(size, c.layout.size_min);
+            return size;
+        }
+
+        TBounds2 Place(Imp2D c, TBounds2 slot)
+        {
+            TBounds2 b = slot.FromLayout(c.position, c.layout);
+            b.start += c.transform.position;
+            b.end += c.transform.position;
+            return b;
+        }
+
+        TBounds2 inner = ContentBounds();
+
+        if (layout == EBoxLayout.Stacked)
+            return Place(child, inner);
+
+        bool horiz = layout == EBoxLayout.Horizontal;
+        float inner_main = horiz
+            ? MathF.Abs(inner.end.X - inner.start.X)
+            : MathF.Abs(inner.end.Y - inner.start.Y);
+
+        float preferred_total = 0;
+        int fill_n = 0;
+        for (int i = 0; i < children.Count; i++)
+        {
+            if (children[i] is not Imp2D c || !c.is_visible) continue;
+            Vector2 sz = PrefSize(c);
+            preferred_total += horiz ? sz.X : sz.Y;
+            if ((horiz ? c.layout.align_H : c.layout.align_V) == EUIViewportAlignment.Fill)
+                fill_n++;
+        }
+
+        float extra = inner_main - preferred_total;
+        if (extra < 0) extra = 0;
+        float extra_each = fill_n > 0 ? extra / fill_n : 0;
+
+        float x0 = MathF.Min(inner.start.X, inner.end.X);
+        float y0 = MathF.Min(inner.start.Y, inner.end.Y);
+        float x1 = MathF.Max(inner.start.X, inner.end.X);
+        float y1 = MathF.Max(inner.start.Y, inner.end.Y);
+        float cursor = 0;
+
+        for (int i = 0; i < children.Count; i++)
+        {
+            if (children[i] is not Imp2D c || !c.is_visible) continue;
+            Vector2 sz = PrefSize(c);
+            float main = horiz ? sz.X : sz.Y;
+            bool fill = (horiz ? c.layout.align_H : c.layout.align_V) == EUIViewportAlignment.Fill;
+            if (fill) main += extra_each;
+            if (c.layout.size_max != Vector2.Zero)
+            {
+                float max = horiz ? c.layout.size_max.X : c.layout.size_max.Y;
+                if (max > 0 && main > max) main = max;
+            }
+
+            TBounds2 slot = horiz
+                ? new TBounds2 { start = new Vector2(x0 + cursor, y0), end = new Vector2(x0 + cursor + main, y1) }
+                : new TBounds2 { start = new Vector2(x0, y0 + cursor), end = new Vector2(x1, y0 + cursor + main) };
+
+            if (c == child) return Place(child, slot);
+            cursor += main;
+        }
+        return default;
     }
 }
 
 public class UI_Box : ImpAsset
 {
-    public static UI_Box BkgDark = new()
-    {
-        tint = new Color(30, 30, 30, 255),
-    };
-    
-    public static UI_Box BkgMid = new()
-    {
-        tint = new Color(50, 50, 50, 255),
-    };
-    
-    public static UI_Box BkgLight = new()
-    {
-        tint = new Color(100, 100, 100, 255),
-    };
+    [ImpVar] public A_Texture? background; 
+    [ImpVar] public TMargins background_nineslice;
+    [ImpVar] public Color tint=Color.White;
+    [ImpVar] public TMargins inner_margins; // margins seperating the children from the edges of the box
+    [ImpVar] public TMargins outer_margins; // margins surrounding the box
 
-    public static UI_Box BtnIdle = new()
+    public TBounds2 Draw(TBounds2 bounds, TTransform2 offset) //returning bounds is the bounds for the content margins (taking both inner and outer margins into account)
     {
-        texture = A_Texture.BTN_A,
-        tint = new Color(50, 50, 50, 255),
-    };
-    public static UI_Box BtnHover = new()
-    {
-        texture = A_Texture.BTN_A,
-        tint = new Color(60, 100, 100, 255),
-    };
-    public static UI_Box BtnPress = new()
-    {
-        texture = A_Texture.BTN_A,
-        tint = new Color(0, 84, 153, 255),
-    };
-    
-    public static UI_Box TabIdle = new()
-    {
-        texture = A_Texture.TAB_A,
-        tint = new Color(100, 100, 100, 255),
-    };
-    public static UI_Box TabHover = new()
-    {
-        texture = A_Texture.TAB_A,
-        tint = new Color(0, 120, 215, 255),
-    };
-    public static UI_Box TabPress = new()
-    {
-        texture = A_Texture.TAB_A,
-        tint = new Color(0, 84, 153, 255),
-    };
-
-    [ImpVar] public A_Texture? texture = A_Texture.PANEL_B;
-    [ImpVar] public Color tint=new Color(50,50,50,100);
-    [ImpVar] public TMargins margins_outer; //offset drawn box from dimension edges
-    [ImpVar] public TMargins margins_inner; //when used as a container, offset inner box from dimension edges (as in, children margins)
-    [ImpVar] public bool is_nine_slice=true;
-    [ImpVar] public TMargins nine_slice_margins=new (10,10,10,10);
-
-    public void Draw(TDimensions2 dim)
-    {
-        Vector2 pos = dim.position + new Vector2(margins_outer.left, margins_outer.top);
-        Vector2 sz = dim.size - new Vector2(
-            margins_outer.left + margins_outer.right,
-            margins_outer.top + margins_outer.bottom);
-        if (sz.X <= 0 || sz.Y <= 0) return;
-
-        if (texture == null)
+        TBounds2 visual = TBounds2.Inset(bounds, outer_margins);
+        float x = visual.start.X;
+        float y = visual.start.Y;
+        float w = visual.end.X - x;
+        float h = visual.end.Y - y;
+        if (w > 1e-4f && h > 1e-4f)
         {
-            Raylib.DrawRectangleV(pos, sz, tint);
-            return;
+            if (background != null)
+                background.Draw(visual, offset, EImageLayout.NineSlice, background_nineslice, tint: tint);
+            if (background == null || background.texture.Id == 0)
+            {
+                Vector2 origin = MathF.Abs((float)offset.rotation) > 1e-4f ? offset.position : Vector2.Zero;
+                Raylib.DrawRectanglePro(new Rectangle(x, y, w, h), origin, (float)offset.rotation, tint);
+            }
         }
-
-        Texture2D tex = texture.texture;
-        if (!is_nine_slice)
-        {
-            Raylib.DrawTexturePro(tex, new Rectangle(0, 0, tex.Width, tex.Height),
-                new Rectangle(pos.X, pos.Y, sz.X, sz.Y), Vector2.Zero, 0f, tint);
-            return;
-        }
-
-        float l = nine_slice_margins.left, r = nine_slice_margins.right;
-        float t = nine_slice_margins.top, b = nine_slice_margins.bottom;
-        float tw = tex.Width, th = tex.Height;
-        float cx = MathF.Max(0, tw - l - r), cy = MathF.Max(0, th - t - b);
-        float dx = MathF.Max(0, sz.X - l - r), dy = MathF.Max(0, sz.Y - t - b);
-        float px = pos.X, py = pos.Y;
-
-        void Patch(float sx, float sy, float sw, float sh, float dx_, float dy_, float dw, float dh)
-        {
-            if (sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0) return;
-            Raylib.DrawTexturePro(tex, new Rectangle(sx, sy, sw, sh), new Rectangle(dx_, dy_, dw, dh), Vector2.Zero, 0f, tint);
-        }
-
-        // corners
-        Patch(0, 0, l, t, px, py, l, t);
-        Patch(tw - r, 0, r, t, px + sz.X - r, py, r, t);
-        Patch(0, th - b, l, b, px, py + sz.Y - b, l, b);
-        Patch(tw - r, th - b, r, b, px + sz.X - r, py + sz.Y - b, r, b);
-        // edges
-        Patch(l, 0, cx, t, px + l, py, dx, t);
-        Patch(l, th - b, cx, b, px + l, py + sz.Y - b, dx, b);
-        Patch(0, t, l, cy, px, py + t, l, dy);
-        Patch(tw - r, t, r, cy, px + sz.X - r, py + t, r, dy);
-        // center
-        Patch(l, t, cx, cy, px + l, py + t, dx, dy);
+        return TBounds2.Inset(visual, inner_margins);
     }
+
+    public TBounds2 ContentBounds(TBounds2 bounds) => TBounds2.Inset(TBounds2.Inset(bounds, outer_margins), inner_margins);
 }

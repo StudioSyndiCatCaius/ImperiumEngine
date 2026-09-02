@@ -1,9 +1,6 @@
-﻿namespace ImperiumEngine.Assets.Flow;
+﻿namespace Engine.Assets.Flow;
 
 public class Flow_Dialogue : A_Flow
 {
-    public override string Editor_GetTypeLabel()
-    {
-        return "Dialogue";
-    }
+
 }

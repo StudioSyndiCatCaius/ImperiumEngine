@@ -1,85 +1,40 @@
 ﻿using System.Numerics;
-using ImperiumEngine.Comps._1D.Systems;
-using ImperiumEngine.Structs;
+using Engine.Comps._1D.Systems;
+using Engine.Core;
+using Engine.Structs;
 using Raylib_cs;
 
-namespace ImperiumEngine.Comps._1D.Systems;
+namespace Engine.Comps._1D.Systems;
 
 
-public class sys_Explore : C1_GameSystem
+public class sys_Explore : C1_System
 {
     [ImpVar][Config][Category("Camera")] public Vector3 camera_init_rotation;
     [ImpVar][Config][Category("Camera")] public bool camera_enable_rotate_H;
     [ImpVar][Config][Category("Camera")] public bool camera_enable_rotate_V;
 
-    [ImpVar][Config][Category("States")] public TClass<C1_GameSystem> system_pause;
+    [ImpVar][Config][Category("States")] public TClass<C1_System> system_pause;
+
 
     public sys_Explore()
     {
-        system_tags = new TTagSet("System.Explore");
-        system_pause = new TClass<C1_GameSystem>(typeof(sys_Pause));
+        //blocked_system_tags = new("System.Explore");
     }
 
-    public override void OnBegin()
+    public override void Input_Down(ImpPlayer player, TLabel ia, Vector3 axis, double dt)
     {
-        base.OnBegin();
-        if (ImpPlayer.players.Count > 0)
+        base.Input_Down(player, ia, axis, dt);
+        if (ia == "_Move")
         {
-            Input_SetOwnerActive(0, true);
-            ImpPlayer.players[0].cursor.is_hidden = true;
-            Raylib.DisableCursor();
+            if (player.pawn != null)
+            {
+                player.pawn.Phys_Move(axis);
+            }
         }
-    }
 
-    public override void OnEnd()
-    {
-        if (ImpPlayer.players.Count > 0)
+        if (ia == "_Rotate")
         {
-            ImpPlayer.players[0].cursor.is_hidden = false;
-            Raylib.EnableCursor();
-        }
-        base.OnEnd();
-    }
-
-    protected override void OnDestroy()
-    {
-        if (ImpPlayer.players.Count > 0)
-        {
-            ImpPlayer.players[0].cursor.is_hidden = false;
-            Raylib.EnableCursor();
-        }
-        base.OnDestroy();
-    }
-
-    public override void Input_Update(ImpPlayer player, TLabel iaction, double dt, Vector3 axis)
-    {
-        base.Input_Update(player, iaction, dt, axis);
-        if (player.target_view != null)
-        {
-            player.target_view.Input_Update(player, iaction, dt, axis);
-        }
-    }
-
-    public override void Input_Pressed(ImpPlayer player, TLabel iaction, Vector3 axis)
-    {
-        base.Input_Pressed(player, iaction, axis);
-        if (iaction == "_Pause")
-        {
-            C1_GameSystem.Activate(system_pause);
-            return;
-        }
-        if (player.target_view != null)
-        {
-            player.target_view.Input_Pressed(player, iaction, axis);
-        }
-    }
-
-    public override void Input_Released(ImpPlayer player, TLabel iaction, Vector3 axis)
-    {
-        base.Input_Released(player, iaction, axis);
-        if (player.target_view != null)
-        {
-            player.target_view.Input_Released(player, iaction, axis);
+            player.control_rotation+=axis;
         }
     }
 }

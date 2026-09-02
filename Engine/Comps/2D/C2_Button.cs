@@ -1,233 +1,171 @@
 using System.Numerics;
-using ImperiumEngine.Assets;
-using ImperiumEngine.Enums;
-using ImperiumEngine.Structs;
+using Engine.Assets;
+using Engine.Core;
+using Engine.Enums;
+using Engine.Interfaces;
+using Engine.Structs;
 using Raylib_cs;
 
-namespace ImperiumEngine.Comps._2D;
-
-[ImpClass(Common = true)]
-public class C2_Button : Imp2D
-{
-    public string text = "";
-    public A_Texture icon = null;
-    public A_Texture icon2 = null;
-    public EButtonLayout button_layout = EButtonLayout.Icon_Text_H;
-    public UI_Button style = UI_Button.DEFAULT;
-    public UI_Text text_style = UI_Text.DEFAULT;
-
-    public float icon_size = 16;
-    public int override_font_size = 0;
-    public float content_pad = 4;
-    public float gap = 4;
-    public EUIPositionAlignment content_align_h = EUIPositionAlignment.Center;
-    public EUIPositionAlignment content_align_v = EUIPositionAlignment.Center;
-    public bool is_disabled = false;
-
-    public Action on_click;
-
-    public bool is_hovered = false;
-    public bool is_pressed = false;
-
-    public C2_Button()
-    {
-        option_button = this;
-        cursor_filter = ECursorFilter.Hit;
-    }
-
-    public override void OnDraw2D(double dt, EDrawFlags flags)
-    {
-        base.OnDraw2D(dt, flags);
-        if (style == null) return;
-
-        TDimensions2 dim = Dimensions_Get();
-        if (dim.size.X <= 0 || dim.size.Y <= 0) return;
-
-        if (is_pressed)
-        {
-            style.pressed.Draw(dim);
-            is_pressed = false;
-        }
-        else if (is_hovered) style.hovered.Draw(dim);
-        else style.unhovered.Draw(dim);
-
-        bool has_icon = icon != null;
-        bool has_text = !string.IsNullOrEmpty(text);
-        if (!has_icon && !has_text) return;
-
-        float pad = content_pad > 0 ? content_pad : 0;
-        Vector2 origin = dim.position + new Vector2(pad, pad);
-        Vector2 area = dim.size - new Vector2(pad * 2, pad * 2);
-        if (area.X <= 0 || area.Y <= 0) return;
-
-        float iw = 0, ih = 0;
-        if (has_icon)
-        {
-            float s = icon_size > 0 ? icon_size : 16;
-            Texture2D tex = icon.texture;
-            float tw0 = tex.Width > 0 ? tex.Width : s;
-            float th0 = tex.Height > 0 ? tex.Height : s;
-            if (tw0 >= th0)
-            {
-                iw = s;
-                ih = s * (th0 / tw0);
-            }
-            else
-            {
-                ih = s;
-                iw = s * (tw0 / th0);
-            }
-        }
-
-        float tw = 0, th = 0;
-        Font font = text_style?.font != null ? text_style.font.font : Raylib.GetFontDefault();
-        float font_size = override_font_size > 0
-            ? override_font_size
-            : (text_style != null && text_style.size > 0 ? text_style.size : 16);
-        if (has_text)
-        {
-            Vector2 m = Raylib.MeasureTextEx(font, text, font_size, 1f);
-            tw = m.X;
-            th = m.Y;
-        }
-
-        float g = has_icon && has_text ? gap : 0;
-        bool vertical = button_layout is EButtonLayout.Icon_Text_V or EButtonLayout.Text_Icon_V;
-        float block_w = vertical ? MathF.Max(iw, tw) : iw + g + tw;
-        float block_h = vertical ? ih + g + th : MathF.Max(ih, th);
-        float bx = content_align_h switch
-        {
-            EUIPositionAlignment.Center => origin.X + (area.X - block_w) * 0.5f,
-            EUIPositionAlignment.End => origin.X + area.X - block_w,
-            _ => origin.X,
-        };
-        float by = content_align_v switch
-        {
-            EUIPositionAlignment.Center => origin.Y + (area.Y - block_h) * 0.5f,
-            EUIPositionAlignment.End => origin.Y + area.Y - block_h,
-            _ => origin.Y,
-        };
-
-        Vector2 icon_pos, text_pos;
-        switch (button_layout)
-        {
-            case EButtonLayout.Text_Icon_H:
-                text_pos = new Vector2(bx, by + (block_h - th) * 0.5f);
-                icon_pos = new Vector2(bx + tw + g, by + (block_h - ih) * 0.5f);
-                break;
-            case EButtonLayout.Icon_Text_V:
-                icon_pos = new Vector2(bx + (block_w - iw) * 0.5f, by);
-                text_pos = new Vector2(bx + (block_w - tw) * 0.5f, by + ih + g);
-                break;
-            case EButtonLayout.Text_Icon_V:
-                text_pos = new Vector2(bx + (block_w - tw) * 0.5f, by);
-                icon_pos = new Vector2(bx + (block_w - iw) * 0.5f, by + th + g);
-                break;
-            default: // Icon_Text_H
-                icon_pos = new Vector2(bx, by + (block_h - ih) * 0.5f);
-                text_pos = new Vector2(bx + iw + g, by + (block_h - th) * 0.5f);
-                break;
-        }
-
-        if (has_icon)
-        {
-            Texture2D tex = icon.texture;
-            Raylib.DrawTexturePro(tex,
-                new Rectangle(0, 0, tex.Width, tex.Height),
-                new Rectangle(icon_pos.X, icon_pos.Y, iw, ih),
-                Vector2.Zero, 0f, is_disabled ? new Color(255, 255, 255, 120) : Color.White);
-        }
-
-        if (icon2 != null)
-        {
-            float s2 = icon_size > 0 ? icon_size : 16;
-            Texture2D tex2 = icon2.texture;
-            float src_w = tex2.Width > 0 ? tex2.Width : s2;
-            float src_h = tex2.Height > 0 ? tex2.Height : s2;
-            float iw2;
-            float ih2;
-            if (src_w >= src_h)
-            {
-                iw2 = s2;
-                ih2 = s2 * (src_h / src_w);
-            }
-            else
-            {
-                ih2 = s2;
-                iw2 = s2 * (src_w / src_h);
-            }
-            float gap2 = gap;
-            if (!has_icon)
-            {
-                gap2 = 0;
-            }
-            Vector2 icon2_pos = new Vector2(
-                icon_pos.X + iw + gap2,
-                by + (block_h - ih2) * 0.5f);
-            text_pos = new Vector2(text_pos.X + iw2 + gap, text_pos.Y);
-            Color tint2 = Color.White;
-            if (is_disabled)
-            {
-                tint2 = new Color(255, 255, 255, 120);
-            }
-            Raylib.DrawTexturePro(tex2,
-                new Rectangle(0, 0, tex2.Width, tex2.Height),
-                new Rectangle(icon2_pos.X, icon2_pos.Y, iw2, ih2),
-                Vector2.Zero, 0f, tint2);
-        }
-
-        if (has_text && text_style != null)
-        {
-            Color prev = text_style.color;
-            if (is_disabled) text_style.color = new Color(prev.R, prev.G, prev.B, (byte)120);
-            text_style.Draw(text, text_pos, new Vector2(tw + 1, th + 1), override_font_size, ETextWrap.None,
-                EUIPositionAlignment.Start, EUIPositionAlignment.Start);
-            text_style.color = prev;
-        }
-    }
-
-    public override void Cursor_OnEvent(ImpPlayer player, ECursorEvent evnt)
-    {
-        base.Cursor_OnEvent(player, evnt);
-        if (is_disabled) return;
-        if (evnt == ECursorEvent.Select_A)
-        {
-            is_pressed = true;
-            as_option_select?.Invoke(this);
-            on_click?.Invoke();
-        }
-    }
-
-    public override void _Notify_AsCursorTarget(ImpPlayer player, ENotifyGeneric notify, double dt)
-    {
-        base._Notify_AsCursorTarget(player, notify, dt);
-        if (notify == ENotifyGeneric.Begin)
-        {
-            is_hovered = true;
-            as_option_hover?.Invoke(this);
-        }
-        else if (notify == ENotifyGeneric.End)
-        {
-            is_hovered = false;
-            as_option_unhover?.Invoke(this);
-        }
-    }
-}
-
+namespace Engine.Comps._2D;
 
 public enum EButtonLayout
 {
-    Icon_Text_H, Icon_Text_V, Text_Icon_H, Text_Icon_V,
+    H_Icon_Text,
+    H_Text_Icon,
+    V_Icon_Text,
+    V_Text_Icon,
 }
 
+public enum EButtonState
+{
+    Normal, Hover, Pressed,
+}
+[ImpClass(Common = true)]
+public class C2_Button : Imp2D
+{
+    [ImpVar] public UI_Button style=UI_Button.DEFAULT;
+    [ImpVar] public string text;
+    [ImpVar] public A_Texture? icon;
+    [ImpVar] public EButtonLayout button_layout;
+
+    private bool _hovered;
+    private bool _held;
+    
+    public Action<C2_Button> on_click;
+    public Action<C2_Button> on_hover;
+    public Action<C2_Button> on_unhover;
+
+    public override bool ChildLayout_IsFree() { return false; }
+
+    public C2_Button()
+    {
+        cursor_filter = ECursorFilter.Hit;
+        option_button = this;
+    }
+
+    public override void OnInit()
+    {
+        base.OnInit();
+        cursor_filter = ECursorFilter.Hit;
+    }
+
+    public override void OnOption_Refreshed()
+    {
+        if (option_data is I_General g)
+        {
+            Console.WriteLine("button refreshed: "+g.getTitle());
+            text = g.getTitle();
+            icon = g.getIcon();
+            //text = "ga";
+        }
+        else
+        {
+            text = "nah";
+        }
+    }
+    
+
+    public override void OnDraw2D(double dt, EDrawFlags flags = EDrawFlags.None)
+    {
+        base.OnDraw2D(dt, flags);
+        if (bounds.IsEmpty) bounds = Bounds_Cache();
+
+        UI_Box box=style.box_normal;
+        if(_held) box=style.box_pressed;
+        else if(_hovered) box=style.box_hover;
+        
+        TBounds2 _content_bounds = box.Draw(bounds, global_transform);
+        
+        TBounds2[] icon_text_bounds;
+        float icon_size=0.0f; //get icons size here
+        float[] _sizes = new float[1];
+        _sizes.SetValue(icon_size,0);
+        if (button_layout == EButtonLayout.H_Icon_Text || button_layout == EButtonLayout.H_Text_Icon)
+        {
+            icon_text_bounds = _content_bounds.Split(_sizes, false);
+        }
+        else
+        {
+            icon_text_bounds = _content_bounds.Split(_sizes, false, EUIOrentation.V);
+        }
+
+        if (button_layout == EButtonLayout.H_Icon_Text || button_layout == EButtonLayout.V_Icon_Text) icon_text_bounds.Reverse();
+        
+        style.font.Draw(text, icon_text_bounds[0], global_transform, ETextWrap.Word);
+        if(icon!=null) icon.Draw(icon_text_bounds[1],global_transform,EImageLayout.Retain_Fit);
+
+    }
+
+    public override void _NotifyAs_CursorTarget(ImpPlayer player, ENotifyGeneric notify, double dt)
+    {
+        base._NotifyAs_CursorTarget(player, notify, dt);
+        switch (notify)
+        {
+            case ENotifyGeneric.Begin:
+                _hovered = true;
+                on_hover?.Invoke(this);
+                Hooks.btn_hover?.Invoke(this);
+                break;
+            case ENotifyGeneric.End:
+                _hovered = false;
+                on_unhover?.Invoke(this);
+                Hooks.btn_unhover?.Invoke(this);
+                break;
+        }
+    }
+
+    public override void _InputAs_CursorTarget(ImpPlayer player, EInputKey key, EInputState state, double dt)
+    {
+        base._InputAs_CursorTarget(player, key, state, dt);
+        if (!player.Key_IsDragStart(key) && !ImpPlayer.KeyType_IsTouch(key)) return;
+        if (state == EInputState.Pressed) _held = true;
+        else if (state == EInputState.Released)
+        {
+            if (_held && _hovered && player.drag_target == null)
+            {
+                on_click?.Invoke(this);
+                Hooks.btn_clicked?.Invoke(this);
+            }
+            _held = false;
+        }
+    }
+    
+}
 
 public class UI_Button : ImpAsset
 {
-    [ImpVar] public UI_Box unhovered = UI_Box.BtnIdle;
-    [ImpVar] public UI_Box hovered = UI_Box.BtnHover;
-    [ImpVar] public UI_Box pressed = UI_Box.BtnPress;
+    private static TMargins _default_nineslice = new TMargins(10, 10, 10, 10);
+    
+    [ImpVar] public UI_Box box_normal = new UI_Box
+    {
+        is_inlined = true,
+        background = A_Texture.UI_BTN,
+        background_nineslice = _default_nineslice,
+        tint = new Color(58, 58, 64, 255),
+        inner_margins = new TMargins(8, 8, 6, 6),
+    };
 
-    public static UI_Button DEFAULT = new();
+    [ImpVar] public UI_Box box_hover = new UI_Box
+    {
+        is_inlined = true,
+        background = A_Texture.UI_BTN,
+        background_nineslice = _default_nineslice,
+        tint = new Color(78, 82, 94, 255),
+        inner_margins = new TMargins(8, 8, 6, 6),
+    };
+
+    [ImpVar] public UI_Box box_pressed = new UI_Box
+    {
+        is_inlined = true,
+        background = A_Texture.UI_BTN,
+        background_nineslice = _default_nineslice,
+        tint = new Color(40, 42, 48, 255),
+        inner_margins = new TMargins(8, 8, 6, 6),
+    };
+    [ImpVar] public A_Font font=A_Font.ARIAL_P;
+    
+    // ================================================================================================================
+    // STATIC
+    // ================================================================================================================
+    [Builtin] public static UI_Button DEFAULT = new();
 }
-
-

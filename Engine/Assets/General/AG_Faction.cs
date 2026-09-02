@@ -1,7 +1,7 @@
-﻿using ImperiumEngine.Enums;
-using ImperiumEngine.Structs;
+﻿using Engine.Enums;
+using Engine.Structs;
 
-namespace ImperiumEngine.Assets.General;
+namespace Engine.Assets.General;
 
 public class AG_Faction : A_General
 {

@@ -1,7 +1,7 @@
-﻿using ImperiumEngine.Assets.General;
-using ImperiumEngine.Comps._1D;
+﻿using Engine.Assets.General;
+using Engine.Comps._1D;
 
-namespace ImperiumEngine.Assets.Effects;
+namespace Engine.Assets.Effects;
 
 public class Eff_DamageFlat : A_Effect
 {

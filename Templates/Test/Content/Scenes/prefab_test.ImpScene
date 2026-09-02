@@ -1,0 +1,120 @@
+type = "A_Scene"
+prefab_refs = {}
+
+[vars]
+root = {
+    type = "Imp3D",
+    vars = {
+        transform = {
+            position = {
+                X = 0,
+                Y = 0,
+                Z = 0,
+            },
+            rotation = {
+                X = 0,
+                Y = 0,
+                Z = 0,
+            },
+            scale = {
+                X = 1,
+                Y = 1,
+                Z = 1,
+            },
+        },
+        physics_enabled = false,
+        movement_enabled = false,
+        is_visible = true,
+        cast_shadows = false,
+        name = "",
+    },
+    children = [
+        {
+            type = "C3_Mesh",
+            vars = {
+                mesh = "$A_Mesh:{engine}/3D/Shapes/sm_ED_shape_cube.ImpAsset",
+                transform = {
+                    position = {
+                        X = 0,
+                        Y = 1.0026741,
+                        Z = -2.2,
+                    },
+                    rotation = {
+                        X = -0,
+                        Y = 0,
+                        Z = 0,
+                    },
+                    scale = {
+                        X = 1,
+                        Y = 1,
+                        Z = 1,
+                    },
+                },
+                physics_enabled = false,
+                movement_enabled = false,
+                is_visible = true,
+                cast_shadows = true,
+                name = "",
+            },
+            children = [],
+        },
+        {
+            type = "C3_Mesh",
+            vars = {
+                mesh = "$A_Mesh:{engine}/3D/Shapes/sm_ED_shape_cube.ImpAsset",
+                transform = {
+                    position = {
+                        X = 0,
+                        Y = 1,
+                        Z = 0,
+                    },
+                    rotation = {
+                        X = 0,
+                        Y = 0,
+                        Z = 0,
+                    },
+                    scale = {
+                        X = 1,
+                        Y = 1,
+                        Z = 1,
+                    },
+                },
+                physics_enabled = false,
+                movement_enabled = false,
+                is_visible = true,
+                cast_shadows = true,
+                name = "",
+            },
+            children = [],
+        },
+        {
+            type = "C3_Mesh",
+            vars = {
+                mesh = "$A_Mesh:{engine}/3D/Shapes/sm_ED_shape_cube.ImpAsset",
+                transform = {
+                    position = {
+                        X = 0,
+                        Y = 1,
+                        Z = 2.2,
+                    },
+                    rotation = {
+                        X = 0,
+                        Y = 0,
+                        Z = 0,
+                    },
+                    scale = {
+                        X = 1,
+                        Y = 1,
+                        Z = 1,
+                    },
+                },
+                physics_enabled = false,
+                movement_enabled = false,
+                is_visible = true,
+                cast_shadows = true,
+                name = "",
+            },
+            children = [],
+        },
+    ],
+}

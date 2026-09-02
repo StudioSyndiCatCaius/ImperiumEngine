@@ -1,6 +1,6 @@
-﻿using ImperiumEngine.Structs;
+﻿using Engine.Structs;
 
-namespace ImperiumEngine.Assets.General;
+namespace Engine.Assets.General;
 
 public struct TEquipSlotConditions
 {

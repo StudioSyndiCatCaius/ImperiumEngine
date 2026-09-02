@@ -1,6 +1,6 @@
-﻿using ImperiumEngine.Assets;
+﻿
 
-namespace ImperiumEngine;
+namespace Engine;
 
 
 [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
@@ -8,9 +8,6 @@ public sealed class ImpVarAttribute : Attribute
 {
     // Optional: allow a custom JSON key
     public string? Name { get; }
-
-    public EImpVarInspect Inspect { get; init; }
-    public EImpVarEdit Edit { get; init; }
     
     public bool ReadOnly { get; init; } //DEPRC
     public bool Hidden { get; init; }
@@ -43,6 +40,17 @@ public sealed class TitleAttribute : Attribute
 }
 
 
+//indicates a ImpAsset is "built-in", meaning it can be select in editor DLG_PickAsset under the "built-ins" section.  
+[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
+public sealed class BuiltinAttribute : Attribute
+{
+    // Optional: allow a custom JSON key
+    public string? Name { get; }
+
+    public BuiltinAttribute(string? name = null) => Name = name;
+}
+
+
 
 
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
@@ -66,8 +74,7 @@ public sealed class ConfigAttribute : Attribute
 [AttributeUsage(AttributeTargets.Struct | AttributeTargets.Class)]
 public sealed class ImpClassAttribute : Attribute
 {
-
-    
+    public bool GlobalizeFunctions { get; init; } //Mainly for scripting like .lua. TRUE= all `[ScriptCall] public static` functions() are global, like "MyFunc(35)". FALSE= you must call class name first, like "ImpWhatever.MyFunc(35)" 
     public bool Hidden { get; init; } //hides from the editor
 
     public bool Common { get; init; }  // for ImpComps. appears in the "Comps" tab next to the scene tree
@@ -95,13 +102,12 @@ public class CallInEditorAttribute : Attribute
 [AttributeUsage(AttributeTargets.Method)]
 public class ScriptCallAttribute : Attribute
 {
-    // DEPCR. try to auto make any non-void with no Action/Func args as a pure-type by default. 
     //public bool pure { get; set; } //only for non-void return functions. defaults to pure with 
 }
 
 // only for "virtual" functions. indicates that this function is overridable in the scripting system 
 [AttributeUsage(AttributeTargets.Method)]
-public class ScriptOverrideAttribute : Attribute
+public class ScriptHookAttribute : Attribute
 {
     
 }

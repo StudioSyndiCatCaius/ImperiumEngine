@@ -1,23 +1,19 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <OutputType>Exe</OutputType>
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <RootNamespace>ImperiumEngine</RootNamespace>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
 
     <ItemGroup>
       <PackageReference Include="JoltPhysicsSharp" Version="2.22.0" />
+      <PackageReference Include="MoonSharp" Version="3.0.0-beta.1" />
       <PackageReference Include="R3D-cs" Version="0.11.0" />
-      <PackageReference Include="Raygui-cs-creeperlv" Version="1.0.0" />
-      <PackageReference Include="Raylib-cs" Version="8.0.0" />
-    </ItemGroup>
-
-    <!-- engine content ships beside the exe; flows to referencing projects too -->
-    <ItemGroup>
-      <None Update="Content\**\*.*" CopyToOutputDirectory="PreserveNewest" />
+      <PackageReference Include="Raylib-cs" Version="8.1.0-rc.1" />
+      <PackageReference Include="Tomlyn" Version="2.10.1" />
+      <PackageReference Include="Twizzle.ImGui.NET" Version="1.89.4" />
     </ItemGroup>
 
 </Project>

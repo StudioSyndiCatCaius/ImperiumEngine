@@ -1,6 +1,6 @@
-﻿using ImperiumEngine.Assets.General;
+﻿using Engine.Assets.General;
 
-namespace ImperiumEngine.Interfaces;
+namespace Engine.Interfaces;
 
 public struct TAttributeModifier
 {

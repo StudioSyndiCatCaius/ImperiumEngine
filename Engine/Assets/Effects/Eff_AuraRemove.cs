@@ -1,7 +1,7 @@
-﻿using ImperiumEngine.Comps._1D;
-using ImperiumEngine.Structs;
+﻿using Engine.Comps._1D;
+using Engine.Structs;
 
-namespace ImperiumEngine.Assets.Effects;
+namespace Engine.Assets.Effects;
 
 public class Eff_AuraRemove : A_Effect
 {

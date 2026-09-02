@@ -1,9 +1,12 @@
-﻿using ImperiumEngine.Structs;
+﻿using System.Numerics;
+using Engine.Assets;
+using Engine.Core;
+using Engine.Structs;
 
-namespace ImperiumEngine.Comps._1D;
+namespace Engine.Comps._1D;
 
 //a component that affects a C1_Creature in some way
-public class C1_Aura : ImpComp
+public class C1_Aura : Imp1D
 {
     public C1_Creature target;
     public C1_Creature instigator;

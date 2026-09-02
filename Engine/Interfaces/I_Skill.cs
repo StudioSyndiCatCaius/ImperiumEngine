@@ -1,9 +1,9 @@
-﻿using ImperiumEngine.Assets;
-using ImperiumEngine.Assets.General;
-using ImperiumEngine.Comps._1D;
-using ImperiumEngine.Structs;
+﻿using Engine.Assets;
+using Engine.Assets.General;
+using Engine.Comps._1D;
+using Engine.Structs;
 
-namespace ImperiumEngine.Interfaces;
+namespace Engine.Interfaces;
 
 public struct TSkillConfig
 {

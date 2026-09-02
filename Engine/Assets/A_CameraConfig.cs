@@ -1,6 +1,7 @@
 using System.Numerics;
+using Engine.Core;
 
-namespace ImperiumEngine.Assets;
+namespace Engine.Assets;
 
 public enum ECameraViewMode
 {
@@ -29,51 +30,5 @@ public class A_CameraConfig : ImpAsset
     [ImpVar][Category("Input")] public bool enable_rotate_H = true;
     [ImpVar][Category("Input")] public bool enable_rotate_V = true;
 
-    public override string File_GetExtension()
-    {
-        return "ImpCameraConfig";
-    }
 
-    public static A_CameraConfig CAM_THIRDPERSON = new()
-    {
-        fov = 70,
-        view_mode = ECameraViewMode.Perspective,
-        boom_distance = 4,
-        boom_uses_collision = true,
-        starting_rotation = new Vector3(-15f, 0f, 0f),
-        look_lerp = 0.5,
-        look_speed = 0.2,
-        enable_move = true,
-        enable_rotate_H = true,
-        enable_rotate_V = true,
-        filepath = BuiltinPrefix + "A_CameraConfig.CAM_THIRDPERSON",
-    };
-
-    public static A_CameraConfig CAM_FIRSTPERSON = new()
-    {
-        fov = 90,
-        view_mode = ECameraViewMode.Perspective,
-        boom_distance = 0,
-        starting_rotation = Vector3.Zero,
-        look_lerp = 0.8,
-        look_speed = 0.2,
-        enable_move = true,
-        enable_rotate_H = true,
-        enable_rotate_V = true,
-        filepath = BuiltinPrefix + "A_CameraConfig.CAM_FIRSTPERSON",
-    };
-
-    public static A_CameraConfig CAM_TOPDOWN = new()
-    {
-        fov = 18,
-        view_mode = ECameraViewMode.Orthographic,
-        boom_distance = 20,
-        starting_rotation = new Vector3(-90f, 0f, 0f),
-        look_lerp = 0.5,
-        look_speed = 0.2,
-        enable_move = true,
-        enable_rotate_H = false,
-        enable_rotate_V = false,
-        filepath = BuiltinPrefix + "A_CameraConfig.CAM_TOPDOWN",
-    };
 }

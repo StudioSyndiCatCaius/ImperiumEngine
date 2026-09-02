@@ -1,19 +1,20 @@
-﻿using ImperiumEngine.Assets;
-using ImperiumEngine.Structs;
-using Raylib_cs;
+﻿using Engine.Assets;
+using Engine.Core;
+using Engine.Enums;
+using Engine.Structs;
 
-namespace ImperiumEngine.Comps._2D;
+namespace Engine.Comps._2D;
 
 [ImpClass(Common = true)]
 public class C2_Image : Imp2D
 {
     [ImpVar] public A_Texture texture;
-    [ImpVar] public Color tint = Color.White;
+    [ImpVar] public EImageLayout image_layout;
+    [ImpVar] public TMargins nine_slice_margins;
+    public override bool ChildLayout_IsFree() { return false; }
 
-    public override void OnDraw2D(double dt, EDrawFlags flags)
+    public override void OnDraw2D(double dt, EDrawFlags flags = 0)
     {
-        base.OnDraw2D(dt, flags);
-        //texture.Draw(Dimensions_Get());
-        Draw_Texture(Bounds_Get(),Transform_Get(true),texture,tint);
+        if (texture != null) texture.Draw(bounds,global_transform, image_layout, nine_slice_margins);
     }
 }

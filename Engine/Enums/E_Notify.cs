@@ -1,4 +1,4 @@
-﻿namespace ImperiumEngine.Enums;
+﻿namespace Engine.Enums;
 
 public enum ENotifyGeneric
 {

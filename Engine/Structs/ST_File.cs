@@ -1,12 +1,12 @@
-using System.Numerics;
-using System.Text.Json.Serialization;
-using ImperiumEngine.Comps._2D;
-using ImperiumEngine.Enums;
-using ImperiumEngine.Interfaces;
+﻿using Engine.Core;
+using Engine.Interfaces;
 
-namespace ImperiumEngine.Structs;
+namespace Engine.Structs;
 
-
+/*
+ * stores a file path. LONG TERM, consider having this use some sort of byte index or hash map, where instead of a full string,
+ * we store some sort of reference to folders that themselves are stored in some kind of map (for performance)
+ */
 public struct TFile : I_Property
 {
 
@@ -14,7 +14,7 @@ public struct TFile : I_Property
 
     public TFile(string? path) { this.path = path ?? ""; }
 
-
+    public string Get() { return Imp.Make_Path_Absolute(path); }
 }
 
 public struct TDirectory : I_Property
@@ -22,4 +22,12 @@ public struct TDirectory : I_Property
 
     [ImpVar] public string path;
 
+}
+
+
+public struct TFileLabel
+{
+    public TLabel mod; // Example: {game}, {engine}, {mod1}, {mod2}
+    public string path; // Example: txt_grass.png, /creature/slime.glb
+    public TLabel ext;
 }

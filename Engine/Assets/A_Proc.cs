@@ -1,9 +1,6 @@
-﻿using ImperiumEngine.Interfaces;
+﻿namespace Engine.Assets;
 
-namespace ImperiumEngine.Assets;
-
-//procedurally populates values of the asset based on the asset's name
-public abstract class A_Proc : ImpAsset, I_General
+public class A_Proc : A_General
 {
     
 }

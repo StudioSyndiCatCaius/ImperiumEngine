@@ -1,6 +1,7 @@
-﻿using ImperiumEngine;
+﻿using Engine;
+using Engine.Core;
 
-namespace ImperiumEngine.Assets;
+namespace Engine.Assets;
 
 public class A_Particle : ImpAsset
 {

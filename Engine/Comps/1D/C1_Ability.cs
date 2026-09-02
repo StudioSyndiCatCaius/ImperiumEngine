@@ -1,10 +1,11 @@
 ﻿using System.Numerics;
-using ImperiumEngine.Assets;
-using ImperiumEngine.Structs;
+using Engine.Assets;
+using Engine.Core;
+using Engine.Structs;
 
-namespace ImperiumEngine.Comps._1D;
+namespace Engine.Comps._1D;
 
-public abstract class C1_Ability : ImpComp
+public abstract class C1_Ability : Imp1D
 {
     [ImpVar][Category("Input")] public TLabel input_label;
     [ImpVar][Category("Input")] public bool input_release_stops_ability;

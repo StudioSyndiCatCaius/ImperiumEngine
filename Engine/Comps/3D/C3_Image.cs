@@ -1,9 +1,8 @@
-﻿using ImperiumEngine.Assets;
+﻿using Engine.Core;
 
-namespace ImperiumEngine.Comps._3D;
+namespace Engine.Comps._3D;
 
 public class C3_Image : Imp3D
 {
-    [ImpVar] A_Texture image;
-    [ImpVar] bool is_billboard;
+    public bool is_billboard;
 }

@@ -1,0 +1,392 @@
+type = "A_Scene"
+prefab_refs = {
+    3441648 = "{game}\\Scenes\\prefab_test",
+}
+
+[vars]
+root = {
+    type = "Imp3D",
+    vars = {
+        transform = {
+            position = {
+                X = 0,
+                Y = 0,
+                Z = 0,
+            },
+            rotation = {
+                X = 0,
+                Y = 0,
+                Z = 0,
+            },
+            scale = {
+                X = 1,
+                Y = 1,
+                Z = 1,
+            },
+        },
+        physics_enabled = false,
+        movement_enabled = false,
+        is_visible = true,
+        cast_shadows = false,
+        name = "",
+    },
+    children = [
+        {
+            type = "C3_Camera",
+            vars = {
+                fov = 60,
+                near_plane = 0.1,
+                far_plane = 1000,
+                is_orthographic = false,
+                look_speed = 5,
+                transform = {
+                    position = {
+                        X = -3,
+                        Y = 3,
+                        Z = 3,
+                    },
+                    rotation = {
+                        X = 0,
+                        Y = -35.264,
+                        Z = -45,
+                    },
+                    scale = {
+                        X = 1,
+                        Y = 1,
+                        Z = 1,
+                    },
+                },
+                physics_enabled = false,
+                movement_enabled = false,
+                is_visible = true,
+                cast_shadows = false,
+                name = "",
+            },
+            children = [],
+        },
+        {
+            type = "C3_Light",
+            vars = {
+                type = "Point",
+                intensity = 4,
+                color = {
+                    R = {},
+                    G = {},
+                    B = {},
+                    A = {},
+                },
+                radius = 29,
+                transform = {
+                    position = {
+                        X = 2,
+                        Y = 4,
+                        Z = 2,
+                    },
+                    rotation = {
+                        X = 0,
+                        Y = 0,
+                        Z = 0,
+                    },
+                    scale = {
+                        X = 1,
+                        Y = 1,
+                        Z = 1,
+                    },
+                },
+                physics_enabled = false,
+                movement_enabled = false,
+                is_visible = true,
+                cast_shadows = false,
+                name = "",
+            },
+            children = [],
+        },
+        {
+            type = "C3_Mesh",
+            vars = {
+                mesh = "$A_Mesh:{engine}/3D/Shapes/sm_ED_shape_plane.ImpAsset",
+                transform = {
+                    position = {
+                        X = 0,
+                        Y = 0.06809139,
+                        Z = 0,
+                    },
+                    rotation = {
+                        X = 0,
+                        Y = 0,
+                        Z = 0,
+                    },
+                    scale = {
+                        X = 10,
+                        Y = 10,
+                        Z = 10,
+                    },
+                },
+                physics_enabled = false,
+                movement_enabled = false,
+                is_visible = true,
+                cast_shadows = true,
+                name = "",
+            },
+            children = [],
+        },
+        {
+            type = "C3_Mesh",
+            vars = {
+                mesh = "$A_Mesh:{engine}/3D/Shapes/sm_ED_shape_sphere.ImpAsset",
+                transform = {
+                    position = {
+                        X = 0,
+                        Y = 1,
+                        Z = 0,
+                    },
+                    rotation = {
+                        X = 0,
+                        Y = 0,
+                        Z = 0,
+                    },
+                    scale = {
+                        X = 1,
+                        Y = 1,
+                        Z = 1,
+                    },
+                },
+                physics_enabled = false,
+                movement_enabled = false,
+                is_visible = true,
+                cast_shadows = true,
+                name = "",
+            },
+            children = [],
+        },
+        {
+            is_prefab = true,
+            prefab_id = 3441648,
+            vars = {
+                transform = {
+                    position = {
+                        X = 3,
+                        Y = 0,
+                        Z = 0,
+                    },
+                    rotation = {
+                        X = 0,
+                        Y = 0,
+                        Z = 0,
+                    },
+                    scale = {
+                        X = 1,
+                        Y = 1,
+                        Z = 1,
+                    },
+                },
+                physics_enabled = false,
+                movement_enabled = false,
+                is_visible = true,
+                cast_shadows = false,
+                name = "Imp3D",
+            },
+            children = [],
+        },
+        {
+            type = "C2_Image",
+            vars = {
+                image_layout = "Stretch",
+                nine_slice_margins = {
+                    left = 0,
+                    right = 0,
+                    top = 0,
+                    bottom = 0,
+                },
+                position = {
+                    X = 0,
+                    Y = 0,
+                },
+                layout = {
+                    align_H = "Start",
+                    align_V = "Start",
+                    size = {
+                        X = 100,
+                        Y = 100,
+                    },
+                    size_min = {
+                        X = 0,
+                        Y = 0,
+                    },
+                    size_max = {
+                        X = 0,
+                        Y = 0,
+                    },
+                },
+                pivot_normalized = true,
+                pivot = {
+                    X = 0.5,
+                    Y = 0.5,
+                },
+                cursor_filter = "Pass",
+                transform = {
+                    position = {
+                        X = 896,
+                        Y = 192,
+                    },
+                    rotation = 0,
+                    scale = {
+                        X = 0,
+                        Y = 0,
+                    },
+                },
+                is_visible = true,
+                cast_shadows = false,
+                name = "NewComp",
+            },
+            children = [],
+        },
+        {
+            type = "C2_OptionList",
+            vars = {
+                child_type = {
+                    class_name = "C2_Button",
+                },
+                orientation = "V",
+                child_layout = {
+                    align_H = "Fill",
+                    align_V = "Fill",
+                    size = {
+                        X = 20,
+                        Y = 20,
+                    },
+                    size_min = {
+                        X = 0,
+                        Y = 0,
+                    },
+                    size_max = {
+                        X = 0,
+                        Y = 0,
+                    },
+                },
+                list_style = "$OptionListStyle_List:",
+                default_options = [
+                    {
+                        type = "A_General",
+                        vars = {
+                            title = "tetasddh",
+                            description = "stata",
+                            color = {
+                                R = {},
+                                G = {},
+                                B = {},
+                                A = {},
+                            },
+                            tags = {},
+                            sourcefile = "",
+                        },
+                    },
+                    {
+                        type = "A_General",
+                        vars = {
+                            title = "aasra1",
+                            description = "rarsar",
+                            color = {
+                                R = {},
+                                G = {},
+                                B = {},
+                                A = {},
+                            },
+                            tags = {},
+                            sourcefile = "",
+                        },
+                    },
+                ],
+                position = {
+                    X = 0,
+                    Y = 0,
+                },
+                layout = {
+                    align_H = "Center",
+                    align_V = "End",
+                    size = {
+                        X = 287,
+                        Y = 154,
+                    },
+                    size_min = {
+                        X = 0,
+                        Y = 0,
+                    },
+                    size_max = {
+                        X = 0,
+                        Y = 0,
+                    },
+                },
+                pivot_normalized = true,
+                pivot = {
+                    X = 0.5,
+                    Y = 0.5,
+                },
+                cursor_filter = "Pass",
+                transform = {
+                    position = {
+                        X = -16,
+                        Y = -224,
+                    },
+                    rotation = 0,
+                    scale = {
+                        X = 0,
+                        Y = 0,
+                    },
+                },
+                is_visible = true,
+                cast_shadows = false,
+                name = "list_root",
+            },
+            children = [],
+        },
+        {
+            type = "C2_Button",
+            vars = {
+                style = "$UI_Button:{builtin}/UI_Button.DEFAULT",
+                button_layout = "H_Icon_Text",
+                position = {
+                    X = 0,
+                    Y = 0,
+                },
+                layout = {
+                    align_H = "Start",
+                    align_V = "Start",
+                    size = {
+                        X = 100,
+                        Y = 100,
+                    },
+                    size_min = {
+                        X = 0,
+                        Y = 0,
+                    },
+                    size_max = {
+                        X = 0,
+                        Y = 0,
+                    },
+                },
+                pivot_normalized = true,
+                pivot = {
+                    X = 0.5,
+                    Y = 0.5,
+                },
+                cursor_filter = "Hit",
+                transform = {
+                    position = {
+                        X = 152.35425,
+                        Y = 141.7249,
+                    },
+                    rotation = 0,
+                    scale = {
+                        X = 0,
+                        Y = 0,
+                    },
+                },
+                is_visible = true,
+                cast_shadows = false,
+                name = "Button",
+            },
+            children = [],
+        },
+    ],
+}

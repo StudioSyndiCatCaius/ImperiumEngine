@@ -1,7 +1,7 @@
-﻿namespace ImperiumEngine.Assets.Proc;
+﻿namespace Engine.Assets.Proc;
 
 //prevents an effect of a specific context asset from being applied
-public class Proc_Acc_AntiAil : A_Proc
+public class Proc_Acc_AntiAil : A_General
 {
     
 }

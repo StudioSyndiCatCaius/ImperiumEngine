@@ -1,4 +1,4 @@
-﻿namespace ImperiumEngine.Assets.General;
+﻿namespace Engine.Assets.General;
 
 public class AG_EquipType : A_General
 {

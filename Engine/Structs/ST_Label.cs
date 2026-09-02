@@ -1,6 +1,6 @@
 ﻿using System.Collections.Concurrent;
 
-namespace ImperiumEngine.Structs;
+namespace Engine.Structs;
 
 public readonly struct TLabel : IEquatable<TLabel>
 {

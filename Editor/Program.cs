@@ -1,30 +1,16 @@
-﻿using Editor;
-using Editor.Scenes;
-using ImperiumEngine;
-using Raylib_cs;
+﻿using Editor.Scenes;
+using Engine;
+using Engine.Assets;
+using ImGuiNET;
 
+App app = new();
 
-ImpApp app = new();
+App.scene_current = new SCN_Editor();
 
-
-app.Run(() =>
+app.Run(new()
 {
-    Raylib.SetConfigFlags(ConfigFlags.MaximizedWindow | ConfigFlags.ResizableWindow);
-    
-}, () =>
-{ 
-    Raylib.MaximizeWindow();
-    ImpScene.current.root = new Scene_Editor()
+    on_post_init = () =>
     {
-
-    };
-    ImpScene.current.is_running=true;
-    
-}, () =>
-{
-    if (Scene_Editor.active != null)
-    {
-        Scene_Editor.active.Standalone_Stop();
-        EdState.Save(Scene_Editor.active);
+        ImGui.GetIO().ConfigFlags |= ImGuiConfigFlags.DockingEnable;
     }
 });

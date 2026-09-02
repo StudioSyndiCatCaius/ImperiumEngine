@@ -1,6 +1,6 @@
-﻿using ImperiumEngine.Interfaces;
+﻿using Engine.Interfaces;
 
-namespace ImperiumEngine.Assets;
+namespace Engine.Assets;
 
 
 public struct TCurve

@@ -1,7 +1,9 @@
-﻿using ImperiumEngine.Assets;
-using ImperiumEngine.Structs;
+﻿using System.Numerics;
+using Engine.Assets;
+using Engine.Core;
+using Engine.Structs;
 
-namespace ImperiumEngine.Comps._1D;
+namespace Engine.Comps._1D;
 
 public enum EAnimatorState
 {
@@ -11,7 +13,7 @@ public enum EAnimatorState
 }
 
 // can play an A_Animation
-public class C1_Animator : ImpComp
+public class C1_Animator : Imp1D
 {
     [ImpVar] public A_Animation animation;
     [ImpVar] public Dictionary<TLabel, ImpComp> comp_bindings;

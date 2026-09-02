@@ -1,4 +1,6 @@
-﻿namespace ImperiumEngine.Assets;
+﻿using Engine.Core;
+
+namespace Engine.Assets;
 
 public struct TBlendSpaceKey
 {

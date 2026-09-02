@@ -1,6 +1,6 @@
-﻿using ImperiumEngine.Interfaces;
+﻿using Engine.Interfaces;
 
-namespace ImperiumEngine.Assets.Proc;
+namespace Engine.Assets.Proc;
 
 //heals the creatures attributes
 public class Proc_Item_Heal : A_Proc, I_Skill
