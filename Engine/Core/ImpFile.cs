@@ -1,6 +1,7 @@
 ﻿using Engine.Assets;
 using Engine.Assets.Materials;
 using Engine.Enums;
+using Engine.Globals;
 using Engine.Structs;
 using R3D_cs;
 using Raylib_cs;
@@ -35,10 +36,10 @@ public class ImpFile
     
     public void Reimport()
     {
-        string _path = Imp.Make_Path_Absolute(filepath);
+        string _path = GFile.Make_Path_Absolute(filepath);
         if (string.IsNullOrEmpty(_path) || !File.Exists(_path)) return;
         Invalidate();
-        if(store_bytes) data = Imp.File_LoadAs_Bytes(_path);
+        if(store_bytes) data = GFile.LoadAs_Bytes(_path);
         switch (file_type)
         {
             // ---- MODEL
@@ -95,7 +96,7 @@ public class ImpFile
 
         void AddAnims()
         {
-            string abs = Imp.Make_Path_Absolute(filepath);
+            string abs = GFile.Make_Path_Absolute(filepath);
             if (string.IsNullOrEmpty(abs) || !File.Exists(abs)) return;
             try
             {

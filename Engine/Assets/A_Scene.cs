@@ -1,4 +1,6 @@
 ﻿using Engine.Core;
+using Engine.Enums;
+using Engine.Globals;
 using Engine.Structs;
 
 namespace Engine.Assets;
@@ -8,30 +10,30 @@ public class A_Scene : ImpAsset
     // ==============================================================================================================
     // STATIC
     // ==============================================================================================================
-    
-    
+
+
     // ==============================================================================================================
     // CLASS
     // ==============================================================================================================
-    [ImpVar] public A_Environment environment=new();
-    
-    
+    [ImpVar] public A_Environment environment = new();
+
+
     public ImpComp root;
     public Dictionary<int, string> prefab_refs = new();
-    public bool is_runtime=false;
+    public bool is_running = false;
     public ImpViewport? viewport; // null = App.viewport_main. not serialized.
 
     public void Begin()
     {
         Refresh();
     }
-    
+
     public void End()
     {
-        
+
     }
-    
-    
+
+
     public void Refresh()
     {
         if (environment != null)
@@ -41,19 +43,15 @@ public class A_Scene : ImpAsset
         }
     }
     
-    public void Update(double dt)
+    public void ProcessNotify(ENotifyProcess notify, double dt)
     {
         if (root != null)
         {
             root.scene = this;
-            root.Update(dt);
+            root.ProcessNotify(notify, dt);
         }
     }
-
-    public void Draw(double dt, EDrawFlags flags = 0, ICollection<ImpComp>? selected = null)
-    {
-        if (root != null) root.Draw(dt, flags, selected);
-    }
+    
 
     //creates a prefab instance of this scene to place in another scene
     public ImpComp Instantiate()
@@ -69,7 +67,7 @@ public class A_Scene : ImpAsset
 
     public int PrefabRef_Intern(A_Scene prefab)
     {
-        string path = Imp.Make_Path_Local(prefab.filepath);
+        string path = GFile.Make_Path_Local(prefab.filepath);
         string ext = GetFileExtension();
         if (path.EndsWith(ext, StringComparison.OrdinalIgnoreCase))
         {
@@ -90,7 +88,7 @@ public class A_Scene : ImpAsset
     public A_Scene PrefabRef_Load(int id)
     {
         if(!prefab_refs.TryGetValue(id,out string path) || string.IsNullOrEmpty(path)) return null;
-        return Imp.Asset_Load<A_Scene>(path+GetFileExtension());
+        return GAsset.Asset_Load<A_Scene>(path+GetFileExtension());
     }
 
     public override void From_Table(TTable tbl)

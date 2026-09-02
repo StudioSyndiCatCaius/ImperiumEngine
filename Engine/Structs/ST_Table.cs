@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using Engine.Core;
+using Engine.Globals;
 using Engine.Interfaces;
 using Tomlyn;
 using Tomlyn.Model;
@@ -469,7 +470,7 @@ public class TTable
             }
             catch (Exception e)
             {
-                Imp.Log_Warning($"TTable: skipped '{member.Name}' ({e.Message})");
+                GLog.Warning($"TTable: skipped '{member.Name}' ({e.Message})");
             }
         }
     }
@@ -540,7 +541,7 @@ public class TTable
                 string reference = raw as string ?? "";
                 int colon = reference.IndexOf(':');
                 string path = colon >= 0 ? reference[(colon + 1)..] : reference;
-                return Imp.Asset_Load(path, member_type);
+                return GAsset.Asset_Load(path, member_type);
             }
             object? created = Activator.CreateInstance(member_type);
             if (created == null) return null;
@@ -552,7 +553,7 @@ public class TTable
         }
         catch (Exception e)
         {
-            Imp.Log_Warning($"TTable: skipped conversion to {member_type.Name} from {raw.GetType().Name} ({e.Message})");
+            GLog.Warning($"TTable: skipped conversion to {member_type.Name} from {raw.GetType().Name} ({e.Message})");
             return null;
         }
     }

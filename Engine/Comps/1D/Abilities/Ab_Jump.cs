@@ -1,5 +1,6 @@
 ﻿using System.Numerics;
 using Engine.Core;
+using Engine.Globals;
 
 namespace Engine.Comps._1D.Abilities;
 
@@ -13,7 +14,7 @@ public class Ab_Jump : C1_Ability
         base.OnAbility_Activate(Context);
         if (owning_creature.creature_root != null)
         {
-            Vector3 jumpv = Imp.WORLD_UP * jump_height;
+            Vector3 jumpv = GMath.WORLD_UP * jump_height;
             owning_creature.creature_root.Phys_Launch(jumpv,false,true);
             Ability_Stop(false);
         }

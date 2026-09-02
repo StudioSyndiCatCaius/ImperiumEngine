@@ -2,6 +2,7 @@
 using Engine.Assets;
 using Engine.Comps._2D;
 using Engine.Enums;
+using Engine.Globals;
 using Engine.Interfaces;
 using Engine.Structs;
 
@@ -27,17 +28,28 @@ public enum ECompNotify
     PreUpdate, PostUpdate,
 }
 
-public class ImpComp : I_Inspectable
+public class ImpComp : I_Inspectable, I_Input
 {
-    
-
+    // ===========================================================================================
+    // Imp Vars
+    // ===========================================================================================
     [ImpVar] public bool is_visible = true;
     [ImpVar] public bool cast_shadows = false;
     [ImpVar] public string name = "";
     [ImpVar] C2_Switcher substate_switcher=null;
 
-    private bool is_visible_pref = false;
+    // ===========================================================================================
+    // ACTIONS
+    // ===========================================================================================
 
+    public Action<ImpComp> on_begin;
+    public Action<ImpComp> on_end;
+    
+    // ===========================================================================================
+    // VARS
+    // ===========================================================================================
+    private bool is_visible_pref = false;
+    
     public TScriptValue? script_instance; //script table loaded from a script file (E.G. for a "MyScene.lua" for "MyScene.ImpScene")
     public List<ImpComp> children=new();
     public ImpComp parent=null;
@@ -55,104 +67,156 @@ public class ImpComp : I_Inspectable
     public A_Scene prefab_scene;
     public TTable prefab_baseline;
 
-    public void Update(double dt)
+    // ===========================================================================================
+    // INIT
+    // ===========================================================================================
+    public ImpComp(IEnumerable<ImpComp> _children = null)
     {
-        if(scene==null) return;
-
-        _Notify( ECompNotify.PreUpdate, dt);
-        
-        // ------ ENGINE
-        switch (life_state_engine)
+        if (_children != null)
         {
-            case ECompLifeState.Starting: // IDEA: whenever a property is edited in editor, reset engine lifestate to STARTING? so OnInit is rerun
-                life_state_engine = ECompLifeState.Life;
-                OnInit();
-                break;
-            case ECompLifeState.Ending:
-                OnDeinit();
-                script_instance?.Call("OnDeinit");
-                break;
-        }
-        Transform_Refresh();
-        
-        // ------ RUNTIME
-        if (scene.is_runtime)
-        {
-            switch (life_state_runtime)
+            foreach (ImpComp child in _children)
             {
-                case ECompLifeState.Starting:
-                    life_state_runtime = ECompLifeState.Life;
-                    if (parent != null)
-                    {
-                        scene = parent.scene;
-                    }
-                    ImpSandbox.current?.Bind(this);
-                    script_instance?.Call("OnInit");
-                    OnBegin();
-                    script_instance?.Call("OnBegin");
-                    break;
-                case ECompLifeState.Ending:
-                    if (parent != null)
-                    {
-                        parent.Child_Remove(this);
-                    }
-                    is_visible = false;
-                    OnEnd();
-                    script_instance?.Call("OnEnd");
-                    break;
-                case ECompLifeState.Life:
-                    if (substate != substate_prev)
-                    {
-                        substate_prev = substate;
-                        if (substate_switcher != null) substate_switcher.current_index = substate;
-                        OnSubstateChange(substate);
-                        script_instance?.Call("OnSubstateChange", substate);
-                    }
-                    break;
+                Child_Add(child);
             }
-            OnUpdate(dt); // this is the RUNTIME update hook
-            script_instance?.Call("OnUpdate", dt);
         }
-
-        if (is_visible != is_visible_pref)
+    }
+    
+    // ===========================================================================================
+    // UPDATE
+    // ===========================================================================================
+    public void ProcessNotify(ENotifyProcess notify, double dt)
+    {
+        switch (notify)
         {
-            is_visible_pref = is_visible;
-            OnVisibleChange(is_visible);
-            script_instance?.Call("OnVisibleChange", is_visible);
+            // ---------------------------------------------------------------------------------------------
+            // UPDATE
+            // ---------------------------------------------------------------------------------------------
+            case ENotifyProcess.Update:
+                
+                if(scene==null) return;
+
+                _Notify( ECompNotify.PreUpdate, dt);
+                
+                // ---------------------------------------------------------
+                // ENGINE
+                // ---------------------------------------------------------
+                switch (life_state_engine)
+                {
+                    case ECompLifeState.Starting: // IDEA: whenever a property is edited in editor, reset engine lifestate to STARTING? so OnInit is rerun
+                        life_state_engine = ECompLifeState.Life;
+                        OnInit();
+                        break;
+                    case ECompLifeState.Ending:
+                        OnDeinit();
+                        script_instance?.Call("OnDeinit");
+                        break;
+                }
+                Transform_Refresh();
+                
+                // ---------------------------------------------------------
+                // RUNTIME
+                // ---------------------------------------------------------
+                if (scene.is_running)
+                {
+                    switch (life_state_runtime)
+                    {
+                        // ---------------------------------------------------------
+                        // BEGIN
+                        // ---------------------------------------------------------
+                        case ECompLifeState.Starting:
+                            life_state_runtime = ECompLifeState.Life;
+                            if (parent != null)
+                            {
+                                scene = parent.scene;
+                            }
+                            ImpSandbox.current?.Bind(this);
+                            script_instance?.Call("OnInit");
+                            OnBegin();
+                            on_begin?.Invoke(this);
+                            script_instance?.Call("OnBegin");
+                            break;
+                        // ---------------------------------------------------------
+                        // END
+                        // ---------------------------------------------------------
+                        case ECompLifeState.Ending:
+                            if (parent != null)
+                            {
+                                parent.Child_Remove(this);
+                            }
+                            is_visible = false;
+                            OnEnd();
+                            on_end?.Invoke(this);
+                            script_instance?.Call("OnEnd");
+                            break;
+                        // ---------------------------------------------------------
+                        // Update/Tick
+                        // ---------------------------------------------------------
+                        case ECompLifeState.Life:
+                            if (substate != substate_prev)
+                            {
+                                substate_prev = substate;
+                                if (substate_switcher != null) substate_switcher.current_index = substate;
+                                OnSubstateChange(substate);
+                                script_instance?.Call("OnSubstateChange", substate);
+                            }
+                            break;
+                    }
+                    OnUpdate(dt); // this is the RUNTIME update hook
+                    script_instance?.Call("OnUpdate", dt);
+                }
+
+                if (is_visible != is_visible_pref)
+                {
+                    is_visible_pref = is_visible;
+                    OnVisibleChange(is_visible);
+                    script_instance?.Call("OnVisibleChange", is_visible);
+                }
+                
+                _Notify( ECompNotify.PostUpdate, dt);
+                
+                break;
+            // ---------------------------------------------------------------------------------------------
+            // DRAW 3D
+            // ---------------------------------------------------------------------------------------------
+            case ENotifyProcess.Draw3D: Draw(dt, 0, EDrawFlags.None); break;
+            // ---------------------------------------------------------------------------------------------
+            // DRAW 2D
+            // ---------------------------------------------------------------------------------------------
+            case ENotifyProcess.Draw2D: Draw(dt, 1, EDrawFlags.None); break;
         }
         
+        // ---------- TO CHILDREN
         foreach (ImpComp child in children)
         {
             child.scene = scene;
-            child.Update(dt);
+            child.ProcessNotify(notify, dt);
         }
-        _Notify( ECompNotify.PostUpdate, dt);
     }
     
-    public void Draw(double dt, EDrawFlags flags, ICollection<ImpComp>? selected = null)
+    
+
+    public void Draw(double dt, byte pass, EDrawFlags flags)
     {
         if (!is_visible) return;
-        EDrawFlags f = flags;
-        if (selected != null)
-        {
-            ImpComp n = this;
-            while (n != null)
-            {
-                if (selected.Contains(n))
-                {
-                    f |= EDrawFlags.Selected;
-                    break;
-                }
-                n = n.parent;
-            }
-        }
         bool is_editor = flags.HasFlag(EDrawFlags.Editor);
-        if (!flags.HasFlag(EDrawFlags.No2D)) OnDraw2D(dt, f);
-        if (is_editor) OnDrawDebug(dt, false);
-        if (!flags.HasFlag(EDrawFlags.No3D)) OnDraw3D(dt, f);
-        if (is_editor) OnDrawDebug(dt, true);
-        foreach (ImpComp child in children)
-            child.Draw(dt, flags, selected);
+        
+        switch (pass)
+        {
+            case 0: //3D
+                if (!flags.HasFlag(EDrawFlags.No3D)) OnDraw3D(dt, flags);
+                if (is_editor) OnDrawDebug(dt, true);        
+                break;
+            case 1: //2D
+                bounds = TBounds2.GetWindowBounds();
+                if (parent != null && parent.children.Contains(this))
+                {
+                    int _ind = parent.children.IndexOf(this); //consider caching child index if ti will make this much faster
+                    bounds=parent.Child_MakeBounds2D(this, _ind);
+                }
+                if (!flags.HasFlag(EDrawFlags.No2D)) OnDraw2D(dt, flags);
+                if (is_editor) OnDrawDebug(dt, false);
+                break;
+        }
     }
     
     public virtual void OnDrawDebug(double dt, bool drawing_3d) {}
@@ -164,9 +228,17 @@ public class ImpComp : I_Inspectable
         life_state_engine = ECompLifeState.Ending;
     }
     
-    // --------------------------------------------------
-    // Child
-    // --------------------------------------------------
+    // ========================================================================================================
+    // 2D
+    // ========================================================================================================
+
+    public TBounds2 bounds; //cached bounds for 2d drawing
+    
+    public virtual TBounds2 Child_MakeBounds2D(ImpComp child, int index) { return TBounds2.GetWindowBounds(); }
+    
+    // ========================================================================================================
+    // Children
+    // ========================================================================================================
     public void Child_Add(ImpComp child, bool builtin = false)
     {
         if (!builtin && !Allow_Children()) return;
@@ -227,9 +299,9 @@ public class ImpComp : I_Inspectable
         return null;
     }
     
-    // --------------------------------------------------
+    // ========================================================================================================
     // Table Read/Write
-    // --------------------------------------------------
+    // ========================================================================================================
     public static ImpComp From_Table(TTable tbl, A_Scene owner)
     {
         ImpComp comp;
@@ -285,9 +357,9 @@ public class ImpComp : I_Inspectable
         return tbl;
     }
     
-    // --------------------------------------------------
+    // ========================================================================================================
     // Prefab
-    // --------------------------------------------------
+    // ========================================================================================================
     
     //clears and rebuilds this comp from a scene as prefab instance
     public void Prefab_Build(A_Scene scene)
@@ -321,7 +393,7 @@ public class ImpComp : I_Inspectable
     static string Prefab_NormPath(string path)
     {
         if (string.IsNullOrEmpty(path)) return "";
-        string p = Imp.Make_Path_Local(path).Replace('\\', '/');
+        string p = GFile.Make_Path_Local(path).Replace('\\', '/');
         const string ext = ".ImpScene";
         if (p.EndsWith(ext, StringComparison.OrdinalIgnoreCase))
             p = p[..^ext.Length];
@@ -503,7 +575,27 @@ public class ImpComp : I_Inspectable
     
     public virtual bool Dragging_IsAllowed() { return false; } //can a player drag this?
     public virtual Imp2D Dragging_GetPreview() { return null; } //the on screen preview/representative of the dragged object that will follow the cursor
-    
+
+    public void _Input_Notif_Key(ImpPlayer player, EInputKey key, EInputState state, double dt) { }
+    public void _Input_Notif_Action(ImpPlayer player, TLabel action, EInputState state, Vector3 axis, double dt)
+    {
+        switch (state)
+        {
+            case EInputState.Down:
+                Input_Down(player,action,axis,dt);
+                script_instance?.Call("Input_Down", player, action, axis, dt);
+                break;
+            case EInputState.Pressed:
+                Input_Pressed(player,action,axis);
+                script_instance?.Call("Input_Pressed", player, action, axis);
+                break;
+            case EInputState.Released:
+                Input_Released(player,action,axis);
+                script_instance?.Call("Input_Released", player, action, axis);
+                break;
+        }
+    }
+
     // Rebuilds global_transform from the parent's. Runs before OnUpdate, and the update walks
     // parents before children, so a child always composes against an up-to-date parent global.
     protected virtual void Transform_Refresh() { }
@@ -514,12 +606,17 @@ public class ImpComp : I_Inspectable
     public virtual bool Is_Singleton() { return false; } // only one instance of this component
     public virtual bool Allow_Children() { return true; }
 
+    // ------------------------------------------------------------------------------------
+    // Inspector / Property
+    // ------------------------------------------------------------------------------------
     public void Inspectable_OnPropertyEdit(string name, object oldValue, object newValue)
     {
         OnInit();
     }
 
+    // ------------------------------------------------------------------------------------
     // --- Script Overrides
+    // ------------------------------------------------------------------------------------
     
     [ScriptHook] public virtual void OnInit() {} //equal of onConstruct/ConstructionScript on UE
     [ScriptHook] public virtual void OnDeinit() {} //equal of onDestruct on UE

@@ -1,4 +1,5 @@
-﻿using Engine.Interfaces;
+﻿using Engine.Globals;
+using Engine.Interfaces;
 using Engine.Structs;
 
 namespace Engine.Core;
@@ -26,7 +27,7 @@ public class ImpAsset : I_Property, I_Inspectable
         TTable _tbl=To_Table();
         string file_str=TTable.ToTOML(_tbl);
         
-        File.WriteAllText(Imp.Make_Path_Absolute(filepath), file_str);
+        File.WriteAllText(GFile.Make_Path_Absolute(filepath), file_str);
         is_dity=false;
     }
     
@@ -37,13 +38,13 @@ public class ImpAsset : I_Property, I_Inspectable
     {
         //get or import sourcefile if not already 
         if (string.IsNullOrEmpty(sourcefile)) return;
-        _src_file_ref = Imp.File_Import<ImpFile>(sourcefile);
+        _src_file_ref = GFile.Import<ImpFile>(sourcefile);
         if (_src_file_ref != null)
         {
             _src_file_ref.Reimport();
             OnReimport(_src_file_ref);
         }
-        else Imp.Log_Error($"Could not find sourcefile {sourcefile}");
+        else GLog.Error($"Could not find sourcefile {sourcefile}");
     }
     
     public ImpFile Source_Get() { return _src_file_ref; }
@@ -96,7 +97,7 @@ public class ImpAsset : I_Property, I_Inspectable
         if (is_inlined)
             return TTable.FromObject(this);
 
-        Imp.Builtin_Is(this);
+        GAsset.Builtin_Is(this);
         return $"${GetType().Name}:{filepath}";
     }
     

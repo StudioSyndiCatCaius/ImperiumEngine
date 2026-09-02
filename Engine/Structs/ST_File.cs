@@ -1,4 +1,5 @@
 ﻿using Engine.Core;
+using Engine.Globals;
 using Engine.Interfaces;
 
 namespace Engine.Structs;
@@ -14,7 +15,7 @@ public struct TFile : I_Property
 
     public TFile(string? path) { this.path = path ?? ""; }
 
-    public string Get() { return Imp.Make_Path_Absolute(path); }
+    public string Get() { return GFile.Make_Path_Absolute(path); }
 }
 
 public struct TDirectory : I_Property

@@ -2,6 +2,7 @@
 using Engine.Core;
 using Engine.Structs;
 using Engine;
+using Engine.Globals;
 using R3D_cs;
 
 namespace Engine.Comps._3D;
@@ -34,8 +35,8 @@ public class C3_Camera : Imp3D
         base.OnUpdate(dt);
         if (look_target != null)
         {
-            Vector3 look_rotation = Imp.V3_LookAt(global_transform.position, look_target.global_transform.position);
-            Rotation_Set(Imp.V3_Interp(global_transform.rotation, look_rotation, dt, look_speed));
+            Vector3 look_rotation = GMath.V3_LookAt(global_transform.position, look_target.global_transform.position);
+            Rotation_Set(GMath.V3_Interp(global_transform.rotation, look_rotation, dt, look_speed));
         }
     }
 

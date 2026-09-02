@@ -1,6 +1,7 @@
 ﻿using System.Numerics;
 using Engine.Core;
 using Engine.Enums;
+using Engine.Globals;
 using Engine.Interfaces;
 
 namespace Engine.Structs;
@@ -32,15 +33,15 @@ public struct TTransform3 : I_Property
         if (scale)
             local_pos = new Vector3(local_pos.X * a.scale.X, local_pos.Y * a.scale.Y, local_pos.Z * a.scale.Z);
         TTransform3 output = new();
-        output.position = Imp.V3_Offset(a.position, local_pos, a.rotation);
-        output.rotation = Imp.Quat_2_Euler(Imp.Euler_2_Quat(a.rotation) * Imp.Euler_2_Quat(b.rotation));
+        output.position = GMath.V3_Offset(a.position, local_pos, a.rotation);
+        output.rotation = GMath.Quat_2_Euler(GMath.Euler_2_Quat(a.rotation) * GMath.Euler_2_Quat(b.rotation));
         output.scale = a.scale * b.scale;
         return output;
     }
 
     public static TTransform3 Subtract(TTransform3 a,TTransform3 b, bool scale = false)
     {
-        Quaternion inv = Quaternion.Inverse(Imp.Euler_2_Quat(b.rotation));
+        Quaternion inv = Quaternion.Inverse(GMath.Euler_2_Quat(b.rotation));
         Vector3 local_pos = Vector3.Transform(a.position - b.position, inv);
         if (scale)
             local_pos = new Vector3(
@@ -49,7 +50,7 @@ public struct TTransform3 : I_Property
                 b.scale.Z != 0 ? local_pos.Z / b.scale.Z : local_pos.Z);
         TTransform3 output = new();
         output.position = local_pos;
-        output.rotation = Imp.Quat_2_Euler(inv * Imp.Euler_2_Quat(a.rotation));
+        output.rotation = GMath.Quat_2_Euler(inv * GMath.Euler_2_Quat(a.rotation));
         output.scale = new Vector3(
             b.scale.X != 0 ? a.scale.X / b.scale.X : a.scale.X,
             b.scale.Y != 0 ? a.scale.Y / b.scale.Y : a.scale.Y,
@@ -60,7 +61,7 @@ public struct TTransform3 : I_Property
     public static TTransform3 Offset(TTransform3 t, Vector3 offset)
     {
         TTransform3 result = t; // carry rotation/scale through; only the position is offset
-        result.position=Imp.V3_Offset(t.position,offset,t.rotation);
+        result.position=GMath.V3_Offset(t.position,offset,t.rotation);
         return result;
     }
 }
@@ -84,7 +85,7 @@ public struct TBounds3
         Vector3 d = point - center;
         if (MathF.Abs(rotation.X) > 1e-4f || MathF.Abs(rotation.Y) > 1e-4f || MathF.Abs(rotation.Z) > 1e-4f)
         {
-            d = Vector3.Transform(d, Quaternion.Inverse(Imp.Euler_2_Quat(rotation)));
+            d = Vector3.Transform(d, Quaternion.Inverse(GMath.Euler_2_Quat(rotation)));
         }
         Vector3 h = new(MathF.Abs(size.X) * 0.5f, MathF.Abs(size.Y) * 0.5f, MathF.Abs(size.Z) * 0.5f);
         return d.X >= -h.X && d.Y >= -h.Y && d.Z >= -h.Z
@@ -98,7 +99,7 @@ public struct TBounds3
         float len2 = dir.LengthSquared();
         if (len2 < 1e-16f) return false;
 
-        Quaternion inv = Quaternion.Inverse(Imp.Euler_2_Quat(rotation));
+        Quaternion inv = Quaternion.Inverse(GMath.Euler_2_Quat(rotation));
         Vector3 o = Vector3.Transform(origin - center, inv);
         Vector3 d = Vector3.Transform(dir, inv);
         Vector3 h = new(MathF.Abs(size.X) * 0.5f, MathF.Abs(size.Y) * 0.5f, MathF.Abs(size.Z) * 0.5f);
@@ -138,7 +139,7 @@ public struct TBounds3
             MathF.Abs(size.X) * 0.5f,
             MathF.Abs(size.Y) * 0.5f,
             MathF.Abs(size.Z) * 0.5f);
-        Quaternion q = Imp.Euler_2_Quat(rotation);
+        Quaternion q = GMath.Euler_2_Quat(rotation);
         Vector3 x = Vector3.Transform(new Vector3(h.X, 0f, 0f), q);
         Vector3 y = Vector3.Transform(new Vector3(0f, h.Y, 0f), q);
         Vector3 z = Vector3.Transform(new Vector3(0f, 0f, h.Z), q);
@@ -209,12 +210,12 @@ public struct TBounds3
                 MathF.Abs(size.Y * t.scale.Y),
                 MathF.Abs(size.Z * t.scale.Z));
         }
-        Quaternion q = Imp.Euler_2_Quat(t.rotation);
+        Quaternion q = GMath.Euler_2_Quat(t.rotation);
         return new TBounds3
         {
             center = t.position + Vector3.Transform(local, q),
             size = size,
-            rotation = Imp.Quat_2_Euler(q * Imp.Euler_2_Quat(bounds.rotation)),
+            rotation = GMath.Quat_2_Euler(q * GMath.Euler_2_Quat(bounds.rotation)),
         };
     }
 
@@ -308,6 +309,7 @@ public struct TBounds2
     public Vector2 end;
 
     public bool IsEmpty => MathF.Abs(end.X - start.X) + MathF.Abs(end.Y - start.Y) <= 1e-8f;
+    
 
     // `this` is the parent/content/slot rect.
     public TBounds2 FromLayout(Vector2 position, TLayout2 layout)
@@ -405,6 +407,12 @@ public struct TBounds2
     // ========================================================================================================
     // STATIC
     // ========================================================================================================
+
+    public static TBounds2 GetWindowBounds()
+    {
+        // Full app window / screen space (kept in sync by App.RefreshWindow).
+        return App.viewport_main.Bounds;
+    }
     
     public static TBounds2 Inset(TBounds2 b, TMargins m)
     {

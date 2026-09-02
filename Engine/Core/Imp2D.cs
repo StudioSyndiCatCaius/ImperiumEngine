@@ -9,7 +9,9 @@ namespace Engine.Core;
 
 public class Imp2D : ImpComp
 {
-    [ImpVar] public Vector2 position;
+    // ===========================================================================================
+    // Imp Vars
+    // ===========================================================================================
     [ImpVar] public TLayout2 layout=new()
     {
         size = {X=100,Y=100}
@@ -20,11 +22,21 @@ public class Imp2D : ImpComp
     
     [ImpVar] public TTransform2 transform; //UNLIKE 3D, 2D transforms are relative to the parent. transform is an additional offset on top of that.
     
+    // ===========================================================================================
+    // vars
+    // ===========================================================================================
     public ImpViewport? owning_viewport; //override only (C3_UI plane, etc). otherwise inherited / scene / App.viewport_main
         
     public TTransform2 global_transform;
-    public TBounds2 bounds; //cached bounds for drawing
 
+    
+    // ===========================================================================================
+    // init
+    // ===========================================================================================
+    
+    // ===========================================================================================
+    // funcs
+    // ===========================================================================================
     public ImpViewport Viewport_Get()
     {
         if (owning_viewport != null) return owning_viewport;
@@ -99,15 +111,15 @@ public class Imp2D : ImpComp
         }
     }
     
-    public virtual bool ChildLayout_IsFree() { return true; } //TRUE=allows children to be freely moved around. FALSE= `ChildLayout_MakeBounds` determines child bounds
-    public virtual TBounds2 ChildLayout_MakeBounds(Imp2D child, int index) { return default; }
+    public virtual bool ChildLayout_IsFree() { return true; } //TRUE=allows children to be freely moved around. FALSE= `Child_MakeBounds2D` determines child bounds
+    
 
     public virtual TBounds2 Bounds_Cache()
     {
         TBounds2 slot = parent is Imp2D p && !p.bounds.IsEmpty
             ? p.ContentBounds()
             : Viewport_Get().Bounds;
-        TBounds2 b = slot.FromLayout(position, layout);
+        TBounds2 b = layout.MakeBounds(slot);
         b.start += transform.position;
         b.end += transform.position;
         return b;
@@ -130,7 +142,7 @@ public class Imp2D : ImpComp
         for (int i = 0; i < children.Count; i++)
         {
             if (children[i] is Imp2D child2d)
-                child2d.bounds = ChildLayout_MakeBounds(child2d, i);
+                child2d.bounds = Child_MakeBounds2D(child2d, i);
         }
     }
 

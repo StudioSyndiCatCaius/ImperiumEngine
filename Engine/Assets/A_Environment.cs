@@ -1,5 +1,6 @@
 using System.Numerics;
 using Engine.Core;
+using Engine.Globals;
 using R3D_cs;
 using Raylib_cs;
 using Environment = R3D_cs.Environment;
@@ -11,7 +12,7 @@ public class A_Environment : ImpAsset
     [ImpVar][Category("Background")] public Color background_color=Color.Black;
     [ImpVar][Category("Background")] public float background_intensity=1;
     
-    [ImpVar][Category("Sky")] public A_Texture? sky_texture= Imp.Asset_Load<A_Texture>(A_Texture.PATH_SKY_1);
+    [ImpVar][Category("Sky")] public A_Texture? sky_texture= GAsset.Asset_Load<A_Texture>(A_Texture.PATH_SKY_1);
     [ImpVar][Category("Sky")] public R3D_cs.CubemapLayout sky_layout=R3D_cs.CubemapLayout.AutoDetect;
     [ImpVar][Category("Sky")] public float sky_blur=0;
     [ImpVar][Category("Sky")] public Vector3 sky_rotation=Vector3.Zero;
@@ -136,7 +137,7 @@ public class A_Environment : ImpAsset
                 sky_path = sky_texture.Source_Get()?.filepath;
             if (!string.IsNullOrEmpty(sky_path))
             {
-                sky_path = Imp.Make_Path_Absolute(sky_path);
+                sky_path = GFile.Make_Path_Absolute(sky_path);
                 if (File.Exists(sky_path))
                     sky = R3D.LoadCubemap(sky_path, sky_layout);
             }
@@ -183,7 +184,7 @@ public class A_Environment : ImpAsset
             Energy = background_intensity,
             SkyBlur = sky_blur,
             Sky = _sky,
-            Rotation = Imp.Euler_2_Quat(sky_rotation),
+            Rotation = GMath.Euler_2_Quat(sky_rotation),
         };
         env.Ambient = new EnvAmbient
         {
@@ -317,7 +318,7 @@ public class A_Environment : ImpAsset
         if (!_sun_ok) return;
 
         Vector3 from = sun_direction;
-        if (from.LengthSquared() < 1e-10f) from = Imp.WORLD_UP;
+        if (from.LengthSquared() < 1e-10f) from = GMath.WORLD_UP;
         from = Vector3.Normalize(from);
         R3D.SetLightTarget(_sun, from * 100f, Vector3.Zero);
         R3D.SetLightColor(_sun, sun_color);

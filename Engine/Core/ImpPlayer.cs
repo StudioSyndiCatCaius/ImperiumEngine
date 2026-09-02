@@ -1,6 +1,8 @@
 ﻿using System.Numerics;
 using Engine.Assets;
 using Engine.Enums;
+using Engine.Globals;
+using Engine.Interfaces;
 using Engine.Structs;
 using Raylib_cs;
 
@@ -60,6 +62,12 @@ public class ImpPlayer
     {
         if( !input_key_states.ContainsKey(key)) input_key_states[key] = EInputState.None;
         return input_key_states[key];
+    }
+
+    public EInputState Action_GetState(TLabel action)
+    {
+        if (!input_action_states.ContainsKey(action)) input_action_states[action] = EInputState.None;
+        return input_action_states[action];
     }
 
     //this is NOT a check on the keys, EInputState. It checks raylib to sey if this key input is down/active (includes gamepad stick & mouse axis
@@ -240,6 +248,12 @@ public class ImpPlayer
     {
         return default;
     }
+
+    public IEnumerable<object> InputTarget_GetAll()
+    {
+        if (App.dialog_current != null) return [App.dialog_current];
+        return input_targets;
+    }
     
     public void Update(double dt)
     {
@@ -272,15 +286,15 @@ public class ImpPlayer
         
         //do cursor trace
         cursor_target = _cursor_redirect
-            ? Imp.Trace2D_ForComp(cursor_data.position, _cursor_scene?.root)
-            : Imp.Trace2D_ForComp(cursor_data.position);
+            ? G2D.Trace2D_ForComp(cursor_data.position, _cursor_scene?.root)
+            : G2D.Trace2D_ForComp(cursor_data.position);
         _cursor_redirect = false;
         _cursor_scene = null;
         if (cursor_target == null)
         {
             Vector3 _start=Cursor_3DPosition();
             Vector3 _end = default; //trace out from cursor screen position
-            TTraceResult3D _res= Imp.Trace3D_Line(_start, _end, cursor_collision_channel);
+            TTraceResult3D _res= G3D.Trace3D_Line(_start, _end, cursor_collision_channel);
             if (_res.hit_comp != null) cursor_target = _res.hit_comp;
         }
         
@@ -295,8 +309,10 @@ public class ImpPlayer
             cursor_target._NotifyAs_CursorTarget(this,ENotifyGeneric.Update,dt);
         }
         
-        // ---------- KEYS
+        // -----------------------------------------------------------------------
+        // KEYS
         // This method is probably SLOW, consider replacing later
+        // -----------------------------------------------------------------------
         EInputState _drag_key_state = EInputState.None;
         foreach (var _k in Enum.GetValues<EInputKey>())
         {
@@ -306,21 +322,24 @@ public class ImpPlayer
             
             switch (_state_old)
             {
-                case EInputState.None:
-                    _state_new = _is_down ? EInputState.Pressed : EInputState.None;
-                    break;
-                case EInputState.Down:
-                    _state_new = _is_down ? EInputState.Down : EInputState.Released;
-                    break;
-                case EInputState.Pressed:
-                    _state_new = _is_down ? EInputState.Down : EInputState.Released;
-                    break;
-                case EInputState.Released:
-                    _state_new = _is_down ? EInputState.Pressed : EInputState.None;
-                    break;
+                case EInputState.None: _state_new = _is_down ? EInputState.Pressed : EInputState.None; break;
+                case EInputState.Down: _state_new = _is_down ? EInputState.Down : EInputState.Released; break;
+                case EInputState.Pressed: _state_new = _is_down ? EInputState.Down : EInputState.Released; break;
+                case EInputState.Released: _state_new = _is_down ? EInputState.Pressed : EInputState.None; break;
             }
+            input_key_states[_k] = _state_new; //set new state
+            
 
-            input_key_states[_k] = _state_new;
+            // this feels ineficient. maybe should collect inputs and iterate over objects late
+            foreach (var it in InputTarget_GetAll())
+            {
+                I_Input iobj = it as I_Input;
+                if (iobj != null)
+                {
+                    iobj._Input_Notif_Key(this,_k, _state_new, dt);
+                }
+            }
+            
             if (Key_IsDragStart(_k))
             {
                 if (_state_new == EInputState.Pressed) _drag_key_state = EInputState.Pressed;
@@ -404,11 +423,13 @@ public class ImpPlayer
                 _drag_target_prev = null;
                 drag_target = null;
             }
-            _press_target = null;
+            _press_target = null; 
         }
         
         // ---------- INPUT ACTIONS
         TInputSet.BUILTINS.Update(this, dt);
         input_actions.Update(this, dt);
+        
     }
+    
 }

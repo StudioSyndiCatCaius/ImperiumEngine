@@ -1,6 +1,7 @@
 using Engine;
 using Engine.Core;
 using Engine.Enums;
+using Engine.Globals;
 
 App _app=new App();
 App.name = "My Game";
@@ -23,7 +24,7 @@ for (int i = 1; i < argv.Length; i++)
 }
 if (!has_game)
 {
-    string test = Path.Combine(Imp.GetDir_Root(EContentDir.Engine), "Templates", "Test", "Test.ImpGame");
+    string test = Path.Combine(GFile.GetDir_Root(EContentDir.Engine), "Templates", "Test", "Test.ImpGame");
     if (File.Exists(test)) force = test;
 }
 _app.Run(hooks, true, force);

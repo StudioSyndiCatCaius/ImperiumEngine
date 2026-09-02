@@ -1,5 +1,6 @@
 ﻿using System.Numerics;
 using Engine.Core;
+using Engine.Globals;
 using Engine.Structs;
 using R3D_cs;
 
@@ -62,7 +63,7 @@ public class A_Mesh : ImpAsset
             mesh.ShadowCastMode = mode;
             meshes[i] = mesh;
         }
-        R3D.DrawModelEx(m, transform.position, Imp.Euler_2_Quat(transform.rotation), transform.scale);
+        R3D.DrawModelEx(m, transform.position, GMath.Euler_2_Quat(transform.rotation), transform.scale);
     }
     
     // ================================================================================================================

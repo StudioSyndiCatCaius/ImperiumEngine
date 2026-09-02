@@ -1,4 +1,5 @@
 using Engine.Enums;
+using Engine.Globals;
 
 namespace Engine.Core;
 
@@ -57,7 +58,7 @@ public abstract class ImpSandbox
         else if (c.parent == null && c.scene != null && !string.IsNullOrEmpty(c.scene.filepath))
             local = Path.ChangeExtension(c.scene.filepath, ".lua");
         if (string.IsNullOrEmpty(local)) return null;
-        string abs = Imp.Make_Path_Absolute(local);
+        string abs = GFile.Make_Path_Absolute(local);
         if (string.IsNullOrEmpty(abs) || !File.Exists(abs)) return null;
         return abs;
     }
@@ -65,7 +66,7 @@ public abstract class ImpSandbox
     public static void LoadGlobals()
     {
         if (current == null) return;
-        string root = Imp.GetDir_Root(EContentDir.Game);
+        string root = GFile.GetDir_Root(EContentDir.Game);
         if (string.IsNullOrEmpty(root) || !Directory.Exists(root)) return;
 
         string g = Path.Combine(root, "G.lua");

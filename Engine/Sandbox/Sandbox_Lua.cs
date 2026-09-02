@@ -3,6 +3,7 @@ using System.Numerics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Engine.Core;
+using Engine.Globals;
 using Engine.Structs;
 using MoonSharp.Interpreter;
 using MoonSharp.Interpreter.Interop;
@@ -15,7 +16,7 @@ namespace Engine.Sandbox;
  * "G.lua" can be placed in the root game directory (or any mod director) & is run automatically on startup.
  *
  * -- lua Globals ---
- * [ScriptCall] public static methods. [ImpClass(GlobalizeFunctions=true)] → Log_Info("x")
+ * [ScriptCall] public static methods. [ImpClass(GlobalizeFunctions=true)] → Info("x")
  * otherwise → TypeName.Method(args)
  */
 
@@ -47,7 +48,7 @@ public class Sandbox_Lua : ImpSandbox
     public override void Init()
     {
         script = new Script(CoreModules.Preset_SoftSandbox);
-        script.Options.DebugPrint = s => Imp.Log_Info(s);
+        script.Options.DebugPrint = s => GLog.Info(s);
         UserData.RegisterType<LuaComp>();
         UserData.RegisterType<LuaAction>();
         UserData.RegisterType<LuaHooks>();
@@ -71,7 +72,7 @@ public class Sandbox_Lua : ImpSandbox
         }
         catch (Exception ex)
         {
-            Imp.Log_Error(LuaErr(path, ex));
+            GLog.Error(LuaErr(path, ex));
         }
     }
 
@@ -90,7 +91,7 @@ public class Sandbox_Lua : ImpSandbox
             DynValue result = script.Call(chunk);
             if (result.Type != DataType.Table)
             {
-                Imp.Log_Error($"Lua {path}: script must return a table");
+                GLog.Error($"Lua {path}: script must return a table");
                 return null;
             }
 
@@ -109,7 +110,7 @@ public class Sandbox_Lua : ImpSandbox
         }
         catch (Exception ex)
         {
-            Imp.Log_Error(LuaErr(path, ex));
+            GLog.Error(LuaErr(path, ex));
             return null;
         }
     }
@@ -143,7 +144,7 @@ public class Sandbox_Lua : ImpSandbox
         }
         catch (Exception ex)
         {
-            Imp.Log_Error(LuaErr(name, ex));
+            GLog.Error(LuaErr(name, ex));
         }
     }
 
@@ -189,7 +190,7 @@ public class Sandbox_Lua : ImpSandbox
                     {
                         if (!globals.Add(m.Name))
                         {
-                            Imp.Log_Error($"ScriptCall global collision: {m.Name} ({t.Name})");
+                            GLog.Error($"ScriptCall global collision: {m.Name} ({t.Name})");
                             continue;
                         }
                         script!.Globals[m.Name] = cb;
@@ -246,7 +247,7 @@ public class Sandbox_Lua : ImpSandbox
             }
             catch (Exception ex)
             {
-                Imp.Log_Error(LuaErr(method.Name, ex is TargetInvocationException tie ? tie.InnerException ?? ex : ex));
+                GLog.Error(LuaErr(method.Name, ex is TargetInvocationException tie ? tie.InnerException ?? ex : ex));
                 return DynValue.Nil;
             }
         };
@@ -382,7 +383,7 @@ public class Sandbox_Lua : ImpSandbox
         if (value.Type == DataType.UserData && value.UserData.Object is LuaAction) return true;
         if (value.Type == DataType.Function)
         {
-            Imp.Log_Error($"Lua: cannot assign function to {field.Name}; use `{field.Name}.Add(fn)` / `{field.Name}.Remove(fn)`");
+            GLog.Error($"Lua: cannot assign function to {field.Name}; use `{field.Name}.Add(fn)` / `{field.Name}.Remove(fn)`");
             return true;
         }
         return false;
@@ -393,7 +394,7 @@ public class Sandbox_Lua : ImpSandbox
         Type[] gens = action_type.IsGenericType ? action_type.GetGenericArguments() : Type.EmptyTypes;
         if (gens.Length > 4)
         {
-            Imp.Log_Error($"Lua: Action arity {gens.Length} not supported ({action_type.Name})");
+            GLog.Error($"Lua: Action arity {gens.Length} not supported ({action_type.Name})");
             return null;
         }
         LuaFnInvoke inv = new() { lua = this, fn = fn };
@@ -433,7 +434,7 @@ public class Sandbox_Lua : ImpSandbox
             }
             catch (Exception ex)
             {
-                Imp.Log_Error(LuaErr("Action", ex));
+                GLog.Error(LuaErr("Action", ex));
             }
         }
     }
@@ -551,7 +552,7 @@ public class Sandbox_Lua : ImpSandbox
             DynValue fn = FnArg(args);
             if (fn.IsNil() || fn.Type != DataType.Function)
             {
-                Imp.Log_Error($"Lua: {field.Name}.{(add ? "Add" : "Remove")} expects a function");
+                GLog.Error($"Lua: {field.Name}.{(add ? "Add" : "Remove")} expects a function");
                 return;
             }
             Sandbox_Lua? lua = ImpSandbox.current as Sandbox_Lua;

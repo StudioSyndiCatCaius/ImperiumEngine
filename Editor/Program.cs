@@ -1,7 +1,10 @@
-﻿using Editor.Scenes;
+﻿using Editor;
+using Editor.Scenes;
 using Engine;
 using Engine.Assets;
+using Engine.Core;
 using ImGuiNET;
+
 
 App app = new();
 
@@ -12,5 +15,6 @@ app.Run(new()
     on_post_init = () =>
     {
         ImGui.GetIO().ConfigFlags |= ImGuiConfigFlags.DockingEnable;
-    }
+    },
 });
+

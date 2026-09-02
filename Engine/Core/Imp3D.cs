@@ -1,6 +1,7 @@
 using System.Numerics;
 using Engine.Assets;
 using Engine.Enums;
+using Engine.Globals;
 using Engine.Structs;
 using JoltPhysicsSharp;
 using R3D_cs;
@@ -149,10 +150,10 @@ public class Imp3D : ImpComp
             CullMask = Layer.All,
             Projection = orthographic ? Projection.Orthographic : Projection.Perspective,
         };
-        Quaternion q = Imp.Euler_2_Quat(t.rotation);
+        Quaternion q = GMath.Euler_2_Quat(t.rotation);
         R3D.CameraLookAt(ref cam,
-            t.position + Vector3.Transform(Imp.WORLD_FORWARD, q),
-            Vector3.Transform(Imp.WORLD_UP, q));
+            t.position + Vector3.Transform(GMath.WORLD_FORWARD, q),
+            Vector3.Transform(GMath.WORLD_UP, q));
         return cam;
     }
     // ---------------------------------------

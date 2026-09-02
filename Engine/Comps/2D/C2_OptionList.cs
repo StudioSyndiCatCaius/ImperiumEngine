@@ -47,7 +47,7 @@ public class C2_OptionList : Imp2D
     protected override void Transform_Refresh()
     {
         BindPending();
-        if (scene != null && !scene.is_runtime)
+        if (scene != null && !scene.is_running)
             RebuildDefaultsIfStale();
         TLayout2 lay = ChildLayout_Effective();
         for (int i = 0; i < children.Count; i++)
@@ -149,7 +149,7 @@ public class C2_OptionList : Imp2D
             on_option_highlight?.Invoke(b, index, true);
     }
 
-    public override TBounds2 ChildLayout_MakeBounds(Imp2D child, int index)
+    public override TBounds2 Child_MakeBounds2D(ImpComp child, int index)
     {
         Vector2 PrefSize(Imp2D c)
         {
@@ -161,11 +161,11 @@ public class C2_OptionList : Imp2D
             return size;
         }
 
-        TBounds2 Place(Imp2D c, TBounds2 slot)
+        TBounds2 Place(ImpComp c, TBounds2 slot)
         {
-            TBounds2 b = slot.FromLayout(c.position, c.layout);
-            b.start += c.transform.position;
-            b.end += c.transform.position;
+            Imp2D cc = c as Imp2D;
+            if(cc == null) return default;
+            TBounds2 b = cc.layout.MakeBounds(slot);
             return b;
         }
 

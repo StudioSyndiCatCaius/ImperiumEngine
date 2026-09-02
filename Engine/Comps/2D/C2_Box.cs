@@ -7,7 +7,7 @@ using Raylib_cs;
 
 namespace Engine.Comps._2D;
 
-public enum EBoxLayout { Stacked, Horizontal, Vertical, }
+public enum EBoxFormat { Stacked, Horizontal, Vertical, }
 
 /*
  * Generic non-free container for other Imp2D components.
@@ -15,9 +15,26 @@ public enum EBoxLayout { Stacked, Horizontal, Vertical, }
 [ImpClass(Common = true)]
 public class C2_Box : Imp2D
 {
-    [ImpVar] public UI_Box style; //if null, blank background
-    [ImpVar] public EBoxLayout layout;
+    // =============================================================================
+    // ImpVars
+    // =============================================================================
+    [ImpVar] public UI_Box style=UI_Box.DARK; //if null, blank background
+    [ImpVar] public EBoxFormat box_format;
 
+    // =============================================================================
+    // INIT
+    // =============================================================================
+    public C2_Box() {}
+    
+    public C2_Box(IEnumerable<ImpComp> _childs, EBoxFormat format=EBoxFormat.Vertical)
+    {
+        foreach (ImpComp child in _childs) Child_Add(child);
+    }
+    
+    // =============================================================================
+    // Overrides
+    // =============================================================================
+    
     public override bool ChildLayout_IsFree() { return false; }
 
     public override TBounds2 ContentBounds()
@@ -27,10 +44,10 @@ public class C2_Box : Imp2D
 
     public override void OnDraw2D(double dt, EDrawFlags flags = 0)
     {
-        if (style != null) style.Draw(bounds, global_transform);
+        if (style != null) style.Draw(layout.MakeBounds(bounds), global_transform);
     }
 
-    public override TBounds2 ChildLayout_MakeBounds(Imp2D child, int index)
+    public override TBounds2 Child_MakeBounds2D(ImpComp child, int index)
     {
         Vector2 PrefSize(Imp2D c)
         {
@@ -42,20 +59,22 @@ public class C2_Box : Imp2D
             return size;
         }
 
-        TBounds2 Place(Imp2D c, TBounds2 slot)
+        TBounds2 Place(ImpComp c, TBounds2 slot)
         {
-            TBounds2 b = slot.FromLayout(c.position, c.layout);
-            b.start += c.transform.position;
-            b.end += c.transform.position;
+            Imp2D cc = c as Imp2D;
+            if(cc == null) return default; 
+            TBounds2 b = cc.layout.MakeBounds(slot);
+            //b.start += c.transform.position;
+            //b.end += c.transform.position;
             return b;
         }
 
         TBounds2 inner = ContentBounds();
 
-        if (layout == EBoxLayout.Stacked)
+        if (box_format == EBoxFormat.Stacked)
             return Place(child, inner);
 
-        bool horiz = layout == EBoxLayout.Horizontal;
+        bool horiz = box_format == EBoxFormat.Horizontal;
         float inner_main = horiz
             ? MathF.Abs(inner.end.X - inner.start.X)
             : MathF.Abs(inner.end.Y - inner.start.Y);
@@ -105,6 +124,10 @@ public class C2_Box : Imp2D
     }
 }
 
+// ####################################################################################################################
+// Style Asset
+// ####################################################################################################################
+
 public class UI_Box : ImpAsset
 {
     [ImpVar] public A_Texture? background; 
@@ -134,4 +157,11 @@ public class UI_Box : ImpAsset
     }
 
     public TBounds2 ContentBounds(TBounds2 bounds) => TBounds2.Inset(TBounds2.Inset(bounds, outer_margins), inner_margins);
+    
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    // STATICS
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    public static UI_Box BLANK = new();
+    public static UI_Box LIGHT = new() { background = null, tint = new Color(255, 255, 255, 255) };
+    public static UI_Box DARK = new() { background = null, tint = new Color(10, 10, 10, 255) };
 }

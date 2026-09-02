@@ -1,5 +1,6 @@
 ﻿using System.Numerics;
 using Engine.Core;
+using Engine.Globals;
 using Engine.Structs;
 
 namespace Engine.Comps._3D;
@@ -29,7 +30,7 @@ public class C3_SpringArm : Imp3D
         {
             if (lag_position_speed > 0)
             {
-                lag_transform.position = Imp.V3_Interp(
+                lag_transform.position = GMath.V3_Interp(
                     lag_transform.position,
                     global_transform.position,
                     dt,
@@ -42,7 +43,7 @@ public class C3_SpringArm : Imp3D
 
             if (lag_rotation_speed > 0)
             {
-                lag_transform.rotation = Imp.V3_Interp(
+                lag_transform.rotation = GMath.V3_Interp(
                     lag_transform.rotation,
                     global_transform.rotation,
                     dt,

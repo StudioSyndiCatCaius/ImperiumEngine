@@ -22,7 +22,7 @@ public class C2_ProgressBar : Imp2D
     public override void OnDraw2D(double dt, EDrawFlags flags = EDrawFlags.None)
     {
         base.OnDraw2D(dt, flags);
-        TMargins progress_clipping_margins=new(); //calc based on layout and progress
+        TMargins progress_clipping_margins=new(); //calc based on Format and progress
         
         style.background_texture.Draw(bounds, global_transform, EImageLayout.Stretch, style.background_nineslice_margins);
         style.progress_texture.Draw(bounds, global_transform, EImageLayout.Stretch, style.progress_nineslice_margins,progress_clipping_margins, true);

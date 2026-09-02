@@ -7,6 +7,11 @@ public enum ENotifyGeneric
     End,
 }
 
+public enum ENotifyProcess
+{
+    Update, Draw2D, Draw3D,
+}
+
 public enum ENotifyGrabTarget
 {
     Hover_AsTarget_Start, // when this begins hovering over a target 

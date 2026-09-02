@@ -2,6 +2,7 @@
 using Engine.Core;
 using Engine.Structs;
 using Engine.Assets;
+using Engine.Globals;
 using R3D_cs;
 using Raylib_cs;
 using Material = R3D_cs.Material;
@@ -17,7 +18,7 @@ public class C3_Mesh : Imp3D
 
     public C3_Mesh()
     {
-        mesh=Imp.Asset_Load<A_Mesh>(A_Mesh.PATH_SHAPE_CUBE);
+        mesh=GAsset.Asset_Load<A_Mesh>(A_Mesh.PATH_SHAPE_CUBE);
         cast_shadows=true;
     }
     

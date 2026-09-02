@@ -3,6 +3,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Engine.Assets;
 using Engine.Core;
+using Engine.Enums;
+using Engine.Globals;
 using Engine.Sandbox;
 using Engine.Structs;
 using R3D_cs;
@@ -29,22 +31,30 @@ public enum EAppSceneState
 
 public class App
 {
-    // ==============================================================================================================
+    // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     // STATIC
-    // ==============================================================================================================
+    // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     public static App app = null;
     public static ImpPlayer[] players=new []{new ImpPlayer()};
 
+    // ========================================================================================
+    // Mods
+    // ========================================================================================
+    
     public Dictionary<string,ImpMod> mods=new()
     {
         ["game"]=new() { type = EModuleType.Game },
         ["engine"]=new() { type = EModuleType.Engine, },
     };
     
+    // ========================================================================================
+    // Dialog
+    // ========================================================================================
+    public static ImpDialog dialog_current = null; // a dialog is a window that HOGS ALL INPUT until closed
     
-    // -----------------------------------------------------------------------
+    // ========================================================================================
     // Camera
-    // -----------------------------------------------------------------------
+    // ========================================================================================
     public static ImpViewport viewport_main = new();
     public static Camera2D camera_2d = new() { Zoom = 1 };
     
@@ -58,9 +68,9 @@ public class App
     public static TVector2i window_size = TVector2i.p1440;
     public static TVector2i render_size = TVector2i.p1440;
     
-    // -----------------------------------------------------------------------
+    // ========================================================================================
     // Scene
-    // -----------------------------------------------------------------------
+    // ========================================================================================
     
     public static A_Scene scene_current = null;
     public static A_Scene scene_next = null;
@@ -70,9 +80,9 @@ public class App
     private static A_Scene scene_prev = null;
 
     
-    // -----------------------------------------------------------------------
+    // ========================================================================================
     // Command Line Args
-    // -----------------------------------------------------------------------
+    // ========================================================================================
     private static Dictionary<string,string> args = new();
     
     public bool HasArg(string arg) { return args.ContainsKey(arg); }
@@ -80,26 +90,26 @@ public class App
     public static int getArg_Int(string arg) { int.TryParse(getArg_String(arg), out int val); return val; }
     public static bool getArg_Bool(string arg) { return getArg_String(arg) == "true"; }
 
-    // -----------------------------------------------------------------------
+    // ========================================================================================
     // Game
-    // -----------------------------------------------------------------------
+    // ========================================================================================
     
     public static string game_file = "";
     public static TTable game_data = new();
     public static Dictionary<TFile,ImpAsset> assets = new();
     public static Dictionary<TFile,ImpFile> files = new();
     
-    // ==============================================================================================================
+    // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     // Class
-    // ==============================================================================================================
+    // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     
     [System.STAThread]
     public void Run(TAppHooks hooks=default, bool as_game=false, string force_game_path="")
     {
         app = this;
-        Imp.A = this;
+        G.A = this;
         
-        // ----------------------------------------------------------------------------------
+        // ========================================================================================-----------
         // ---- Parse Command Line Args
         
         string NormalizeArgName(string arg) { return arg.Trim().TrimStart('-', '/').ToLowerInvariant(); } 
@@ -135,7 +145,7 @@ public class App
             }
         }
         
-        // ----------------------------------------------------------------------------------
+        // ========================================================================================-----------
         // --- Validate game
         if (as_game)
         {
@@ -149,7 +159,7 @@ public class App
             }
             else
             {
-                game_file = Imp.File_GetFirstOfExt(Imp.GetExePath(), "ImpGame");
+                game_file = GFile.GetFirstOfExt(GFile.GetExePath(), "ImpGame");
             }
             //if no valid .ImpGame file, exit.
             if (game_file == "" || !File.Exists(game_file))
@@ -158,13 +168,13 @@ public class App
                 return;
             }
 
-            game_data = TTable.FromTOML(Imp.File_LoadAs_String(game_file));
+            game_data = TTable.FromTOML(GFile.LoadAs_String(game_file));
         }
         
         hooks.on_pre_init?.Invoke();
         Hooks.app_pre_init?.Invoke();
         
-        // ----------------------------------------------------------------------------------
+        // ========================================================================================-----------
         // ---- Raylib
         Raylib.SetConfigFlags(ConfigFlags.Msaa4xHint | 
                               ConfigFlags.HighDpiWindow | 
@@ -175,7 +185,7 @@ public class App
         if (as_game) BindRuntimeConsole();
         //Raylib.MaximizeWindow();
         
-        // ----------------------------------------------------------------------------------
+        // ========================================================================================-----------
         // ---- R3D
         R3D.SetHint(Hint.ShadowDirSize,4096);
         int rw = Raylib.GetRenderWidth();
@@ -207,24 +217,26 @@ public class App
                 first_scene_path = game_data.get_String("starting_scene");
             if (!string.IsNullOrEmpty(first_scene_path))
             {
-                A_Scene starting_scene = Imp.Asset_Load<A_Scene>(first_scene_path);
+                A_Scene starting_scene = GAsset.Asset_Load<A_Scene>(first_scene_path);
                 if (starting_scene != null)
                 {
-                    starting_scene.is_runtime = true;
+                    starting_scene.is_running = true;
                     scene_current = starting_scene;
                 }
             }
         }
-        
+        // ========================================================================================----------------------------
+        // LOOP
+        // ========================================================================================----------------------------
         while (!Raylib.WindowShouldClose())
         {
             RefreshWindow();
             Imp3D.ApplyRenderSettings();
             double dt = Raylib.GetFrameTime();
-
-            foreach (A_Scene scene in scenes_global) scene.Update(dt);
-
-            // -------- SCENE
+            
+            // -----------------------------------------------------
+            // Scene Change
+            // -----------------------------------------------------
             if (scene_prev != scene_current)
             {
                 Hooks.scene_change_begin?.Invoke();
@@ -235,14 +247,22 @@ public class App
             else if (scene_state == EAppSceneState.Loading)
             {
                 scene_state = EAppSceneState.Idle;
+                scene_current.is_running = true;
                 scene_current?.Begin();
                 Hooks.scene_change_end?.Invoke();
             }
-            scene_prev?.Update(dt);
-
+            if(dialog_current!=null) { dialog_current.scene=scene_prev;}
+            
+            // -----------------------------------------------------
+            // Player/Input update
+            // -----------------------------------------------------
             foreach (ImpPlayer player in players) player.Update(dt);
 
-            // -------- DRAW
+            ProcessUpdate(ENotifyProcess.Update, dt);
+            
+            // -----------------------------------------------------
+            // Draw
+            // -----------------------------------------------------
             Raylib.BeginDrawing();
             Raylib.ClearBackground(Color.Black);
             rlImGui.Begin();
@@ -263,27 +283,31 @@ public class App
                     CullMask = Layer.All,
                     Projection = Projection.Perspective,
                 };
-                R3D.CameraLookAt(ref camera_view, Vector3.Zero, Imp.WORLD_UP);
+                R3D.CameraLookAt(ref camera_view, Vector3.Zero, GMath.WORLD_UP);
             }
             view_target_data=R3D.CameraToRL(camera_view);
-            R3D.BeginEx(camera_view);
-
-            foreach (A_Scene scene in scenes_global) scene.Draw(dt, EDrawFlags.No2D);
-            scene_prev?.Draw(dt, EDrawFlags.No2D);
-
+            
+            // ---------- Draw 3D
+            R3D.BeginEx(camera_view); 
+            ProcessUpdate(ENotifyProcess.Draw3D, dt);
             // R3D_End is the actual 3D submit + post-process to the default framebuffer.
             // ImGui must render after that or the 3D pass covers the whole window.
             R3D.End();
 
+            // ---------- Draw 2D
             Raylib.BeginMode2D(camera_2d);
-            foreach (A_Scene scene in scenes_global) scene.Draw(dt, EDrawFlags.No3D);
-            scene_prev?.Draw(dt, EDrawFlags.No3D);
+            ProcessUpdate(ENotifyProcess.Draw2D, dt);
             Raylib.EndMode2D();
 
             hooks.on_draw_end?.Invoke();
             rlImGui.End();
             Raylib.EndDrawing();
         }
+        
+        // -----------------------------------------------------
+        // Shutdown
+        // -----------------------------------------------------
+        
         hooks.on_shutdown?.Invoke();
         ImpSandbox.current?.Shutdown();
         
@@ -291,6 +315,13 @@ public class App
         rlImGui.Shutdown();
         Raylib.ShowCursor();
         Raylib.CloseWindow();
+    }
+    
+    private void ProcessUpdate(ENotifyProcess notify, double dt)
+    {
+        foreach (A_Scene scene in scenes_global) scene.ProcessNotify(notify, dt);
+        scene_current?.ProcessNotify(notify, dt);
+        dialog_current?.ProcessNotify(notify, dt);
     }
 
     private static void RefreshWindow(bool force = false)
@@ -313,7 +344,7 @@ public class App
 
         render_size.x = rw;
         render_size.y = rh;
-        // 2D layout/draw is in screen pixels; HighDPI framebuffer is only for R3D.
+        // 2D Format/draw is in screen pixels; HighDPI framebuffer is only for R3D.
         viewport_main.size = new Vector2(sw, sh);
 
         // Use the actual R3D resize/refresh method exposed by your binding if this name differs.

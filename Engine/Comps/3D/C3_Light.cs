@@ -1,4 +1,5 @@
 ﻿using Engine.Core;
+using Engine.Globals;
 using R3D_cs;
 using Raylib_cs;
 
@@ -64,6 +65,6 @@ public class C3_Light : Imp3D
         R3D.SetLightEnergy(light_id, intensity);
         R3D.SetLightRange(light_id, radius);
         if (type == ELightType.Spot)
-            R3D.SetLightDirection(light_id, Imp.V3_Rotate(Imp.WORLD_FORWARD, global_transform.rotation));
+            R3D.SetLightDirection(light_id, GMath.V3_Rotate(GMath.WORLD_FORWARD, global_transform.rotation));
     }
 }

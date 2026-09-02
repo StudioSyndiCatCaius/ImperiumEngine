@@ -1,6 +1,7 @@
 ﻿using System.Numerics;
 using Engine.Core;
 using Engine.Enums;
+using Engine.Globals;
 using Engine.Structs;
 using Raylib_cs;
 
@@ -138,5 +139,5 @@ public class A_Texture : ImpAsset
     // ===============================================================================================================
     // STATICS
     // ===============================================================================================================
-    [Builtin] public static A_Texture UI_BTN = Imp.Asset_Import<A_Texture>("{engine}/2D/UI/UI_Editor_Button_A.png");
+    [Builtin] public static A_Texture UI_BTN = GAsset.Asset_Import<A_Texture>("{engine}/2D/UI/UI_Editor_Button_A.png");
 }

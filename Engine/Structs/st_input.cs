@@ -2,6 +2,7 @@
 using Engine.Core;
 using Engine.Interfaces;
 using Engine.Enums;
+using Engine.Globals;
 
 namespace Engine.Structs;
 
@@ -9,16 +10,26 @@ public class TInputKey
 {
     [ImpVar] public List<EInputKey> prereq_keys = new(); // keys that must be Down before this main key can be considered pressed
     [ImpVar] public float deadzone;
+    // (0,0,0) = digital button (Space/Enter/etc). Non-zero = analog contribution for GetAxis.
     [ImpVar] public Vector3 axis_scale;
 
-    public bool IsDown(ImpPlayer player, Vector3 axis)
+    public bool IsDigital => axis_scale.LengthSquared() <= 0f;
+
+    public bool PrereqsHeld(ImpPlayer player)
     {
         foreach (var key in prereq_keys)
         {
-            if(player.Key_GetState(key) != EInputState.Down) return false;
+            EInputState s = player.Key_GetState(key);
+            if (s is not (EInputState.Pressed or EInputState.Down)) return false;
         }
-        if(axis.Length() < deadzone) return false;
         return true;
+    }
+
+    public bool IsActive(ImpPlayer player, Vector3 axis)
+    {
+        if (!PrereqsHeld(player)) return false;
+        if (IsDigital) return true;
+        return axis.Length() >= deadzone;
     }
     
 }
@@ -29,53 +40,49 @@ public class TInputAction : I_Property
     [ImpVar] public string name;
     [ImpVar] public bool average_axis; //TRUE = average axis values of all keys that are Down | FALSE = add axis values of all keys that are Down
     [ImpVar] public Dictionary<EInputKey, TInputKey> keys = new();
-
+    
     public EInputState GetState(ImpPlayer player)
     {
-        EInputState result = EInputState.None;
-
-        foreach (var key in keys.Keys)
+        EInputState last_state = EInputState.None;
+        foreach (var pair in keys)
         {
-            EInputState state = player.Key_GetState(key);
-
-            if (state == EInputState.Pressed)
-                return EInputState.Pressed;
-
-            if (state == EInputState.Released)
-                result = EInputState.Released;
-            else if (state == EInputState.Down && result == EInputState.None)
-                result = EInputState.Down;
+            EInputState s = player.Key_GetState(pair.Key);
+            if(s==EInputState.Down) return EInputState.Down; //if any key is Down, action is Down
+            if(s==EInputState.Released) last_state=EInputState.Released;
+            if(s==EInputState.Pressed) last_state=EInputState.Pressed;
         }
-
-        return result;
+        return last_state;
     }
 
+    //If at least one attached key is active, return true
+    public bool IsActive(ImpPlayer player)
+    {
+        foreach (var pair in keys)
+        {
+            if(pair.Value.IsActive(player, Vector3.Zero)) return true;
+        }
+        return false;
+    }
+    
     public Vector3 GetAxis(ImpPlayer player)
     {
         Vector3 result = Vector3.Zero;
-        int downCount = 0;
-
+        Vector3 axis_sum = Vector3.Zero;
+        int axis_count = 0;
         foreach (var pair in keys)
         {
-            EInputKey key = pair.Key;
-            TInputKey inputKey = pair.Value;
-
-            EInputState state = player.Key_GetState(key);
-            if (state is not (EInputState.Pressed or EInputState.Down))
-                continue;
-
-            Vector3 rawAxis = player.Key_GetAxis(key);
-            Vector3 scaledAxis = rawAxis * inputKey.axis_scale;
-
-            if (!inputKey.IsDown(player, scaledAxis))
-                continue;
-
-            result += scaledAxis;
-            downCount++;
+            Vector3 _axis = player.Key_GetAxis(pair.Key)*pair.Value.axis_scale;
+            if (pair.Value.IsActive(player, _axis))
+            {
+                axis_sum += _axis;
+                axis_count++;
+            }
         }
 
-        if (average_axis && downCount > 0)
-            result /= downCount;
+        if (axis_count > 0)
+        {
+            result = average_axis ? axis_sum / axis_count : axis_sum;
+        }
 
         return result;
     }
@@ -90,25 +97,17 @@ public class TInputSet
     {
         foreach (var _ia in actions)
         {
-            foreach (var _targ in player.input_targets)
+            bool active = _ia.Value.IsActive(player);
+            if (!active) continue;
+            
+            Vector3 _axis = _ia.Value.GetAxis(player);
+            EInputState _state = _ia.Value.GetState(player);
+            player.input_action_states[_ia.Key] = _state;
+
+            foreach (var _targ in player.InputTarget_GetAll())
             {
-                EInputState _state = _ia.Value.GetState(player);
-                Vector3 _axis = _ia.Value.GetAxis(player);
-                switch (_state)
-                {
-                    case EInputState.Down:
-                        _targ.Input_Down(player,_ia.Key,_axis,dt);
-                        _targ.script_instance?.Call("Input_Down", player, _ia.Key, _axis, dt);
-                        break;
-                    case EInputState.Pressed:
-                        _targ.Input_Pressed(player,_ia.Key,_axis);
-                        _targ.script_instance?.Call("Input_Pressed", player, _ia.Key, _axis);
-                        break;
-                    case EInputState.Released:
-                        _targ.Input_Released(player,_ia.Key,_axis);
-                        _targ.script_instance?.Call("Input_Released", player, _ia.Key, _axis);
-                        break;
-                }
+                if (_targ is not I_Input iobj) continue;
+                iobj._Input_Notif_Action(player, _ia.Key, _state, _axis, dt);
             }
         }
     }
@@ -127,13 +126,13 @@ public class TInputSet
             {
                 keys =new()
                 {
-                    [EInputKey.Key_W]=new(){axis_scale=Imp.WORLD_FORWARD},
-                    [EInputKey.Key_A]=new(){axis_scale=Imp.WORLD_LEFT},
-                    [EInputKey.Key_S]=new(){axis_scale=-Imp.WORLD_FORWARD},
-                    [EInputKey.Key_D]=new(){axis_scale=-Imp.WORLD_LEFT},
+                    [EInputKey.Key_W]=new(){axis_scale=GMath.WORLD_FORWARD},
+                    [EInputKey.Key_A]=new(){axis_scale=GMath.WORLD_LEFT},
+                    [EInputKey.Key_S]=new(){axis_scale=-GMath.WORLD_FORWARD},
+                    [EInputKey.Key_D]=new(){axis_scale=-GMath.WORLD_LEFT},
                     
-                    [EInputKey.Pad_LeftStickX]=new(){axis_scale=Imp.WORLD_FORWARD,deadzone = DEADZONE},
-                    [EInputKey.Pad_LeftStickY]=new(){axis_scale=Imp.WORLD_LEFT,deadzone = DEADZONE}
+                    [EInputKey.Pad_LeftStickX]=new(){axis_scale=GMath.WORLD_FORWARD,deadzone = DEADZONE},
+                    [EInputKey.Pad_LeftStickY]=new(){axis_scale=GMath.WORLD_LEFT,deadzone = DEADZONE}
                 },
             },
             // ---- ROTATE
@@ -162,20 +161,20 @@ public class TInputSet
             {
                 keys =new()
                 {
-                    [EInputKey.Key_Up]=new(){axis_scale=Imp.WORLD_FORWARD,deadzone = DEADZONE},
-                    [EInputKey.Key_Down]=new(){axis_scale=-Imp.WORLD_FORWARD,deadzone = DEADZONE},
-                    [EInputKey.Key_Left]=new(){axis_scale=Imp.WORLD_LEFT,deadzone = DEADZONE},
-                    [EInputKey.Key_Right]=new(){axis_scale=-Imp.WORLD_LEFT,deadzone = DEADZONE},
+                    [EInputKey.Key_Up]=new(){axis_scale=GMath.WORLD_FORWARD,deadzone = DEADZONE},
+                    [EInputKey.Key_Down]=new(){axis_scale=-GMath.WORLD_FORWARD,deadzone = DEADZONE},
+                    [EInputKey.Key_Left]=new(){axis_scale=GMath.WORLD_LEFT,deadzone = DEADZONE},
+                    [EInputKey.Key_Right]=new(){axis_scale=-GMath.WORLD_LEFT,deadzone = DEADZONE},
                     
-                    [EInputKey.Pad_DPadUp]=new(){axis_scale=Imp.WORLD_FORWARD,deadzone = DEADZONE},
-                    [EInputKey.Pad_DPadDown]=new(){axis_scale=-Imp.WORLD_FORWARD,deadzone = DEADZONE},
-                    [EInputKey.Pad_DPadLeft]=new(){axis_scale=Imp.WORLD_LEFT,deadzone = DEADZONE},
-                    [EInputKey.Pad_DPadRight]=new(){axis_scale=-Imp.WORLD_LEFT,deadzone = DEADZONE},
+                    [EInputKey.Pad_DPadUp]=new(){axis_scale=GMath.WORLD_FORWARD,deadzone = DEADZONE},
+                    [EInputKey.Pad_DPadDown]=new(){axis_scale=-GMath.WORLD_FORWARD,deadzone = DEADZONE},
+                    [EInputKey.Pad_DPadLeft]=new(){axis_scale=GMath.WORLD_LEFT,deadzone = DEADZONE},
+                    [EInputKey.Pad_DPadRight]=new(){axis_scale=-GMath.WORLD_LEFT,deadzone = DEADZONE},
                 }
             },
             
-            ["_confirm"]=new() { keys = { [EInputKey.Key_Enter]={}, [EInputKey.Pad_FaceDown]={}, } },
-            ["_cancel"]=new() { keys = { [EInputKey.Key_Escape]={}, [EInputKey.Pad_FaceRight]={}, } },
+            ["_confirm"]=new() { keys = { [EInputKey.Key_Enter]=new(){}, [EInputKey.Pad_FaceDown]=new() {}, } },
+            ["_cancel"]=new() { keys = { [EInputKey.Key_Escape]=new(){}, [EInputKey.Pad_FaceRight]=new(){}, } },
         }
     };
 }
