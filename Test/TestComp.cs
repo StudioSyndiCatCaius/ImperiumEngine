@@ -11,11 +11,6 @@ public class TestComp : ImpComp
     {
         base.OnBegin();
         ImpPlayer.Get().input_targets.Add(this);
-        Console.WriteLine("TestComp started");
-        DLG_Alert.Run("Testing Alert", () =>
-        {
-            Console.WriteLine("Alert closed");
-        });
     }
 
     public override void OnUpdate(double dt)
@@ -28,8 +23,11 @@ public class TestComp : ImpComp
         base.Input_Pressed(player, ia, axis);
         if (ia == "_cancel")
         {
-            Console.WriteLine("Cancel pressed");
-            
+            new DLG_Confirm("Testing Confirm", (b) =>
+            {
+                if(b) Console.WriteLine("Confirmed");
+                else Console.WriteLine("Cancelled");
+            });
         }
     }
 }

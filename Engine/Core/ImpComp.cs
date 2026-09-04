@@ -84,7 +84,7 @@ public class ImpComp : I_Inspectable, I_Input
     // ===========================================================================================
     // UPDATE
     // ===========================================================================================
-    public void ProcessNotify(ENotifyProcess notify, double dt)
+    public virtual void ProcessNotify(ENotifyProcess notify, double dt)
     {
         switch (notify)
         {
@@ -207,12 +207,6 @@ public class ImpComp : I_Inspectable, I_Input
                 if (is_editor) OnDrawDebug(dt, true);        
                 break;
             case 1: //2D
-                bounds = TBounds2.GetWindowBounds();
-                if (parent != null && parent.children.Contains(this))
-                {
-                    int _ind = parent.children.IndexOf(this); //consider caching child index if ti will make this much faster
-                    bounds=parent.Child_MakeBounds2D(this, _ind);
-                }
                 if (!flags.HasFlag(EDrawFlags.No2D)) OnDraw2D(dt, flags);
                 if (is_editor) OnDrawDebug(dt, false);
                 break;
@@ -227,14 +221,6 @@ public class ImpComp : I_Inspectable, I_Input
         life_state_runtime = ECompLifeState.Ending;
         life_state_engine = ECompLifeState.Ending;
     }
-    
-    // ========================================================================================================
-    // 2D
-    // ========================================================================================================
-
-    public TBounds2 bounds; //cached bounds for 2d drawing
-    
-    public virtual TBounds2 Child_MakeBounds2D(ImpComp child, int index) { return TBounds2.GetWindowBounds(); }
     
     // ========================================================================================================
     // Children
@@ -573,8 +559,13 @@ public class ImpComp : I_Inspectable, I_Input
     public virtual void _NotifyAs_DragTarget(ImpPlayer player, ImpComp drop_target, ENotifyGeneric notify, double dt) { }
     public virtual void _InputAs_DragTarget(ImpPlayer player, EInputKey key, EInputState state, double dt) { }
     
+    // ==========================================================================================
+    // Drag & Drop
+    // ==========================================================================================
     public virtual bool Dragging_IsAllowed() { return false; } //can a player drag this?
     public virtual Imp2D Dragging_GetPreview() { return null; } //the on screen preview/representative of the dragged object that will follow the cursor
+    
+    public virtual void Dragging_OnDrop(ImpPlayer player, ImpComp drop_target, Vector2 cursor_pos, double dt) { }
 
     public void _Input_Notif_Key(ImpPlayer player, EInputKey key, EInputState state, double dt) { }
     public void _Input_Notif_Action(ImpPlayer player, TLabel action, EInputState state, Vector3 axis, double dt)

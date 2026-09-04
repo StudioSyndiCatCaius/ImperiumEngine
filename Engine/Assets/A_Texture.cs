@@ -139,5 +139,8 @@ public class A_Texture : ImpAsset
     // ===============================================================================================================
     // STATICS
     // ===============================================================================================================
-    [Builtin] public static A_Texture UI_BTN = GAsset.Asset_Import<A_Texture>("{engine}/2D/UI/UI_Editor_Button_A.png");
+    [Builtin] public static A_Texture UI_BTN = GAsset.ImportSource<A_Texture>("{engine}/2D/UI/UI_btn_D.png");
+    [Builtin] public static A_Texture UI_BOX_LIGHT = GAsset.ImportSource<A_Texture>("{engine}/2D/UI/UI_box_L_B.png");
+    [Builtin] public static A_Texture UI_BOX_DARK = GAsset.ImportSource<A_Texture>("{engine}/2D/UI/UI_box_D_B.png");
+    
 }

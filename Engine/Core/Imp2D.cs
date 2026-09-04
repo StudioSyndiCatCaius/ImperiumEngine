@@ -9,34 +9,93 @@ namespace Engine.Core;
 
 public class Imp2D : ImpComp
 {
-    // ===========================================================================================
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    // STATIC
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    public static List<Imp2D> cursortrace_stack = new();
+
+    public static Imp2D GetCursorTraceHit(Vector2 point) //might need to reverse?
+    {
+        foreach (Imp2D comp in cursortrace_stack)
+        {
+            if (comp.Contains(point)) return comp;
+        }
+        return null;
+    }
+    
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    // CLASS
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    
+    // ==========================================================================
     // Imp Vars
-    // ===========================================================================================
+    // ==========================================================================
     [ImpVar] public TLayout2 layout=new()
     {
         size = {X=100,Y=100}
     };
-    [ImpVar] public bool pivot_normalized=true;
-    [ImpVar] public Vector2 pivot=new(0.5f,0.5f);
     [ImpVar] public ECursorFilter cursor_filter=ECursorFilter.Pass; //applied when cursor is in the bounds of this component
     
     [ImpVar] public TTransform2 transform; //UNLIKE 3D, 2D transforms are relative to the parent. transform is an additional offset on top of that.
     
-    // ===========================================================================================
+    // ==========================================================================
     // vars
-    // ===========================================================================================
+    // ==========================================================================
     public ImpViewport? owning_viewport; //override only (C3_UI plane, etc). otherwise inherited / scene / App.viewport_main
         
     public TTransform2 global_transform;
-
+    public TBounds2 bounds; //cached bounds for 2d drawing
     
-    // ===========================================================================================
+    // ==========================================================================
     // init
-    // ===========================================================================================
+    // ==========================================================================
     
-    // ===========================================================================================
+    // ==========================================================================
     // funcs
-    // ===========================================================================================
+    // ==========================================================================
+
+    public override void ProcessNotify(ENotifyProcess notify, double dt)
+    {
+        if (notify == ENotifyProcess.CursorStack)
+        {
+            if(!is_visible) return;
+            bool _do_children=false;
+            bool _do_self=false;
+            switch (cursor_filter)
+            {
+                case ECursorFilter.Pass:
+                    _do_children=true;
+                    break;
+                case ECursorFilter.Hit:
+                    _do_self = true;
+                    _do_children=true;
+                    break; 
+                case ECursorFilter.Ignore:
+                    break;
+                case ECursorFilter.Block:
+                    _do_self=true;
+                    break;
+            }
+
+            if (_do_self)
+            {
+                cursortrace_stack.Add(this);
+            }
+
+            if (_do_children)
+            {
+                foreach (ImpComp child in children)
+                {
+                    if (child is Imp2D child2d) child2d.ProcessNotify(notify, dt);
+                }
+            }
+            
+            return;
+        }
+        base.ProcessNotify(notify, dt);
+    }
+    
+    
     public ImpViewport Viewport_Get()
     {
         if (owning_viewport != null) return owning_viewport;
@@ -45,71 +104,28 @@ public class Imp2D : ImpComp
         return App.viewport_main;
     }
 
+    public override void OnDraw2D(double dt, EDrawFlags flags = EDrawFlags.None)
+    {
+        base.OnDraw2D(dt, flags);
+        bounds = TBounds2.GetWindowBounds();
+        if (parent != null && parent.children.Contains(this))
+        {
+            if (parent is Imp2D p)
+            {
+                int _ind=p.children.IndexOf(this);
+                if (_ind >= 0)
+                {
+                    bounds = p.Child_MakeBounds2D(this, _ind);
+                }
+            }
+        }
+        bounds=layout.MakeBounds(bounds);
+    }
+
     public virtual TBounds2 ContentBounds() { return bounds; }
+    public virtual TBounds2 Child_MakeBounds2D(ImpComp child, int index) { return bounds; }
+
     
-    [CallInEditor] public void SetPivot_Corner() { pivot = new(0,0); pivot_normalized = false; }
-    [CallInEditor] public void SetPivot_Center() { pivot = new(0.5f,0.5f); pivot_normalized = true; }
-
-    public Vector2 Pivot_Pixels()
-    {
-        Vector2 size = new(
-            MathF.Abs(bounds.end.X - bounds.start.X),
-            MathF.Abs(bounds.end.Y - bounds.start.Y));
-        return pivot_normalized ? pivot * size : pivot;
-    }
-
-    public Vector2 Pivot_Point()
-    {
-        return new Vector2(
-            MathF.Min(bounds.start.X, bounds.end.X),
-            MathF.Min(bounds.start.Y, bounds.end.Y)) + Pivot_Pixels();
-    }
-
-    public bool Contains(Vector2 point)
-    {
-        if (bounds.IsEmpty) return false;
-        Vector2 origin = new(
-            MathF.Min(bounds.start.X, bounds.end.X),
-            MathF.Min(bounds.start.Y, bounds.end.Y));
-        Vector2 size = new(
-            MathF.Abs(bounds.end.X - bounds.start.X),
-            MathF.Abs(bounds.end.Y - bounds.start.Y));
-        float rot = (float)global_transform.rotation;
-        if (MathF.Abs(rot) > 1e-4f)
-        {
-            Vector2 o = origin + Pivot_Pixels();
-            float rad = -rot * (MathF.PI / 180f);
-            float c = MathF.Cos(rad), s = MathF.Sin(rad);
-            Vector2 d = point - o;
-            point = o + new Vector2(d.X * c - d.Y * s, d.X * s + d.Y * c);
-        }
-        return point.X >= origin.X && point.Y >= origin.Y
-            && point.X < origin.X + size.X && point.Y < origin.Y + size.Y;
-    }
-
-    public void Corners(Span<Vector2> corners)
-    {
-        Vector2 origin = new(
-            MathF.Min(bounds.start.X, bounds.end.X),
-            MathF.Min(bounds.start.Y, bounds.end.Y));
-        Vector2 size = new(
-            MathF.Abs(bounds.end.X - bounds.start.X),
-            MathF.Abs(bounds.end.Y - bounds.start.Y));
-        corners[0] = origin;
-        corners[1] = new Vector2(origin.X + size.X, origin.Y);
-        corners[2] = new Vector2(origin.X + size.X, origin.Y + size.Y);
-        corners[3] = new Vector2(origin.X, origin.Y + size.Y);
-        float rot = (float)global_transform.rotation;
-        if (MathF.Abs(rot) <= 1e-4f) return;
-        Vector2 o = origin + Pivot_Pixels();
-        float rad = rot * (MathF.PI / 180f);
-        float c = MathF.Cos(rad), s = MathF.Sin(rad);
-        for (int i = 0; i < 4; i++)
-        {
-            Vector2 d = corners[i] - o;
-            corners[i] = o + new Vector2(d.X * c - d.Y * s, d.X * s + d.Y * c);
-        }
-    }
     
     public virtual bool ChildLayout_IsFree() { return true; } //TRUE=allows children to be freely moved around. FALSE= `Child_MakeBounds2D` determines child bounds
     
@@ -124,6 +140,8 @@ public class Imp2D : ImpComp
         b.end += transform.position;
         return b;
     }
+    
+    public bool Contains(Vector2 point) { return bounds.IsPointInside(point); }
 
     // ---------------------------------------
     // Transform (Set Global)

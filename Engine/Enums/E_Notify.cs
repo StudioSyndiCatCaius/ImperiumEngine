@@ -9,7 +9,7 @@ public enum ENotifyGeneric
 
 public enum ENotifyProcess
 {
-    Update, Draw2D, Draw3D,
+    Update, Draw2D, Draw3D, CursorStack,
 }
 
 public enum ENotifyGrabTarget

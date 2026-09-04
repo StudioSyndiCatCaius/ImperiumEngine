@@ -1,40 +1,65 @@
 ﻿using System.Numerics;
+using Editor.Panels;
+using Engine;
+using Engine.Assets;
+using Engine.Comps._2D;
+using Engine.Core;
+using Engine.Enums;
+using Engine.Globals;
+using Engine.Structs;
 using ImGuiNET;
 
 namespace Editor.Windows;
 
+
 public class WND_Scene : EdWindow
 {
-    public override void Draw()
+
+    // ==============================================================================================
+    // INIT
+    // ==============================================================================================
+    public WND_Scene()
     {
-        base.Draw();
-        float leftWidth = ImGui.GetContentRegionAvail().X-300;
         
-        // Left pane — drag its right edge
-        ImGui.BeginChild("left", new Vector2(leftWidth, 0), true, ImGuiWindowFlags.AlwaysAutoResize);
-        ImGui.Text("Left pane");
-        ImGui.EndChild();
-
-
-        ImGui.SameLine();
-
-        ImGui.BeginChild("right", new Vector2(0, 0), true,ImGuiWindowFlags.AlwaysAutoResize);
-        
-        float availY = ImGui.GetContentRegionAvail().Y;
-        float gap = ImGui.GetStyle().ItemSpacing.Y;
-        float h = MathF.Max(0f, (availY - gap) * 0.5f);
-
-        
-        ImGui.BeginChild("targa", new Vector2(0, h), true, ImGuiWindowFlags.AlwaysAutoResize);
-        ImGui.Text("Right pane");
-        ImGui.EndChild();
-            
-        ImGui.BeginChild("targo", new Vector2(0,h), true, ImGuiWindowFlags.AlwaysAutoResize);
-        ImGui.Text("Right pane");
-        ImGui.EndChild();
-            
-        ImGui.EndChild();
-
-
     }
+    
+    // ==============================================================================================
+    // Scene
+    // ==============================================================================================
+
+
+ 
+    // ==============================================================================================
+    // INPUT
+    // ==============================================================================================
+    
+}
+
+public enum EEditorScene_View { View_3D, View_2D, }
+public enum EEditorGizmo_Mode { Translate, Rotate, Scale, }
+public enum EEditorGizmo_Axis { World, Local }
+public enum EEditorScene_EditMode { Gizmo, Landscape }
+
+// ############################################################################################################
+// Scene Panel
+// ############################################################################################################
+
+public class PNL_Scene : C2_Box
+{
+    public EEditorScene_View view = EEditorScene_View.View_3D;
+    public EEditorGizmo_Mode gizmo_mode = EEditorGizmo_Mode.Translate;
+    public EEditorGizmo_Axis gizmo_axis = EEditorGizmo_Axis.World;
+
+    public A_Scene scene;
+    
+
+}
+
+// ############################################################################################################
+// Common Comp Item
+// ############################################################################################################
+
+public class CommonCompItem : Imp2D
+{
+    
 }

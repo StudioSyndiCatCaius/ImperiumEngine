@@ -74,7 +74,7 @@ public static class GAsset
     }
     
     //imports an ImpFile fromt a sourcefile and then creates OR loads an ImpAsset from the sourcefile.
-    public static T? Asset_Import<T>(string sourcefile) where T : ImpAsset
+    public static T? ImportSource<T>(string sourcefile) where T : ImpAsset
     {
         Console.WriteLine(" --------------  ");
         if (string.IsNullOrEmpty(sourcefile)) return null;

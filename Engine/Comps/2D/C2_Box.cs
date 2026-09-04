@@ -3,6 +3,7 @@ using Engine.Core;
 using Engine.Structs;
 using Engine.Assets;
 using Engine.Enums;
+using Engine.Globals;
 using Raylib_cs;
 
 namespace Engine.Comps._2D;
@@ -24,10 +25,14 @@ public class C2_Box : Imp2D
     // =============================================================================
     // INIT
     // =============================================================================
-    public C2_Box() {}
+    public C2_Box()
+    {
+        cursor_filter = ECursorFilter.Hit;
+    }
     
     public C2_Box(IEnumerable<ImpComp> _childs, EBoxFormat format=EBoxFormat.Vertical)
     {
+        box_format = format;
         foreach (ImpComp child in _childs) Child_Add(child);
     }
     
@@ -44,7 +49,8 @@ public class C2_Box : Imp2D
 
     public override void OnDraw2D(double dt, EDrawFlags flags = 0)
     {
-        if (style != null) style.Draw(layout.MakeBounds(bounds), global_transform);
+        base.OnDraw2D(dt, flags);
+        if (style != null) style.Draw(bounds, global_transform);
     }
 
     public override TBounds2 Child_MakeBounds2D(ImpComp child, int index)
@@ -61,12 +67,8 @@ public class C2_Box : Imp2D
 
         TBounds2 Place(ImpComp c, TBounds2 slot)
         {
-            Imp2D cc = c as Imp2D;
-            if(cc == null) return default; 
-            TBounds2 b = cc.layout.MakeBounds(slot);
-            //b.start += c.transform.position;
-            //b.end += c.transform.position;
-            return b;
+            // Return the slot only. Imp2D.OnDraw2D applies the child's layout.
+            return c is Imp2D ? slot : default;
         }
 
         TBounds2 inner = ContentBounds();
@@ -86,7 +88,7 @@ public class C2_Box : Imp2D
             if (children[i] is not Imp2D c || !c.is_visible) continue;
             Vector2 sz = PrefSize(c);
             preferred_total += horiz ? sz.X : sz.Y;
-            if ((horiz ? c.layout.align_H : c.layout.align_V) == EUIViewportAlignment.Fill)
+            if ((horiz ? c.layout.alignment.align_H : c.layout.alignment.align_V) == ELayoutAlignment.Fill)
                 fill_n++;
         }
 
@@ -94,18 +96,36 @@ public class C2_Box : Imp2D
         if (extra < 0) extra = 0;
         float extra_each = fill_n > 0 ? extra / fill_n : 0;
 
+        // Leftover space on the main axis is not a slot of its own. Fill children
+        // eat it; otherwise the packed group is placed with the children's
+        // main-axis alignment (one Center child sits in the middle of the box).
+        float leading = 0;
+        if (fill_n == 0 && extra > 0)
+        {
+            ELayoutAlignment? group = null;
+            for (int i = 0; i < children.Count; i++)
+            {
+                if (children[i] is not Imp2D c || !c.is_visible) continue;
+                ELayoutAlignment a = horiz ? c.layout.alignment.align_H : c.layout.alignment.align_V;
+                if (group == null) group = a;
+                else if (group != a) { group = ELayoutAlignment.Start; break; }
+            }
+            if (group == ELayoutAlignment.Center) leading = extra * 0.5f;
+            else if (group == ELayoutAlignment.End) leading = extra;
+        }
+
         float x0 = MathF.Min(inner.start.X, inner.end.X);
         float y0 = MathF.Min(inner.start.Y, inner.end.Y);
         float x1 = MathF.Max(inner.start.X, inner.end.X);
         float y1 = MathF.Max(inner.start.Y, inner.end.Y);
-        float cursor = 0;
+        float cursor = leading;
 
         for (int i = 0; i < children.Count; i++)
         {
             if (children[i] is not Imp2D c || !c.is_visible) continue;
             Vector2 sz = PrefSize(c);
             float main = horiz ? sz.X : sz.Y;
-            bool fill = (horiz ? c.layout.align_H : c.layout.align_V) == EUIViewportAlignment.Fill;
+            bool fill = (horiz ? c.layout.alignment.align_H : c.layout.alignment.align_V) == ELayoutAlignment.Fill;
             if (fill) main += extra_each;
             if (c.layout.size_max != Vector2.Zero)
             {
@@ -161,7 +181,27 @@ public class UI_Box : ImpAsset
     // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     // STATICS
     // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    public static UI_Box BLANK = new();
-    public static UI_Box LIGHT = new() { background = null, tint = new Color(255, 255, 255, 255) };
-    public static UI_Box DARK = new() { background = null, tint = new Color(10, 10, 10, 255) };
+    private static TMargins def_inner_margins=new(10, 10, 10, 10);
+    private static TMargins def_outer_margins=new(2, 2, 2, 2);
+    private static TMargins def_nineslice=new(10, 10, 10, 10);
+    
+    public static UI_Box BLANK = new()
+    {
+        tint = Color.Blank,
+    };
+    public static UI_Box LIGHT = new() { 
+        background = A_Texture.UI_BOX_LIGHT,
+        background_nineslice = def_nineslice,
+        inner_margins = def_inner_margins
+    };
+    public static UI_Box DARK = new() { 
+        background = A_Texture.UI_BOX_DARK,
+        background_nineslice = def_nineslice,
+        inner_margins = def_inner_margins
+    };
+
+    public static UI_Box BTN_A_IDLE = new UI_Box() { };
+    public static UI_Box BTN_A_HOVER = new UI_Box() { };
+    public static UI_Box BTN_A_PRESSED = new UI_Box() { };
+    public static UI_Box BTN_A_HIGHLIGHT = new UI_Box() { };
 }

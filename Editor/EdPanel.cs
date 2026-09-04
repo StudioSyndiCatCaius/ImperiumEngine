@@ -1,6 +1,8 @@
-﻿namespace Editor;
+﻿using Engine.Comps._2D;
 
-public class EdPanel 
+namespace Editor;
+
+public class EdPanel : EdUi
 {
-    public virtual void Draw() { }
+    
 }

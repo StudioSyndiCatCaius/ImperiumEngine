@@ -256,6 +256,8 @@ public class App
             // -----------------------------------------------------
             // Player/Input update
             // -----------------------------------------------------
+            ProcessUpdate(ENotifyProcess.CursorStack, dt);
+            
             foreach (ImpPlayer player in players) player.Update(dt);
 
             ProcessUpdate(ENotifyProcess.Update, dt);
@@ -319,6 +321,7 @@ public class App
     
     private void ProcessUpdate(ENotifyProcess notify, double dt)
     {
+        if(notify==ENotifyProcess.CursorStack) Imp2D.cursortrace_stack.Clear();
         foreach (A_Scene scene in scenes_global) scene.ProcessNotify(notify, dt);
         scene_current?.ProcessNotify(notify, dt);
         dialog_current?.ProcessNotify(notify, dt);

@@ -1,6 +1,11 @@
-﻿namespace Editor;
+﻿using System.Numerics;
+using Engine.Core;
+using Engine.Enums;
+using Engine.Structs;
 
-public class EdWindow
+namespace Editor;
+
+public class EdWindow : EdUi
 {
-    public virtual void Draw() { }
+
 }

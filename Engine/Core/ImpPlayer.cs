@@ -28,6 +28,7 @@ public class ImpPlayer
     // ==============================================================================================================
     [ImpVar][Config] public static TInputSet input_actions = new();
 
+    public static Action<int,EInputKey,EInputState> on_input_key_event;
     
     public static ImpPlayer Get(int id = 0)
     {
@@ -43,14 +44,18 @@ public class ImpPlayer
     public static bool KeyType_IsTouch   (EInputKey k) => (int)k is >= 3000 and < 4000;
     public static bool KeyType_IsStick   (EInputKey k) => (int)k >= 4000;
     
-    // ==============================================================================================================
+    // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     // Class
-    // ==============================================================================================================
+    // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     public int id;
     public Imp3D pawn;
     public Vector3 control_rotation = Vector3.Zero;
     public TCursorData cursor_data = new();
 
+    // ===============================================================
+    // Actions
+    // ===============================================================
+    
     // -------------------------------------------------------------
     // INPUT
     // -------------------------------------------------------------
@@ -257,7 +262,9 @@ public class ImpPlayer
     
     public void Update(double dt)
     {
-        // ---------- CURSOR
+        // --------------------------------------------------------------------------------
+        // Cursor assign to mouse (player 0)
+        // --------------------------------------------------------------------------------
         if (id == 0)
         {
             if (_cursor_redirect)
@@ -284,19 +291,14 @@ public class ImpPlayer
             cursor_data.position = Vector2.Clamp(cursor_data.position, vp.start, vp.end);
         }
         
-        //do cursor trace
-        cursor_target = _cursor_redirect
-            ? G2D.Trace2D_ForComp(cursor_data.position, _cursor_scene?.root)
-            : G2D.Trace2D_ForComp(cursor_data.position);
-        _cursor_redirect = false;
-        _cursor_scene = null;
-        if (cursor_target == null)
-        {
-            Vector3 _start=Cursor_3DPosition();
-            Vector3 _end = default; //trace out from cursor screen position
-            TTraceResult3D _res= G3D.Trace3D_Line(_start, _end, cursor_collision_channel);
-            if (_res.hit_comp != null) cursor_target = _res.hit_comp;
-        }
+        // --------------------------------------------------------------------------------
+        // Do Cursor Trace
+        // --------------------------------------------------------------------------------
+                
+        cursor_target=Imp2D.GetCursorTraceHit(cursor_data.position);
+        
+        if(cursor_target!=null) Console.WriteLine("Cursor Target: "+cursor_target);
+        else Console.WriteLine("Cursor Target: null");
         
         if (cursor_target != _cursor_target_prev)
         {
@@ -304,11 +306,11 @@ public class ImpPlayer
             _cursor_target_prev = cursor_target;
             if(cursor_target!=null) cursor_target._NotifyAs_CursorTarget(this,ENotifyGeneric.Begin,dt);
         }
-        else if( cursor_target != null)
+        else if(cursor_target != null)
         {
             cursor_target._NotifyAs_CursorTarget(this,ENotifyGeneric.Update,dt);
         }
-        
+
         // -----------------------------------------------------------------------
         // KEYS
         // This method is probably SLOW, consider replacing later
@@ -328,6 +330,7 @@ public class ImpPlayer
                 case EInputState.Released: _state_new = _is_down ? EInputState.Pressed : EInputState.None; break;
             }
             input_key_states[_k] = _state_new; //set new state
+            if (_state_new != EInputState.None) on_input_key_event?.Invoke(id, _k, _state_new); // this feels bad?
             
 
             // this feels ineficient. maybe should collect inputs and iterate over objects late
@@ -348,6 +351,9 @@ public class ImpPlayer
             }
         }
         
+        // --------------------------------------------------------------------------------
+        // Drag & Drop
+        // --------------------------------------------------------------------------------
         if (_drag_key_state == EInputState.Pressed && cursor_target != null)
         {
             _press_target = cursor_target;
@@ -362,11 +368,15 @@ public class ImpPlayer
             }
         }
         
-        // ---------- DRAG & DROP
+
         bool _drag_released = _drag_key_state == EInputState.Released;
         if (drag_target != _drag_target_prev)
         {
-            if( _drag_target_prev != null) _drag_target_prev._NotifyAs_DragTarget( this, cursor_target, ENotifyGeneric.End, dt);
+            if( _drag_target_prev != null)
+            {
+                _drag_target_prev._NotifyAs_DragTarget(this, cursor_target, ENotifyGeneric.End, dt);
+                _drag_target_prev.Dragging_OnDrop( this, drag_target, cursor_data.position, dt);
+            }
             _drag_target_prev = drag_target;
             if(drag_target != null) drag_target._NotifyAs_DragTarget( this, null, ENotifyGeneric.Begin, dt);
         }
@@ -381,7 +391,9 @@ public class ImpPlayer
             if (preview != null) preview.Position_Set(cursor_data.position, true);
         }
         
-        // ---------- FOCUS TARGET
+        // --------------------------------------------------------------------------------
+        // Focus Target
+        // --------------------------------------------------------------------------------
         if (focus_target != _focus_target_prev)
         {
             if(_focus_target_prev!=null) _focus_target_prev._NotifyAs_FocusTarget(this,ENotifyGeneric.End,dt);

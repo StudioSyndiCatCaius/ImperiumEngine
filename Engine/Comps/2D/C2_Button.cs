@@ -23,25 +23,61 @@ public enum EButtonState
 [ImpClass(Common = true)]
 public class C2_Button : Imp2D
 {
+    // =============================================================================
+    // ImpVars
+    // =============================================================================
     [ImpVar] public UI_Button style=UI_Button.DEFAULT;
     [ImpVar] public string text;
     [ImpVar] public A_Texture? icon;
     [ImpVar] public EButtonLayout button_layout;
 
-    private bool _hovered;
-    private bool _held;
-    
+    // =============================================================================
+    // Actions
+    // =============================================================================
     public Action<C2_Button> on_click;
     public Action<C2_Button> on_hover;
     public Action<C2_Button> on_unhover;
 
-    public override bool ChildLayout_IsFree() { return false; }
-
+    // =============================================================================
+    // vars
+    // =============================================================================
+    private bool _hovered;
+    private bool _held;
+    
+    // =============================================================================
+    // INIT
+    // =============================================================================
     public C2_Button()
     {
         cursor_filter = ECursorFilter.Hit;
         option_button = this;
+        layout=TLayout2.FULL;
     }
+
+    public C2_Button(string _text, A_Texture _icon, Action<C2_Button> _clicked=null)
+    {
+        text = _text; icon = _icon;
+        on_click = _clicked;
+        cursor_filter = ECursorFilter.Hit;
+        option_button = this;
+        layout=TLayout2.FULL;
+    }
+
+    public C2_Button(string _text, Action<C2_Button> _clicked=null)
+    {
+        text = _text;
+        on_click = _clicked;
+        cursor_filter = ECursorFilter.Hit;
+        option_button = this;
+        layout=TLayout2.FULL;
+    }
+    
+    // =============================================================================
+    // overrides
+    // =============================================================================
+    
+    public override bool ChildLayout_IsFree() { return false; }
+
 
     public override void OnInit()
     {
@@ -75,24 +111,28 @@ public class C2_Button : Imp2D
         else if(_hovered) box=style.box_hover;
         
         TBounds2 _content_bounds = box.Draw(bounds, global_transform);
-        
-        TBounds2[] icon_text_bounds;
-        float icon_size=0.0f; //get icons size here
-        float[] _sizes = new float[1];
-        _sizes.SetValue(icon_size,0);
-        if (button_layout == EButtonLayout.H_Icon_Text || button_layout == EButtonLayout.H_Text_Icon)
+
+        TBounds2 text_bounds = _content_bounds;
+        if (icon != null)
         {
-            icon_text_bounds = _content_bounds.Split(_sizes, false);
-        }
-        else
-        {
-            icon_text_bounds = _content_bounds.Split(_sizes, false, EUIOrentation.V);
+            bool horiz = button_layout == EButtonLayout.H_Icon_Text || button_layout == EButtonLayout.H_Text_Icon;
+            float main = horiz
+                ? MathF.Abs(_content_bounds.end.X - _content_bounds.start.X)
+                : MathF.Abs(_content_bounds.end.Y - _content_bounds.start.Y);
+            float icon_size = horiz
+                ? MathF.Abs(_content_bounds.end.Y - _content_bounds.start.Y)
+                : MathF.Abs(_content_bounds.end.X - _content_bounds.start.X);
+            if (icon_size > main) icon_size = main;
+            TBounds2[] icon_text_bounds = _content_bounds.Split(
+                [icon_size, main - icon_size], false, horiz ? EUIOrentation.H : EUIOrentation.V);
+            // Split is icon-first. Flip so [0] is always text, [1] is always icon.
+            if (button_layout == EButtonLayout.H_Icon_Text || button_layout == EButtonLayout.V_Icon_Text)
+                Array.Reverse(icon_text_bounds);
+            text_bounds = icon_text_bounds[0];
+            icon.Draw(icon_text_bounds[1], global_transform, EImageLayout.Retain_Fit);
         }
 
-        if (button_layout == EButtonLayout.H_Icon_Text || button_layout == EButtonLayout.V_Icon_Text) icon_text_bounds.Reverse();
-        
-        style.font.Draw(text, icon_text_bounds[0], global_transform, ETextWrap.Word);
-        if(icon!=null) icon.Draw(icon_text_bounds[1],global_transform,EImageLayout.Retain_Fit);
+        style.font.Draw(text, text_bounds, ETextWrap.Word, TLayoutAlignment.CENTER);
 
     }
 

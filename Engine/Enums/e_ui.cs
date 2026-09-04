@@ -19,7 +19,7 @@ public enum EUIPositionAlignment
 
 
 
-public enum EUIViewportAlignment 
+public enum ELayoutAlignment 
 {
     Start, Center, End, Fill,
 }
@@ -28,8 +28,9 @@ public enum EUIViewportAlignment
 
 public enum ECursorFilter
 {
-    Hit, //this ui can get cursor focus
     Pass, //this ui cannot get cursor focus but its children can (depending on their filter)
+    Hit, //this ui can get cursor focus
+    Block, //this ui cannot get cursor focus but its children cannot
     Ignore, //this ui cannot get cursor focus nor its children
 }
 

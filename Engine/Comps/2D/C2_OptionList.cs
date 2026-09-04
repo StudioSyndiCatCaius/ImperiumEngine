@@ -163,10 +163,8 @@ public class C2_OptionList : Imp2D
 
         TBounds2 Place(ImpComp c, TBounds2 slot)
         {
-            Imp2D cc = c as Imp2D;
-            if(cc == null) return default;
-            TBounds2 b = cc.layout.MakeBounds(slot);
-            return b;
+            // Return the slot only. Imp2D.OnDraw2D applies the child's layout.
+            return c is Imp2D ? slot : default;
         }
 
         TBounds2 inner = ContentBounds();
@@ -182,7 +180,7 @@ public class C2_OptionList : Imp2D
             if (children[i] is not Imp2D c || !c.is_visible) continue;
             Vector2 sz = PrefSize(c);
             preferred_total += horiz ? sz.X : sz.Y;
-            if ((horiz ? c.layout.align_H : c.layout.align_V) == EUIViewportAlignment.Fill)
+            if ((horiz ? c.layout.alignment.align_H : c.layout.alignment.align_V) == ELayoutAlignment.Fill)
                 fill_n++;
         }
 
@@ -201,7 +199,7 @@ public class C2_OptionList : Imp2D
             if (children[i] is not Imp2D c || !c.is_visible) continue;
             Vector2 sz = PrefSize(c);
             float main = horiz ? sz.X : sz.Y;
-            bool fill = (horiz ? c.layout.align_H : c.layout.align_V) == EUIViewportAlignment.Fill;
+            bool fill = (horiz ? c.layout.alignment.align_H : c.layout.alignment.align_V) == ELayoutAlignment.Fill;
             if (fill) main += extra_each;
             if (c.layout.size_max != Vector2.Zero)
             {
@@ -226,12 +224,12 @@ public class C2_OptionList : Imp2D
         if (lay.size.X <= 0)
         {
             lay.size.X = horiz ? 100 : 20;
-            if (!horiz) lay.align_H = EUIViewportAlignment.Fill;
+            if (!horiz) lay.alignment.align_H = ELayoutAlignment.Fill;
         }
         if (lay.size.Y <= 0)
         {
             lay.size.Y = horiz ? 20 : 32;
-            if (horiz) lay.align_V = EUIViewportAlignment.Fill;
+            if (horiz) lay.alignment.align_V = ELayoutAlignment.Fill;
         }
         return lay;
     }

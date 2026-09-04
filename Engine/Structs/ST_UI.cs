@@ -21,23 +21,44 @@ public struct TMargins
     }
 }
 
+public struct TLayoutAlignment
+{
+    [ImpVar] public ELayoutAlignment align_H=ELayoutAlignment.Center;
+    [ImpVar] public ELayoutAlignment align_V=ELayoutAlignment.Center;
+    public TLayoutAlignment() {}
+    
+    public static TLayoutAlignment CENTER=new() { align_H=ELayoutAlignment.Center, align_V=ELayoutAlignment.Center };
+    public static TLayoutAlignment FILL=new() { align_H=ELayoutAlignment.Fill, align_V=ELayoutAlignment.Fill };
+    public static TLayoutAlignment TOP=new() { align_V=ELayoutAlignment.Start };
+    public static TLayoutAlignment BOTTOM=new() { align_V=ELayoutAlignment.End };
+    public static TLayoutAlignment LEFT=new() { align_H=ELayoutAlignment.Start };
+    public static TLayoutAlignment RIGHT=new() { align_H=ELayoutAlignment.End };
+    public static TLayoutAlignment TOP_LEFT=new() { align_H=ELayoutAlignment.Start, align_V=ELayoutAlignment.Start };
+    public static TLayoutAlignment TOP_RIGHT=new() { align_H=ELayoutAlignment.End, align_V=ELayoutAlignment.Start };
+    public static TLayoutAlignment BOTTOM_LEFT=new() { align_H=ELayoutAlignment.Start, align_V=ELayoutAlignment.End };
+    public static TLayoutAlignment BOTTOM_RIGHT=new() { align_H=ELayoutAlignment.End, align_V=ELayoutAlignment.End };
+    public static TLayoutAlignment FILL_TOP=new() { align_H=ELayoutAlignment.Fill, align_V=ELayoutAlignment.Start };
+    public static TLayoutAlignment FILL_BOTTOM=new() { align_H=ELayoutAlignment.Fill, align_V=ELayoutAlignment.End };
+    public static TLayoutAlignment FILL_LEFT=new() { align_H=ELayoutAlignment.Start, align_V=ELayoutAlignment.Fill };
+    public static TLayoutAlignment FILL_RIGHT=new() { align_H=ELayoutAlignment.End, align_V=ELayoutAlignment.Fill };
+    public static TLayoutAlignment FILL_CENTER_V=new() { align_H=ELayoutAlignment.Center, align_V=ELayoutAlignment.Fill };
+    public static TLayoutAlignment FILL_CENTER_H=new() { align_H=ELayoutAlignment.Fill, align_V=ELayoutAlignment.Center };
+}
+
 
 public struct TLayout2 //Layout in 2d space. is relative to in input TBounds2 space
 {
-    [ImpVar] public EUIViewportAlignment align_H=EUIViewportAlignment.Center;
-    [ImpVar] public EUIViewportAlignment align_V=EUIViewportAlignment.Center;
+    [ImpVar] public TLayoutAlignment alignment = default;
     [ImpVar] public Vector2 position=Vector2.Zero; //position offset after alignment assinged
-    [ImpVar] public Vector2 size=new(100,100);
+    [ImpVar] public Vector2 size=new(0,0);
     [ImpVar] public Vector2 size_min=Vector2.Zero;
     [ImpVar] public Vector2 size_max=Vector2.Zero;
+    // Point on the output rect that alignment places. (0.5,0.5) + Center + window
+    // puts the output center on the window center.
     [ImpVar] public Vector2 anchor_position=new(0.5f,0.5f);
     [ImpVar] public bool anchor_normalized=true;
 
-    public TLayout2()
-    {
-        align_H = EUIViewportAlignment.Start;
-        align_V = EUIViewportAlignment.Start;
-    }
+    public TLayout2() { }
 
     public Vector2 GetSize()
     {
@@ -47,7 +68,12 @@ public struct TLayout2 //Layout in 2d space. is relative to in input TBounds2 sp
 
     public Vector2 GetAnchorPosition()
     {
-        return anchor_normalized ? anchor_position * size : anchor_position;
+        return GetAnchorPosition(GetSize());
+    }
+
+    public Vector2 GetAnchorPosition(Vector2 resolved_size)
+    {
+        return anchor_normalized ? anchor_position * resolved_size : anchor_position;
     }
 
     public TBounds2 MakeBounds(TBounds2 outer=default)
@@ -61,25 +87,25 @@ public struct TLayout2 //Layout in 2d space. is relative to in input TBounds2 sp
             MathF.Abs(outer.end.Y - outer.start.Y));
 
         Vector2 sz = GetSize();
-        if (align_H == EUIViewportAlignment.Fill) sz.X = view.X;
-        if (align_V == EUIViewportAlignment.Fill) sz.Y = view.Y;
+        if (alignment.align_H == ELayoutAlignment.Fill) sz.X = view.X;
+        if (alignment.align_V == ELayoutAlignment.Fill) sz.Y = view.Y;
 
-        static float Axis(EUIViewportAlignment a, float viewStart, float viewSize, float self, float offset)
+        Vector2 anchor = GetAnchorPosition(sz);
+
+        // Alignment places the ANCHOR in `outer`, not the top-left.
+        static float Axis(ELayoutAlignment a, float viewStart, float viewSize, float offset, float anch)
             => a switch
             {
-                EUIViewportAlignment.Center => viewStart + (viewSize - self) * 0.5f + offset,
-                EUIViewportAlignment.End    => viewStart + viewSize - self - offset,
-                // Start and Fill: pin to the start edge; Fill already stretched size
+                ELayoutAlignment.Center => viewStart + viewSize * 0.5f + offset,
+                ELayoutAlignment.End    => viewStart + viewSize - offset,
+                // Fill: place the anchor so that after subtract the rect still covers the parent.
+                ELayoutAlignment.Fill   => viewStart + anch + offset,
                 _ => viewStart + offset,
             };
 
         Vector2 s = new(
-            Axis(align_H, origin.X, view.X, sz.X, position.X),
-            Axis(align_V, origin.Y, view.Y, sz.Y, position.Y));
-
-        // Anchor: position refers to this point on the widget, not top-left.
-        // Use the resolved size (sz), not the raw `size` field, after Fill/clamp.
-        Vector2 anchor = anchor_normalized ? anchor_position * sz : anchor_position;
+            Axis(alignment.align_H, origin.X, view.X, position.X, anchor.X),
+            Axis(alignment.align_V, origin.Y, view.Y, position.Y, anchor.Y));
         s -= anchor;
 
         return new TBounds2 { start = s, end = s + sz };
@@ -95,26 +121,22 @@ public struct TLayout2 //Layout in 2d space. is relative to in input TBounds2 sp
 
     public static TLayout2 CENTER_BOX = new()
     {
-        align_V = EUIViewportAlignment.Center,
-        align_H = EUIViewportAlignment.Center,
-        size = new Vector2(500, 300),
+        alignment = TLayoutAlignment.CENTER,
+        size = new Vector2(400, 200),
     };
     
     public static TLayout2 H_BAR = new() //as a small horizontal bar
     {
-        align_V = EUIViewportAlignment.Start,
-        align_H = EUIViewportAlignment.Fill,
+        alignment = TLayoutAlignment.FILL_CENTER_H,
         size = new Vector2(20, 20),
     }; 
-    public static TLayout2 V_BAR = new() //as a small horizontal bar
+    public static TLayout2 V_BAR = new() //as a small vertical bar
     {
-        align_V = EUIViewportAlignment.Fill,
-        align_H = EUIViewportAlignment.Start,
+        alignment = TLayoutAlignment.FILL_CENTER_V,
         size = new Vector2(20, 20),
     };
     public static TLayout2 FULL = new()
     {
-        align_V = EUIViewportAlignment.Fill,
-        align_H = EUIViewportAlignment.Fill,
+        alignment = TLayoutAlignment.FILL,
     };
 }

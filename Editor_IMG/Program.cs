@@ -4,7 +4,6 @@ using Engine;
 using Engine.Assets;
 using Engine.Core;
 using ImGuiNET;
-using Raylib_cs;
 
 
 App app = new();
@@ -15,8 +14,7 @@ app.Run(new()
 {
     on_post_init = () =>
     {
-        //ImGui.GetIO().ConfigFlags |= ImGuiConfigFlags.DockingEnable;
-        Raylib.MaximizeWindow();
+        ImGui.GetIO().ConfigFlags |= ImGuiConfigFlags.DockingEnable;
     },
 });
 

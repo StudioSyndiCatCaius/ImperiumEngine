@@ -314,33 +314,8 @@ public struct TBounds2
     // `this` is the parent/content/slot rect.
     public TBounds2 FromLayout(Vector2 position, TLayout2 layout)
     {
-        Vector2 origin = new(
-            MathF.Min(start.X, end.X),
-            MathF.Min(start.Y, end.Y));
-        Vector2 view = new(
-            MathF.Abs(end.X - start.X),
-            MathF.Abs(end.Y - start.Y));
-
-        Vector2 size = layout.size;
-        if (layout.size_max != Vector2.Zero)
-            size = Vector2.Clamp(size, layout.size_min, layout.size_max);
-        else
-            size = Vector2.Max(size, layout.size_min);
-
-        if (layout.align_H == EUIViewportAlignment.Fill) size.X = view.X;
-        if (layout.align_V == EUIViewportAlignment.Fill) size.Y = view.Y;
-
-        float Axis(EUIViewportAlignment a, float view_start, float view_size, float self, float offset) => a switch
-        {
-            EUIViewportAlignment.Center => view_start + (view_size - self) * 0.5f + offset,
-            EUIViewportAlignment.End => view_start + view_size - self - offset,
-            _ => view_start + offset,
-        };
-
-        Vector2 s = new(
-            Axis(layout.align_H, origin.X, view.X, size.X, position.X),
-            Axis(layout.align_V, origin.Y, view.Y, size.Y, position.Y));
-        return new TBounds2 { start = s, end = s + size };
+        layout.position = position;
+        return layout.MakeBounds(this);
     }
     
     public Vector2 Center(TBounds2 bounds) { return (start + end) / 2; }
@@ -403,6 +378,8 @@ public struct TBounds2
     }
     
     public TBounds2 Offset(Vector2 offset) { return new TBounds2 { start = start + offset, end = end + offset }; }
+    
+    public Vector2 Size { get { return end - start; } }
 
     // ========================================================================================================
     // STATIC
