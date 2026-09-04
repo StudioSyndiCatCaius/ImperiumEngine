@@ -1,6 +1,7 @@
 ﻿using Engine;
 using Engine.Assets;
 using Engine.Core;
+using Raylib_cs;
 using Test;
 
 // -- run
@@ -11,4 +12,7 @@ TestComp testcomp=new TestComp();
 
 scene.root=testcomp;
 App.scene_current=scene;
-app.Run();
+app.Run(new()
+{
+    
+});

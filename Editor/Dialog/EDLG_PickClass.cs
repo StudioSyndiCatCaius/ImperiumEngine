@@ -2,7 +2,7 @@
 
 namespace Editor.Dialog;
 
-public class DLG_PickClass : ImpDialog
+public class EDLG_PickClass : EdDialog
 {
     
 }

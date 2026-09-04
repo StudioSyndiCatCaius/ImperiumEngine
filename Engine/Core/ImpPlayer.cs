@@ -297,9 +297,6 @@ public class ImpPlayer
                 
         cursor_target=Imp2D.GetCursorTraceHit(cursor_data.position);
         
-        if(cursor_target!=null) Console.WriteLine("Cursor Target: "+cursor_target);
-        else Console.WriteLine("Cursor Target: null");
-        
         if (cursor_target != _cursor_target_prev)
         {
             if(_cursor_target_prev!=null) _cursor_target_prev._NotifyAs_CursorTarget(this,ENotifyGeneric.End,dt);

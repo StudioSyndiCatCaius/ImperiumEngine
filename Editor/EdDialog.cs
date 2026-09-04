@@ -1,6 +1,6 @@
 ﻿namespace Editor;
 
-public class EdPanel : EdUi
+public class EdDialog : EdUi
 {
     
 }

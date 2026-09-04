@@ -2,5 +2,5 @@
 
 public class EdUi
 {
-    virtual public void Draw() { }
+    public virtual void OnDraw() { }
 }
