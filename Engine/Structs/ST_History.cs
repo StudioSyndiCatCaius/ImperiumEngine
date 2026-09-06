@@ -146,11 +146,6 @@ public class THistoryItem
             o3.Transform_Set(t3, false);
             return;
         }
-        if (target is Imp2D o2 && path == "transform" && value is TTransform2 t2)
-        {
-            o2.Transform_Set(t2, false);
-            return;
-        }
 
         string[] parts = path.Split('.');
         object? cur = target is Type ? null : target;

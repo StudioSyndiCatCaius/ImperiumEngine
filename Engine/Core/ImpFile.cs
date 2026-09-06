@@ -38,6 +38,21 @@ public class ImpFile
     {
         string _path = GFile.Make_Path_Absolute(filepath);
         if (string.IsNullOrEmpty(_path) || !File.Exists(_path)) return;
+        if (file_type == EFileType.DataText)
+        {
+            switch (Path.GetExtension(_path).ToLowerInvariant())
+            {
+                case ".png": case ".jpg": case ".jpeg": case ".tga": case ".bmp": case ".gif":
+                case ".hdr": case ".exr":
+                    file_type = EFileType.Texture; break;
+                case ".wav": case ".ogg": case ".mp3":
+                    file_type = EFileType.Sound; break;
+                case ".ttf": case ".otf":
+                    file_type = EFileType.Font; break;
+                case ".glb": case ".gltf":
+                    file_type = EFileType.Model; break;
+            }
+        }
         Invalidate();
         if(store_bytes) data = GFile.LoadAs_Bytes(_path);
         switch (file_type)
@@ -146,7 +161,7 @@ public class ImpFile
                         list.Add(new A_Skeleton { sourcefile = filepath, filepath = "SKEL" });
                     int mats = model.Materials.Length;
                     for (int i = 0; i < mats; i++)
-                        list.Add(new A_M_Object { sourcefile = filepath, filepath = mats > 1 ? "M_" + (i + 1) : "M" });
+                        list.Add(new A_M3_Object { sourcefile = filepath, filepath = mats > 1 ? "M_" + (i + 1) : "M" });
                 }
                 AddAnims();
                 break;

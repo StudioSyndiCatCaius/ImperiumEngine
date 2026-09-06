@@ -48,22 +48,15 @@ public class C2_TabContainer : Imp2D
             on_tab_changed?.Invoke(current_tab);
         }
         
-        foreach (var child in children)
-        {
-            int _index = children.IndexOf(child);
-            if(_index == current_tab) child.is_visible = true;
-            else child.is_visible = false;
-        }
+        for (int i = 0; i < children.Count; i++)
+            children[i].is_visible = i == current_tab;
         
         bound_bar=default;
         bound_body=bounds;
         if (show_tabs)
         {
             float size_bar=50;
-            float size_body=bounds.Size.Y-size_bar;
-            TBounds2[] sections = bounds.Split([size_bar,size_body], false, EUIOrentation.V);
-            bound_bar = sections[0];
-            bound_body = sections[1];
+            bounds.Split2(size_bar, bounds.Size.Y - size_bar, false, EUIOrentation.V, out bound_bar, out bound_body);
         }
     }
 
@@ -76,28 +69,20 @@ public class C2_TabContainer : Imp2D
     {
         base.OnDraw2D(dt, flags);
         if(style==null) return;
-        if(style.body_background != null) style.body_background.Draw(bound_body, global_transform);
+        if(style.body_background != null) style.body_background.Draw(bound_body, new TTransform2());
         
         if (show_tabs)
         {
-            float[] tab_sections = new float[] { };
-            foreach (var c in children)
-            {
-                int ind = children.IndexOf(c);
-                tab_sections.SetValue(1,ind);
-            }
-
-            TBounds2[] tab_bounds = bound_bar.Split(tab_sections, true, EUIOrentation.H);
-            foreach (var _bounds_4_tab in tab_bounds)
-            {
-                
-            }
         }
     }
 }
 
 public class UI_TabContainer : ImpAsset
 {
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    // CLASS
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    
     [ImpVar] public UI_Box body_background=UI_Box.DARK;
     
     [ImpVar] public UI_Box tabs_background=UI_Box.DARK;
@@ -107,5 +92,13 @@ public class UI_TabContainer : ImpAsset
     [ImpVar] public UI_Box tab_current;
     [ImpVar] public UI_Box tab_hovered;
     
-    public static UI_TabContainer DEFAULT = new();
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    // STATIC
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    
+    [ImpVar] public static UI_TabContainer DEFAULT = new();
+    [ImpVar] public static UI_TabContainer BLANK = new()
+    {
+        body_background=UI_Box.BLANK,
+    };
 }

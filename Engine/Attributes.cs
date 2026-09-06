@@ -20,7 +20,7 @@ public sealed class ImpVarAttribute : Attribute
     public ImpVarAttribute(string? name = null) => Name = name;
 }
 
-[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property | AttributeTargets.Method)]
+[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property | AttributeTargets.Method | AttributeTargets.Class)]
 public sealed class CategoryAttribute : Attribute
 {
     //sorts into a custom editor category. if none given, the category is the name of the owning class
@@ -74,7 +74,7 @@ public sealed class ConfigAttribute : Attribute
 [AttributeUsage(AttributeTargets.Struct | AttributeTargets.Class)]
 public sealed class ImpClassAttribute : Attribute
 {
-    public bool GlobalizeFunctions { get; init; } //Mainly for scripting like .lua. TRUE= all `[ScriptCall] public static` functions() are global, like "MyFunc(35)". FALSE= you must call class name first, like "ImpWhatever.MyFunc(35)" 
+    public bool GlobalizeFunctions { get; init; } // For C# / Vis scripting. TRUE= `[ScriptCall] public static` functions are global ("MyFunc(35)"). FALSE= TypeName.MyFunc(35) 
     public bool Hidden { get; init; } //hides from the editor
 
     public bool Common { get; init; }  // for ImpComps. appears in the "Comps" tab next to the scene tree
@@ -96,7 +96,7 @@ public class CallInEditorAttribute : Attribute
 // Scripting
 // ========================================================================================================
 
-// Imperium supports 2 forms of scripting: Lua, and a cutsom visual scripting system called "Pulse"
+// Scripting (later): C# scripts, and Vis visual scripts.
 
 // indicates that this function is callable in the scripting system
 [AttributeUsage(AttributeTargets.Method)]
@@ -112,3 +112,8 @@ public class ScriptHookAttribute : Attribute
     
 }
 
+[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
+public class ScriptSignalAttribute : Attribute
+{
+    
+}

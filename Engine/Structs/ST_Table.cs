@@ -387,65 +387,117 @@ public class TTable
                 yield return p;
     }
 
+    public static IEnumerable<MemberInfo> Config_Members(Type t, bool statics)
+    {
+        BindingFlags flags = BindingFlags.Public | BindingFlags.DeclaredOnly
+            | (statics ? BindingFlags.Static : BindingFlags.Instance);
+        foreach (FieldInfo f in t.GetFields(flags))
+            if (f.IsDefined(typeof(ImpVarAttribute), true) && f.IsDefined(typeof(ConfigAttribute), true))
+                yield return f;
+        foreach (PropertyInfo p in t.GetProperties(flags))
+            if (p.CanRead && p.CanWrite
+                && p.IsDefined(typeof(ImpVarAttribute), true)
+                && p.IsDefined(typeof(ConfigAttribute), true))
+                yield return p;
+    }
+
+    static object? MemberGet(MemberInfo member, object? host) =>
+        member is FieldInfo f ? f.GetValue(host) : ((PropertyInfo)member).GetValue(host);
+
+    static TTable Vars_Write(object o, HashSet<object> seen)
+    {
+        TTable vars = new();
+        if (!o.GetType().IsValueType && !seen.Add(o))
+            return vars;
+        foreach (MemberInfo member in Vars_Members(o.GetType()))
+        {
+            object? val = MemberGet(member, o);
+            if (val == null) continue;
+            object? written = WriteVal(val, seen);
+            if (written == null) continue;
+            vars.Set(member.Name, written);
+        }
+        return vars;
+    }
+
+    static object? WriteVal(object val, HashSet<object> seen)
+    {
+        Type t = val.GetType();
+        if (t.IsEnum) return val.ToString()!;
+        if (val is bool or int or float or double or string) return val;
+        if (val is TLabel lab) return lab.Value;
+        if (val is I_Property ip && ip.Property_IsCustomParse()) return ip.Property_Write();
+        if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(List<>))
+        {
+            List<object> arr = new();
+            foreach (object? item in (IList)val)
+            {
+                if (item == null) continue;
+                object? written = WriteVal(item, seen);
+                if (written != null) arr.Add(written);
+            }
+            return arr;
+        }
+        if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Dictionary<,>))
+        {
+            TTable map = new();
+            foreach (DictionaryEntry e in (IDictionary)val)
+            {
+                if (e.Key == null || e.Value == null) continue;
+                object? written = WriteVal(e.Value, seen);
+                if (written != null) map.Set(e.Key.ToString() ?? "", written);
+            }
+            return map;
+        }
+        if (!t.IsValueType && seen.Contains(val)) return null;
+        return Vars_Write(val, seen);
+    }
+
     public static TTable FromObject(object obj)
     {
-        HashSet<object> seen = new(ReferenceEqualityComparer.Instance);
-
-        TTable Vars_Write(object o)
-        {
-            TTable vars = new();
-            if (!o.GetType().IsValueType && !seen.Add(o))
-                return vars;
-
-            object? WriteVal(object val)
-            {
-                Type t = val.GetType();
-                if (t.IsEnum) return val.ToString()!;
-                if (val is bool or int or float or double or string) return val;
-                if (val is TLabel lab) return lab.Value;
-                if (val is I_Property ip && ip.Property_IsCustomParse()) return ip.Property_Write();
-                if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(List<>))
-                {
-                    List<object> arr = new();
-                    foreach (object? item in (IList)val)
-                    {
-                        if (item == null) continue;
-                        object? written = WriteVal(item);
-                        if (written != null) arr.Add(written);
-                    }
-                    return arr;
-                }
-                if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Dictionary<,>))
-                {
-                    TTable map = new();
-                    foreach (DictionaryEntry e in (IDictionary)val)
-                    {
-                        if (e.Key == null || e.Value == null) continue;
-                        object? written = WriteVal(e.Value);
-                        if (written != null) map.Set(e.Key.ToString() ?? "", written);
-                    }
-                    return map;
-                }
-                if (!t.IsValueType && seen.Contains(val)) return null;
-                return Vars_Write(val);
-            }
-
-            foreach (MemberInfo member in Vars_Members(o.GetType()))
-            {
-                object? val = member is FieldInfo f ? f.GetValue(o) : ((PropertyInfo)member).GetValue(o);
-                if (val == null) continue;
-                object? written = WriteVal(val);
-                if (written == null) continue;
-                vars.Set(member.Name, written);
-            }
-
-            return vars;
-        }
-
         TTable table = new();
         table.Set("type", obj.GetType().Name);
-        table.Set("vars", Vars_Write(obj));
+        table.Set("vars", Vars_Write(obj, new HashSet<object>(ReferenceEqualityComparer.Instance)));
         return table;
+    }
+
+    public static TTable FromConfig(Type type, object? instance, bool statics)
+    {
+        HashSet<object> seen = new(ReferenceEqualityComparer.Instance);
+        TTable vars = new();
+        object? host = statics ? null : instance;
+        foreach (MemberInfo member in Config_Members(type, statics))
+        {
+            object? val = MemberGet(member, host);
+            if (val == null) continue;
+            object? written = WriteVal(val, seen);
+            if (written == null) continue;
+            vars.Set(member.Name, written);
+        }
+        return vars;
+    }
+
+    public static void PopulateConfig(TTable vars, Type type, object? instance, bool statics)
+    {
+        if (vars == null || type == null) return;
+        object? host = statics ? null : instance;
+        foreach (MemberInfo member in Config_Members(type, statics))
+        {
+            if (!vars.Has(member.Name)) continue;
+            try
+            {
+                object raw = vars.data[member.Name];
+                Type member_type = member is FieldInfo f ? f.FieldType : ((PropertyInfo)member).PropertyType;
+                object? result = ReadVal(member_type, raw);
+                if (result == null) continue;
+                if (member is FieldInfo field) field.SetValue(host, result);
+                else ((PropertyInfo)member).SetValue(host, result);
+            }
+            catch (Exception e)
+            {
+                GLog.Warning($"TTable: skipped config '{type.Name}.{member.Name}' ({e.Message})");
+            }
+        }
     }
 
     // populates [ImpVar]/struct members of an already-constructed object from a "vars" table.

@@ -18,6 +18,16 @@ public enum EDrawFlags
     No3D = 1 << 3,
 }
 
+[Flags]
+public enum ECompProcess : byte
+{
+    None = 0,
+    Update = 1 << 0,
+    Draw3D = 1 << 1,
+    Draw2D = 1 << 2,
+    Cursor = 1 << 3,
+}
+
 enum ECompLifeState
 {
     Starting, Life, Ending,
@@ -28,15 +38,16 @@ public enum ECompNotify
     PreUpdate, PostUpdate,
 }
 
-public class ImpComp : I_Inspectable, I_Input
+public class ImpComp : I_Inspectable, I_Input, I_File
 {
     // ===========================================================================================
     // Imp Vars
     // ===========================================================================================
-    [ImpVar] public bool is_visible = true;
-    [ImpVar] public bool cast_shadows = false;
     [ImpVar] public string name = "";
     [ImpVar] C2_Switcher substate_switcher=null;
+    [ImpVar] public bool is_visible = true;
+    [ImpVar] public bool auto_globalize = false;
+    [ImpVar(Hidden = true)] public bool editor_locked = false;
 
     // ===========================================================================================
     // ACTIONS
@@ -50,10 +61,13 @@ public class ImpComp : I_Inspectable, I_Input
     // ===========================================================================================
     private bool is_visible_pref = false;
     
-    public TScriptValue? script_instance; //script table loaded from a script file (E.G. for a "MyScene.lua" for "MyScene.ImpScene")
+    public TScriptValue? script_instance; // bound later by C# / Vis sandbox
     public List<ImpComp> children=new();
     public ImpComp parent=null;
     public A_Scene scene=null;
+    public int sibling_index;
+    internal ECompProcess _subtree_kinds;
+    internal bool _kinds_inited;
     
     public byte substate=0;
     private byte substate_prev=255;
@@ -108,7 +122,6 @@ public class ImpComp : I_Inspectable, I_Input
                         break;
                     case ECompLifeState.Ending:
                         OnDeinit();
-                        script_instance?.Call("OnDeinit");
                         break;
                 }
                 Transform_Refresh();
@@ -129,11 +142,13 @@ public class ImpComp : I_Inspectable, I_Input
                             {
                                 scene = parent.scene;
                             }
-                            ImpSandbox.current?.Bind(this);
-                            script_instance?.Call("OnInit");
+
+                            if (auto_globalize)
+                            {
+                                App.globalized_comps.Add(name,this);
+                            }
                             OnBegin();
                             on_begin?.Invoke(this);
-                            script_instance?.Call("OnBegin");
                             break;
                         // ---------------------------------------------------------
                         // END
@@ -146,7 +161,6 @@ public class ImpComp : I_Inspectable, I_Input
                             is_visible = false;
                             OnEnd();
                             on_end?.Invoke(this);
-                            script_instance?.Call("OnEnd");
                             break;
                         // ---------------------------------------------------------
                         // Update/Tick
@@ -157,19 +171,16 @@ public class ImpComp : I_Inspectable, I_Input
                                 substate_prev = substate;
                                 if (substate_switcher != null) substate_switcher.current_index = substate;
                                 OnSubstateChange(substate);
-                                script_instance?.Call("OnSubstateChange", substate);
                             }
                             break;
                     }
-                    OnUpdate(dt); // this is the RUNTIME update hook
-                    script_instance?.Call("OnUpdate", dt);
+                    OnUpdate(dt);
                 }
 
                 if (is_visible != is_visible_pref)
                 {
                     is_visible_pref = is_visible;
                     OnVisibleChange(is_visible);
-                    script_instance?.Call("OnVisibleChange", is_visible);
                 }
                 
                 _Notify( ECompNotify.PostUpdate, dt);
@@ -185,12 +196,60 @@ public class ImpComp : I_Inspectable, I_Input
             case ENotifyProcess.Draw2D: Draw(dt, 1, EDrawFlags.None); break;
         }
         
-        // ---------- TO CHILDREN
-        foreach (ImpComp child in children)
+        ECompProcess need = NotifyMask(notify);
+        for (int i = 0; i < children.Count; i++)
         {
-            child.scene = scene;
+            ImpComp child = children[i];
+            if (child._kinds_inited && (child._subtree_kinds & need) == 0) continue;
             child.ProcessNotify(notify, dt);
         }
+    }
+
+    static ECompProcess NotifyMask(ENotifyProcess notify) => notify switch
+    {
+        ENotifyProcess.Update => ECompProcess.Update,
+        ENotifyProcess.Draw3D => ECompProcess.Draw3D,
+        ENotifyProcess.Draw2D => ECompProcess.Draw2D,
+        ENotifyProcess.CursorStack => ECompProcess.Cursor,
+        _ => ECompProcess.None,
+    };
+
+    protected virtual ECompProcess ProcessKinds => ECompProcess.Update;
+
+    public void AssignScene(A_Scene s)
+    {
+        if (scene == s) return;
+        scene = s;
+        for (int i = 0; i < children.Count; i++)
+            children[i].AssignScene(s);
+    }
+
+    void AfterChildrenChanged()
+    {
+        for (int i = 0; i < children.Count; i++)
+        {
+            ImpComp c = children[i];
+            c.parent = this;
+            c.scene = scene;
+            c.sibling_index = i;
+            if (!c._kinds_inited)
+            {
+                c._subtree_kinds = c.ProcessKinds;
+                c._kinds_inited = true;
+            }
+        }
+        RefreshSubtreeKinds();
+    }
+
+    internal void RefreshSubtreeKinds()
+    {
+        ECompProcess k = ProcessKinds;
+        for (int i = 0; i < children.Count; i++)
+            k |= children[i]._subtree_kinds;
+        if (_kinds_inited && k == _subtree_kinds) return;
+        _subtree_kinds = k;
+        _kinds_inited = true;
+        parent?.RefreshSubtreeKinds();
     }
     
     
@@ -198,16 +257,16 @@ public class ImpComp : I_Inspectable, I_Input
     public void Draw(double dt, byte pass, EDrawFlags flags)
     {
         if (!is_visible) return;
-        bool is_editor = flags.HasFlag(EDrawFlags.Editor);
+        bool is_editor = (flags & EDrawFlags.Editor) != 0;
         
         switch (pass)
         {
             case 0: //3D
-                if (!flags.HasFlag(EDrawFlags.No3D)) OnDraw3D(dt, flags);
+                if ((flags & EDrawFlags.No3D) == 0) OnDraw3D(dt, flags);
                 if (is_editor) OnDrawDebug(dt, true);        
                 break;
             case 1: //2D
-                if (!flags.HasFlag(EDrawFlags.No2D)) OnDraw2D(dt, flags);
+                if ((flags & EDrawFlags.No2D) == 0) OnDraw2D(dt, flags);
                 if (is_editor) OnDrawDebug(dt, false);
                 break;
         }
@@ -233,8 +292,30 @@ public class ImpComp : I_Inspectable, I_Input
             children.Add(child);
             child.parent = this;
             child.is_builtin = builtin;
-            if (scene != null) child.scene = scene;
+            child.scene = scene;
+            child.sibling_index = children.Count - 1;
+            if (!child._kinds_inited)
+            {
+                child._subtree_kinds = child.ProcessKinds;
+                child._kinds_inited = true;
+            }
+            RefreshSubtreeKinds();
         }
+    }
+
+    public void Child_Insert(ImpComp child, int index)
+    {
+        if (child == null || child == this || Is_ChildOf(child)) return;
+        ImpComp old = child.parent;
+        bool same = old == this;
+        if (!same && !Allow_Children()) return;
+        old?.children.Remove(child);
+        if (index < 0) index = 0;
+        if (index > children.Count) index = children.Count;
+        children.Insert(index, child);
+        if (old != null && !same) old.AfterChildrenChanged();
+        AfterChildrenChanged();
+        if (child.scene != scene) child.AssignScene(scene);
     }
     
     public bool Is_ChildOf(ImpComp _parent)
@@ -258,17 +339,21 @@ public class ImpComp : I_Inspectable, I_Input
             children.Remove(child);
             child.parent = null;
             child.Kill();
+            AfterChildrenChanged();
         }
     }
 
     public void Child_RemoveAll()
     {
-        List<ImpComp> copy=new (children);
+        ImpComp[] copy = children.Count == 0 ? Array.Empty<ImpComp>() : children.ToArray();
         children.Clear();
-        foreach (ImpComp child in copy)
+        _subtree_kinds = ProcessKinds;
+        _kinds_inited = true;
+        parent?.RefreshSubtreeKinds();
+        for (int i = 0; i < copy.Length; i++)
         {
-            child.parent = null;
-            child.Kill();
+            copy[i].parent = null;
+            copy[i].Kill();
         }
     }
 
@@ -489,16 +574,11 @@ public class ImpComp : I_Inspectable, I_Input
         foreach (ImpComp c in next)
         {
             children.Add(c);
-            c.parent = this;
-            c.scene = scene;
             c.is_child_of_prefab = true;
         }
         foreach (ImpComp c in extras)
-        {
             children.Add(c);
-            c.parent = this;
-            c.scene = scene;
-        }
+        AfterChildrenChanged();
     }
 
     static bool Prefab_SameLayout(ImpComp a, ImpComp b)
@@ -574,21 +654,17 @@ public class ImpComp : I_Inspectable, I_Input
         {
             case EInputState.Down:
                 Input_Down(player,action,axis,dt);
-                script_instance?.Call("Input_Down", player, action, axis, dt);
                 break;
             case EInputState.Pressed:
                 Input_Pressed(player,action,axis);
-                script_instance?.Call("Input_Pressed", player, action, axis);
                 break;
             case EInputState.Released:
                 Input_Released(player,action,axis);
-                script_instance?.Call("Input_Released", player, action, axis);
                 break;
         }
     }
 
-    // Rebuilds global_transform from the parent's. Runs before OnUpdate, and the update walks
-    // parents before children, so a child always composes against an up-to-date parent global.
+    // Rebuilds derived transform/bounds from the parent. Runs before OnUpdate; parents first.
     protected virtual void Transform_Refresh() { }
     
     public virtual void OnDraw2D(double dt, EDrawFlags flags = 0) { }
@@ -597,12 +673,35 @@ public class ImpComp : I_Inspectable, I_Input
     public virtual bool Is_Singleton() { return false; } // only one instance of this component
     public virtual bool Allow_Children() { return true; }
 
+    public bool Editor_IsLocked()
+    {
+        ImpComp n = this;
+        while (n != null)
+        {
+            if (n.editor_locked) return true;
+            n = n.parent;
+        }
+        return false;
+    }
+
     // ------------------------------------------------------------------------------------
     // Inspector / Property
     // ------------------------------------------------------------------------------------
     public void Inspectable_OnPropertyEdit(string name, object oldValue, object newValue)
     {
         OnInit();
+    }
+
+    public Type[] File_GetFavoriteSubTypes()
+    {
+        Type[] output=new []
+        {
+            typeof(ImpComp),
+            typeof(Imp2D),
+            typeof(Imp3D),
+        };
+
+        return output;
     }
 
     // ------------------------------------------------------------------------------------

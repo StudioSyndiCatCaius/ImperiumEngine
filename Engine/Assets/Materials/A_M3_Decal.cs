@@ -1,6 +1,6 @@
 ﻿namespace Engine.Assets.Materials;
 
-public class A_M_Surface
+public class A_M3_Decal : A_Material
 {
     
 }

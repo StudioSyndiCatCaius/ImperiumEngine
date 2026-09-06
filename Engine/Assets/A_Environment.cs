@@ -21,7 +21,7 @@ public class A_Environment : ImpAsset
     [ImpVar][Category("Sky")] public float sky_horizon_curve=0.15f;
     [ImpVar][Category("Sky")] public float sky_energy=1;
     
-    [ImpVar][Category("Sun")] public float sun_intensity=5;
+    [ImpVar][Category("Sun")] public float sun_intensity=2.5f;
     [ImpVar][Category("Sun")] public Color sun_color=Color.White;
     [ImpVar][Category("Sun")] public Vector3 sun_direction=new(-0.45f,1f,-0.35f);
     [ImpVar][Category("Sun")] public float sun_size=MathF.PI/180f;
@@ -37,8 +37,8 @@ public class A_Environment : ImpAsset
     
     [ImpVar][Category("SSAO")] public bool ssao_enabled=true;
     [ImpVar][Category("SSAO")] public int ssao_sample_count=16;
-    [ImpVar][Category("SSAO")] public float ssao_intensity=1;
-    [ImpVar][Category("SSAO")] public float ssao_power=1;
+    [ImpVar][Category("SSAO")] public float ssao_intensity=1.25f;
+    [ImpVar][Category("SSAO")] public float ssao_power=1.5f;
     [ImpVar][Category("SSAO")] public float ssao_max_radius=0.2f;
     [ImpVar][Category("SSAO")] public float ssao_radius=1;
     [ImpVar][Category("SSAO")] public float ssao_bias=0.03f;
@@ -328,4 +328,14 @@ public class A_Environment : ImpAsset
         else
             R3D.DisableLight(_sun);
     }
+    
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    // STATIC
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    
+    [Builtin] public static A_Environment DEFAULT = new();
+    [Builtin] public static A_Environment MORNING = new();
+    [Builtin] public static A_Environment DAY = new();
+    [Builtin] public static A_Environment EVENING = new();
+    [Builtin] public static A_Environment NIGHT = new();
 }

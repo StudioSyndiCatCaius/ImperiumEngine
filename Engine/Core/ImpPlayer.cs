@@ -51,6 +51,11 @@ public class ImpPlayer
     public Imp3D pawn;
     public Vector3 control_rotation = Vector3.Zero;
     public TCursorData cursor_data = new();
+    
+    public Dictionary<EInputKey, EInputState> input_key_states = new();
+    public Dictionary<TLabel, EInputState> input_action_states = new();
+    public List<ImpComp> input_targets=new ();
+    readonly List<ImpComp> _dialog_targets = new(1);
 
     // ===============================================================
     // Actions
@@ -59,20 +64,16 @@ public class ImpPlayer
     // -------------------------------------------------------------
     // INPUT
     // -------------------------------------------------------------
-    public Dictionary<EInputKey, EInputState> input_key_states = new();
-    public Dictionary<TLabel, EInputState> input_action_states = new();
-    public List<ImpComp> input_targets=new ();
+    static readonly EInputKey[] AllKeys = Enum.GetValues<EInputKey>();
 
     public EInputState Key_GetState(EInputKey key)
     {
-        if( !input_key_states.ContainsKey(key)) input_key_states[key] = EInputState.None;
-        return input_key_states[key];
+        return input_key_states.TryGetValue(key, out EInputState s) ? s : EInputState.None;
     }
 
     public EInputState Action_GetState(TLabel action)
     {
-        if (!input_action_states.ContainsKey(action)) input_action_states[action] = EInputState.None;
-        return input_action_states[action];
+        return input_action_states.TryGetValue(action, out EInputState s) ? s : EInputState.None;
     }
 
     //this is NOT a check on the keys, EInputState. It checks raylib to sey if this key input is down/active (includes gamepad stick & mouse axis
@@ -254,10 +255,14 @@ public class ImpPlayer
         return default;
     }
 
-    public IEnumerable<object> InputTarget_GetAll()
+    public List<ImpComp> InputTarget_GetAll()
     {
-        if (App.dialog_current != null) return [App.dialog_current];
-        return input_targets;
+        if (App.dialog_current == null) return input_targets;
+        if (_dialog_targets.Count == 1 && _dialog_targets[0] == App.dialog_current)
+            return _dialog_targets;
+        _dialog_targets.Clear();
+        _dialog_targets.Add(App.dialog_current);
+        return _dialog_targets;
     }
     
     public void Update(double dt)
@@ -310,35 +315,33 @@ public class ImpPlayer
 
         // -----------------------------------------------------------------------
         // KEYS
-        // This method is probably SLOW, consider replacing later
         // -----------------------------------------------------------------------
         EInputState _drag_key_state = EInputState.None;
-        foreach (var _k in Enum.GetValues<EInputKey>())
+        List<ImpComp> targets = InputTarget_GetAll();
+        for (int ki = 0; ki < AllKeys.Length; ki++)
         {
-            EInputState _state_old=Key_GetState(_k);
-            EInputState _state_new = EInputState.None;
-            bool _is_down=Key_IsDown(_k);
-            
-            switch (_state_old)
+            EInputKey _k = AllKeys[ki];
+            if (_k == EInputKey.None) continue;
+            EInputState _state_old = Key_GetState(_k);
+            bool _is_down = Key_IsDown(_k);
+            EInputState _state_new = _state_old switch
             {
-                case EInputState.None: _state_new = _is_down ? EInputState.Pressed : EInputState.None; break;
-                case EInputState.Down: _state_new = _is_down ? EInputState.Down : EInputState.Released; break;
-                case EInputState.Pressed: _state_new = _is_down ? EInputState.Down : EInputState.Released; break;
-                case EInputState.Released: _state_new = _is_down ? EInputState.Pressed : EInputState.None; break;
+                EInputState.None => _is_down ? EInputState.Pressed : EInputState.None,
+                EInputState.Down => _is_down ? EInputState.Down : EInputState.Released,
+                EInputState.Pressed => _is_down ? EInputState.Down : EInputState.Released,
+                EInputState.Released => _is_down ? EInputState.Pressed : EInputState.None,
+                _ => EInputState.None,
+            };
+            if (_state_new == EInputState.None)
+            {
+                if (_state_old != EInputState.None) input_key_states[_k] = EInputState.None;
+                continue;
             }
-            input_key_states[_k] = _state_new; //set new state
-            if (_state_new != EInputState.None) on_input_key_event?.Invoke(id, _k, _state_new); // this feels bad?
-            
+            input_key_states[_k] = _state_new;
+            on_input_key_event?.Invoke(id, _k, _state_new);
 
-            // this feels ineficient. maybe should collect inputs and iterate over objects late
-            foreach (var it in InputTarget_GetAll())
-            {
-                I_Input iobj = it as I_Input;
-                if (iobj != null)
-                {
-                    iobj._Input_Notif_Key(this,_k, _state_new, dt);
-                }
-            }
+            for (int ti = 0; ti < targets.Count; ti++)
+                targets[ti]._Input_Notif_Key(this, _k, _state_new, dt);
             
             if (Key_IsDragStart(_k))
             {
@@ -385,7 +388,12 @@ public class ImpPlayer
         if (drag_target != null)
         {
             Imp2D preview = drag_target.Dragging_GetPreview();
-            if (preview != null) preview.Position_Set(cursor_data.position, true);
+            if (preview != null)
+            {
+                Vector2 c = (preview.bounds.start + preview.bounds.end) * 0.5f;
+                preview.layout.position += cursor_data.position - c;
+                preview.bounds = preview.Bounds_Cache();
+            }
         }
         
         // --------------------------------------------------------------------------------

@@ -1,4 +1,5 @@
-﻿using Engine.Core;
+﻿using System.Numerics;
+using Engine.Core;
 using Engine.Globals;
 using R3D_cs;
 using Raylib_cs;
@@ -16,6 +17,13 @@ public class C3_Light : Imp3D
 
     Light light_id;
     public static readonly List<C3_Light> editor_radius = new();
+    Vector3 _applied_pos;
+    Vector3 _applied_rot;
+    Color _applied_color;
+    float _applied_intensity;
+    float _applied_radius;
+    ELightType _applied_type;
+    bool _applied;
 
     public override void OnInit()
     {
@@ -60,11 +68,26 @@ public class C3_Light : Imp3D
     void Apply()
     {
         if (!R3D.IsLightValid(light_id)) return;
+        if (_applied
+            && _applied_pos == global_transform.position
+            && _applied_rot == global_transform.rotation
+            && _applied_color.Equals(color)
+            && _applied_intensity == intensity
+            && _applied_radius == radius
+            && _applied_type == type)
+            return;
+        _applied = true;
+        _applied_pos = global_transform.position;
+        _applied_rot = global_transform.rotation;
+        _applied_color = color;
+        _applied_intensity = intensity;
+        _applied_radius = radius;
+        _applied_type = type;
         R3D.SetLightPosition(light_id, global_transform.position);
         R3D.SetLightColor(light_id, color);
         R3D.SetLightEnergy(light_id, intensity);
         R3D.SetLightRange(light_id, radius);
         if (type == ELightType.Spot)
-            R3D.SetLightDirection(light_id, GMath.V3_Rotate(GMath.WORLD_FORWARD, global_transform.rotation));
+            R3D.SetLightDirection(light_id, Vector3.Transform(GMath.WORLD_FORWARD, world_rotation));
     }
 }

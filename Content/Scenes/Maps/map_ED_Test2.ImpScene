@@ -1,0 +1,8 @@
+﻿type = "A_Scene"
+prefab_refs = {}
+
+[vars]
+root = {
+    type = "Imp3D",
+    vars = {},
+}

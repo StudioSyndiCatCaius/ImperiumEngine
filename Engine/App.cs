@@ -2,10 +2,10 @@
 using System.Runtime.InteropServices;
 using System.Text;
 using Engine.Assets;
+using Engine.Comps._1D;
 using Engine.Core;
 using Engine.Enums;
 using Engine.Globals;
-using Engine.Sandbox;
 using Engine.Structs;
 using R3D_cs;
 using Raylib_cs;
@@ -61,6 +61,7 @@ public class App
     public static Imp3D view_target=null;
     public static R3D_cs.Camera camera_view = new();
     public static Camera3D view_target_data = new();
+    static bool imgui_enabled;
 
     public static string name = "Imperium";
 
@@ -76,9 +77,9 @@ public class App
     public static A_Scene scene_next = null;
     public static List<A_Scene> scenes_global=new();
     public static EAppSceneState scene_state = EAppSceneState.Idle;
+    public static Dictionary<TLabel,ImpComp> globalized_comps=new(); // comps manually given a global comp binding
     
     private static A_Scene scene_prev = null;
-
     
     // ========================================================================================
     // Command Line Args
@@ -173,6 +174,7 @@ public class App
         
         hooks.on_pre_init?.Invoke();
         Hooks.app_pre_init?.Invoke();
+        GConfig.LoadGame();
         
         // ========================================================================================-----------
         // ---- Raylib
@@ -196,7 +198,8 @@ public class App
         R3D.SetAspectMode(AspectMode.Expand);
         Imp3D.ApplyRenderSettings();
         RefreshWindow(true);
-        rlImGui.Setup(true,true);
+        imgui_enabled = !as_game;
+        if (imgui_enabled) rlImGui.Setup(true,true);
         
         // ---- IMP
         //ImpPhys.Init();
@@ -205,9 +208,7 @@ public class App
         hooks.on_post_init?.Invoke();
         RefreshWindow();
 
-        ImpSandbox.current = new Sandbox_Lua();
-        ImpSandbox.current.Init();
-        if (as_game) ImpSandbox.LoadGlobals();
+        ImpSandbox.current?.Init();
         Hooks.app_post_init?.Invoke();
 
         if (as_game)
@@ -267,7 +268,7 @@ public class App
             // -----------------------------------------------------
             Raylib.BeginDrawing();
             Raylib.ClearBackground(Color.Black);
-            rlImGui.Begin();
+            if (imgui_enabled) rlImGui.Begin();
             hooks.on_draw_begin?.Invoke();
 
             if (view_target != null && view_target.ViewTarget_Enabled())
@@ -276,15 +277,12 @@ public class App
             }
             else
             {
-                camera_view = new R3D_cs.Camera
-                {
-                    Position = new Vector3(-3, 3, 3),
-                    Fovy = 60.0f,
-                    NearPlane = 0.1f,
-                    FarPlane = 1000.0f,
-                    CullMask = Layer.All,
-                    Projection = Projection.Perspective,
-                };
+                camera_view.Position = new Vector3(-3, 3, 3);
+                camera_view.Fovy = 60.0f;
+                camera_view.NearPlane = 0.1f;
+                camera_view.FarPlane = 1000.0f;
+                camera_view.CullMask = Layer.All;
+                camera_view.Projection = Projection.Perspective;
                 R3D.CameraLookAt(ref camera_view, Vector3.Zero, GMath.WORLD_UP);
             }
             view_target_data=R3D.CameraToRL(camera_view);
@@ -296,13 +294,22 @@ public class App
             // ImGui must render after that or the 3D pass covers the whole window.
             R3D.End();
 
+            // R3D leaves depth test, culling, and its shader bound. 2D (C2_Image DrawTexturePro)
+            // is culled or depth-rejected; button boxes still show via DrawRectanglePro fallback.
+            Rlgl.DrawRenderBatchActive();
+            Rlgl.DisableDepthTest();
+            Rlgl.DisableBackfaceCulling();
+            Rlgl.EnableShader(Rlgl.GetShaderIdDefault());
+            Rlgl.SetBlendMode(Raylib_cs.BlendMode.Alpha);
+            Rlgl.SetTexture(0);
+
             // ---------- Draw 2D
             Raylib.BeginMode2D(camera_2d);
             ProcessUpdate(ENotifyProcess.Draw2D, dt);
             Raylib.EndMode2D();
 
             hooks.on_draw_end?.Invoke();
-            rlImGui.End();
+            if (imgui_enabled) rlImGui.End();
             Raylib.EndDrawing();
         }
         
@@ -314,7 +321,7 @@ public class App
         ImpSandbox.current?.Shutdown();
         
         R3D.Close();
-        rlImGui.Shutdown();
+        if (imgui_enabled) rlImGui.Shutdown();
         Raylib.ShowCursor();
         Raylib.CloseWindow();
     }

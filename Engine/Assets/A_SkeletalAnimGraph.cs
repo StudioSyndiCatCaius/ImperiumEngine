@@ -11,7 +11,7 @@ public struct TAnimePose
     
 }
 
-public class A_AnimGraph
+public class A_SkeletalAnimGraph
 {
     
 }

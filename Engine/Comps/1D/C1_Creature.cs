@@ -1,38 +1,51 @@
 ﻿using System.Numerics;
 using Engine.Assets;
 using Engine.Assets.General;
+using Engine.Comps._3D;
 using Engine.Core;
 using Engine.Enums;
 using Engine.Interfaces;
 using Engine.Structs;
 
+
 namespace Engine.Comps._1D;
+
+public struct TCreatureConfig
+{
+    public TClass<C1_Ability> abilities;
+}
+    
 // Creature is an advanced component for handling common gameplay functions for an entity (E.G, Attribute, Abilities, Equipment, Inventory, etc.)  
 public class C1_Creature : Imp1D
 {
     // ================================================================================================================
     // Static
     // ================================================================================================================
-    
-    [ImpVar][Config] public static List<TClass<C1_Ability>> abilities_default;
-    [ImpVar][Config] public static List<TClass<C1_Ability>> abilities_character_default;
+    [ImpVar][Config] public static TCreatureConfig config_default;
+    [ImpVar][Config] public static Dictionary<TClass<Imp3D>,TCreatureConfig> config_per_type = new();
+
+    public TCreatureConfig GetConfig(TClass<Imp3D> type)
+    {
+        return config_per_type.TryGetValue(type, out TCreatureConfig config) ? config : config_default;
+    }
     
     // ================================================================================================================
     // Class
     // ================================================================================================================
     [ImpVar] public Imp3D creature_root; // intended to be the rootmost comp of this scene.
+    [ImpVar] public C3_Skeleton skeleton;
     
     private List<C1_Aura> _auras;
     private List<C1_Ability> _abilities;
     public List<Object> _modifiers;
-    public A_CreatureConfig config;
+    public A_CreatureData data;
     public AG_Faction faction;
 
 
     public override void OnBegin()
     {
         base.OnBegin();
-        if (config == null) { config = new (); }
+        if (data == null) { data = new (); }
     }
 
     // ---------------------------------------------------------------------------------
@@ -62,7 +75,7 @@ public class C1_Creature : Imp1D
     // ---------------------------------------------------------------------------------
     // Abilities
     // ---------------------------------------------------------------------------------
-    
+
     //abilities granted OnBegin
     [ImpVar][Category("Abilities")] public List<TClass<C1_Ability>> auto_abilities;
 
@@ -172,14 +185,14 @@ public class C1_Creature : Imp1D
     public void Equipment_Equip(ImpAsset slot, ImpAsset item)
     {
         Equipment_Unequip(slot);
-        config.equipment[slot] = item;
+        data.equipment[slot] = item;
         on_equip.Invoke( this, slot, item);
     }
     
     public void Equipment_Unequip(ImpAsset slot)
     {
         ImpAsset? uneqipped = Equipment_Get(slot);
-        config.equipment.Remove(slot);
+        data.equipment.Remove(slot);
         if (uneqipped != null)
         {
             on_unequip.Invoke(this, slot, uneqipped);
@@ -188,12 +201,12 @@ public class C1_Creature : Imp1D
 
     public ImpAsset Equipment_Get(ImpAsset slot)
     {
-        return config.equipment.TryGetValue(slot, out ImpAsset item) ? item : null;
+        return data.equipment.TryGetValue(slot, out ImpAsset item) ? item : null;
     }
 
     public List<ImpAsset> Equipment_GetList()
     {
-        return config.equipment.Values.ToList();
+        return data.equipment.Values.ToList();
     }
     
         
@@ -206,14 +219,14 @@ public class C1_Creature : Imp1D
     {
         int _init_amount = Inventory_GetAmount(item);
         _init_amount += amount;
-        config.inventory[item] = _init_amount;
+        data.inventory[item] = _init_amount;
     }
     
     public Dictionary<ImpAsset,int> Inventory_Get(int minimum=1)
     {
         Dictionary<ImpAsset, int> output = new();
 
-        foreach (var (item, amount) in config.inventory)
+        foreach (var (item, amount) in data.inventory)
         {
             if (amount >= minimum)
             {
@@ -225,7 +238,7 @@ public class C1_Creature : Imp1D
     
     public int Inventory_GetAmount(ImpAsset item)
     {
-        return config.inventory.TryGetValue(item, out int amount) ? amount : 0;
+        return data.inventory.TryGetValue(item, out int amount) ? amount : 0;
     }
     
     // ---------------------------------------------------------------------------------
@@ -236,11 +249,11 @@ public class C1_Creature : Imp1D
     
     public void Leveling_XP_Add(AG_Leveling level, float amount)
     {
-        config.leveling[level] += amount;
+        data.leveling[level] += amount;
     }
     public float Leveling_XP_Get(AG_Leveling level)
     {
-        return config.leveling.TryGetValue(level, out float xp) ? xp : 0f;
+        return data.leveling.TryGetValue(level, out float xp) ? xp : 0f;
     }
     
     // ---------------------------------------------------------------------------------
@@ -314,7 +327,7 @@ public class C1_Creature : Imp1D
 }
 
 
-public class A_CreatureConfig : ImpAsset
+public class A_CreatureData : ImpAsset
 {
     public Dictionary<AG_Attribute, float> current_attributes = new();
     public Dictionary<ImpAsset,ImpAsset> equipment = new();

@@ -1,0 +1,46 @@
+wnd_scene = {
+    right_panel_width = 392,
+}
+wnd_config_game = {
+    left_panel_width = 240,
+}
+file_browser = {
+    show_editor_content = true,
+    show_source_files = false,
+    show_file_extensions = false,
+    thumbnail_size = 50,
+}
+file_browser_width = 280
+file_browser_collapsed = false
+log_height = 60
+open_scenes = [
+    {
+        path = "{engine}Scenes\\Maps\\map_ED_Title.ImpScene",
+        view = "Mode_3D",
+        cam3d_position = [
+            8.996537,
+            6.0363317,
+            11.764704,
+        ],
+        cam3d_target = [
+            0,
+            0.5,
+            0,
+        ],
+        cam3d_up = [
+            0,
+            1,
+            0,
+        ],
+        cam3d_fov = 50,
+        cam3d_proj = "Perspective",
+        look_dist = 15.811291,
+        cam2d_target = [
+            960,
+            540,
+        ],
+        cam2d_zoom = 0.5,
+        cam2d_rot = 0,
+    },
+]
+active_scene = "{engine}Scenes\\Maps\\map_ED_Title.ImpScene"

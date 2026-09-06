@@ -285,7 +285,7 @@ public static class G3D
         return default;
     }
 
-    public static bool Ray_Plane(JoltPhysicsSharp.Ray ray, Vector3 plane_p, Vector3 plane_n, out Vector3 hit)
+    public static bool Ray_Plane(TRay3 ray, Vector3 plane_p, Vector3 plane_n, out Vector3 hit)
     {
         hit = default;
         float denom = Vector3.Dot(ray.Direction, plane_n);
@@ -296,7 +296,7 @@ public static class G3D
         return true;
     }
 
-    public static bool Ray_AABB(JoltPhysicsSharp.Ray ray, Vector3 min, Vector3 max, out float t)
+    public static bool Ray_AABB(TRay3 ray, Vector3 min, Vector3 max, out float t)
     {
         t = 0f;
         Vector3 inv = new(
@@ -316,7 +316,7 @@ public static class G3D
         return t >= 0f;
     }
 
-    public static bool Ray_Comp3D(JoltPhysicsSharp.Ray ray, Imp3D c, out float t, out Vector3 hit)
+    public static bool Ray_Comp3D(TRay3 ray, Imp3D c, out float t, out Vector3 hit)
     {
         t = 0f;
         hit = default;
@@ -337,7 +337,7 @@ public static class G3D
             MathF.Abs(b.size.Z) * 0.5f);
         Vector3 o = Vector3.Transform(ray.Position - b.center, inv_q);
         Vector3 d = Vector3.Transform(ray.Direction, inv_q);
-        if (!Ray_AABB(new JoltPhysicsSharp.Ray(o, d), -h, h, out t))
+        if (!Ray_AABB(new TRay3(o, d), -h, h, out t))
         {
             return false;
         }

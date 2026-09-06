@@ -4,14 +4,14 @@ using Engine.Globals;
 namespace Engine.Core;
 
 /*
- *  Sandbox is a handler for scripting. 2 types to start with:
- *  - Lua
- *  - Vis - visual scripting (will implement fully later)
+ * Scripting sandbox. Two backends later:
+ *  - C# scripts
+ *  - Vis (visual scripting)
  *
- * -- Attributes--
- * [ScriptCall] can be called in the scripting system.
- * [ScriptHook] can add a name-matching function in the script to run code when this function is called (E.G. OnBegin, OnUpdate, OnEnd)
+ * [ScriptCall]  callable from a sandbox
+ * [ScriptHook]  overridable from a sandbox (OnBegin, OnUpdate, OnEnd, ...)
  *
+ * Nothing is bound or ticked until a sandbox is actually installed.
  */
 public class TScriptValue
 {
@@ -24,9 +24,9 @@ public class TScriptValue
         return sandbox != null && sandbox.Has(this, name);
     }
 
-    public void Call(string name, params object[] args)
+    public void Call(string name)
     {
-        sandbox?.Call(this, name, args);
+        sandbox?.Call(this, name);
     }
 }
 
@@ -39,7 +39,7 @@ public abstract class ImpSandbox
     public abstract void RunGlobal(string path);
     public abstract TScriptValue? RunInstance(string path, ImpComp owner);
     public abstract bool Has(TScriptValue inst, string name);
-    public abstract void Call(TScriptValue inst, string name, params object[] args);
+    public abstract void Call(TScriptValue inst, string name);
 
     public void Bind(ImpComp c)
     {
@@ -52,11 +52,12 @@ public abstract class ImpSandbox
 
     public static string? SidecarPath(ImpComp c)
     {
+        if (c == null) return null;
         string? local = null;
         if (c.is_prefab && c.prefab_scene != null && !string.IsNullOrEmpty(c.prefab_scene.filepath))
-            local = Path.ChangeExtension(c.prefab_scene.filepath, ".lua");
+            local = c.prefab_scene.filepath;
         else if (c.parent == null && c.scene != null && !string.IsNullOrEmpty(c.scene.filepath))
-            local = Path.ChangeExtension(c.scene.filepath, ".lua");
+            local = c.scene.filepath;
         if (string.IsNullOrEmpty(local)) return null;
         string abs = GFile.Make_Path_Absolute(local);
         if (string.IsNullOrEmpty(abs) || !File.Exists(abs)) return null;
@@ -68,16 +69,6 @@ public abstract class ImpSandbox
         if (current == null) return;
         string root = GFile.GetDir_Root(EContentDir.Game);
         if (string.IsNullOrEmpty(root) || !Directory.Exists(root)) return;
-
-        string g = Path.Combine(root, "G.lua");
-        if (File.Exists(g)) current.RunGlobal(g);
-
-        string mods = Path.Combine(root, "Mods");
-        if (!Directory.Exists(mods)) return;
-        foreach (string dir in Directory.GetDirectories(mods))
-        {
-            string mg = Path.Combine(dir, "G.lua");
-            if (File.Exists(mg)) current.RunGlobal(mg);
-        }
+        current.RunGlobal(root);
     }
 }

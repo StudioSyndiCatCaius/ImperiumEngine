@@ -50,7 +50,7 @@ public struct TRef<T> : I_Property where T : ImpAsset
 
 
 // like TSubclassOf in UE
-public struct TClass<T> : I_Property
+public struct TClass<T> : I_Property, IEquatable<TClass<T>>
 {
     [ImpVar] public string class_name;
 
@@ -67,6 +67,13 @@ public struct TClass<T> : I_Property
         class_name = type?.Name ?? "";
         resolved = type;
     }
+
+    public bool Equals(TClass<T> other) =>
+        string.Equals(class_name ?? "", other.class_name ?? "", StringComparison.Ordinal);
+
+    public override bool Equals(object? obj) => obj is TClass<T> other && Equals(other);
+
+    public override int GetHashCode() => (class_name ?? "").GetHashCode(StringComparison.Ordinal);
 
     public Type? Get()
     {

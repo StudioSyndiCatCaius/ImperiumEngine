@@ -1,0 +1,273 @@
+type = "A_Scene"
+prefab_refs = {}
+
+[vars]
+root = {
+    type = "Imp3D",
+    vars = {
+        transform = {
+            position = {
+                X = 0,
+                Y = 0,
+                Z = 0,
+            },
+            rotation = {
+                X = 0,
+                Y = 0,
+                Z = 0,
+            },
+            scale = {
+                X = 1,
+                Y = 1,
+                Z = 1,
+            },
+        },
+        physics_enabled = false,
+        movement_enabled = false,
+        name = "",
+        is_visible = true,
+        auto_globalize = false,
+        editor_locked = false,
+    },
+    children = [
+        {
+            type = "C2_Image",
+            vars = {
+                texture = "$A_Texture:{builtin}/A_Texture.S_PROTO_WINDOW",
+                image_layout = "Retain_Fill",
+                nine_slice_margins = {
+                    left = 0,
+                    right = 0,
+                    top = 0,
+                    bottom = 0,
+                },
+                layout = {
+                    alignment = {
+                        align_H = "Fill",
+                        align_V = "Fill",
+                    },
+                    position = {
+                        X = 0,
+                        Y = 0,
+                    },
+                    size = {
+                        X = 100,
+                        Y = 100,
+                    },
+                    size_min = {
+                        X = 0,
+                        Y = 0,
+                    },
+                    size_max = {
+                        X = 0,
+                        Y = 0,
+                    },
+                    anchor_position = {
+                        X = 0.5,
+                        Y = 0.5,
+                    },
+                    anchor_normalized = true,
+                },
+                cursor_filter = "Pass",
+                name = "C2_Image",
+                is_visible = true,
+                auto_globalize = false,
+                editor_locked = false,
+            },
+            children = [],
+        },
+        {
+            type = "C2_Image",
+            vars = {
+                texture = "$A_Texture:{builtin}/A_Texture.S_PROTO_STAIR",
+                image_layout = "Stretch",
+                nine_slice_margins = {
+                    left = 0,
+                    right = 0,
+                    top = 0,
+                    bottom = 0,
+                },
+                layout = {
+                    alignment = {
+                        align_H = "Center",
+                        align_V = "Start",
+                    },
+                    position = {
+                        X = 0,
+                        Y = 353.26947,
+                    },
+                    size = {
+                        X = 400,
+                        Y = 400,
+                    },
+                    size_min = {
+                        X = 0,
+                        Y = 0,
+                    },
+                    size_max = {
+                        X = 0,
+                        Y = 0,
+                    },
+                    anchor_position = {
+                        X = 0.5,
+                        Y = 0.5,
+                    },
+                    anchor_normalized = true,
+                },
+                cursor_filter = "Pass",
+                name = "logo",
+                is_visible = true,
+                auto_globalize = true,
+                editor_locked = false,
+            },
+            children = [],
+        },
+        {
+            type = "C2_OptionList",
+            vars = {
+                child_type = {
+                    class_name = "C2_Button",
+                },
+                orientation = "V",
+                child_layout = {
+                    alignment = {
+                        align_H = "Fill",
+                        align_V = "Fill",
+                    },
+                    position = {
+                        X = 0,
+                        Y = 0,
+                    },
+                    size = {
+                        X = 20,
+                        Y = 20,
+                    },
+                    size_min = {
+                        X = 0,
+                        Y = 0,
+                    },
+                    size_max = {
+                        X = 0,
+                        Y = 0,
+                    },
+                    anchor_position = {
+                        X = 0.5,
+                        Y = 0.5,
+                    },
+                    anchor_normalized = true,
+                },
+                list_style = "$OptionListStyle_List:",
+                default_options = [
+                    {
+                        type = "A_General",
+                        vars = {
+                            title = "New Game",
+                            description = "",
+                            color = {
+                                R = {},
+                                G = {},
+                                B = {},
+                                A = {},
+                            },
+                            tags = {},
+                            sourcefile = "",
+                        },
+                    },
+                    {
+                        type = "A_General",
+                        vars = {
+                            title = "Load Game",
+                            description = "",
+                            color = {
+                                R = {},
+                                G = {},
+                                B = {},
+                                A = {},
+                            },
+                            tags = {},
+                            sourcefile = "",
+                        },
+                    },
+                    {
+                        type = "A_General",
+                        vars = {
+                            title = "Extras",
+                            description = "",
+                            color = {
+                                R = {},
+                                G = {},
+                                B = {},
+                                A = {},
+                            },
+                            tags = {},
+                            sourcefile = "",
+                        },
+                    },
+                    {
+                        type = "A_General",
+                        vars = {
+                            title = "Settings",
+                            description = "",
+                            color = {
+                                R = {},
+                                G = {},
+                                B = {},
+                                A = {},
+                            },
+                            tags = {},
+                            sourcefile = "",
+                        },
+                    },
+                    {
+                        type = "A_General",
+                        vars = {
+                            title = "Quit Game",
+                            description = "",
+                            color = {
+                                R = {},
+                                G = {},
+                                B = {},
+                                A = {},
+                            },
+                            tags = {},
+                            sourcefile = "",
+                        },
+                    },
+                ],
+                layout = {
+                    alignment = {
+                        align_H = "Center",
+                        align_V = "End",
+                    },
+                    position = {
+                        X = 2.5117188,
+                        Y = 251.94946,
+                    },
+                    size = {
+                        X = 265.4763,
+                        Y = 239.28566,
+                    },
+                    size_min = {
+                        X = 0,
+                        Y = 0,
+                    },
+                    size_max = {
+                        X = 0,
+                        Y = 0,
+                    },
+                    anchor_position = {
+                        X = 0.5,
+                        Y = 0.5,
+                    },
+                    anchor_normalized = true,
+                },
+                cursor_filter = "Pass",
+                name = "options_root",
+                is_visible = true,
+                auto_globalize = false,
+                editor_locked = false,
+            },
+            children = [],
+        },
+    ],
+}

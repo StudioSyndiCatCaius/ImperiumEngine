@@ -127,7 +127,9 @@ public static class GFile
     public static Type GetType_FromExtension(string file)
     {
         string _ext = Path.GetExtension(file).TrimStart('.').ToUpper();
-        return Type.GetType("Engine.Files.File_" + _ext);
+        if (string.IsNullOrEmpty(_ext)) return null;
+        string name = "Engine.Files.File_" + _ext;
+        return Type.GetType(name) ?? typeof(ImpFile).Assembly.GetType(name);
     }
 
     private static ImpFile _ImportInternal(string filepath, bool force = false, Type? type = null)

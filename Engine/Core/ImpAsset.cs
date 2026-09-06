@@ -1,10 +1,11 @@
-﻿using Engine.Globals;
+﻿using Engine.Assets;
+using Engine.Globals;
 using Engine.Interfaces;
 using Engine.Structs;
 
 namespace Engine.Core;
 
-public class ImpAsset : I_Property, I_Inspectable
+public class ImpAsset : I_Property, I_Inspectable, I_File
 {
     
     // ==============================================================================================================
@@ -29,6 +30,7 @@ public class ImpAsset : I_Property, I_Inspectable
         
         File.WriteAllText(GFile.Make_Path_Absolute(filepath), file_str);
         is_dity=false;
+        GLog.Info("Saved " + filepath);
     }
     
     // Reimports the data from the sourcefile
@@ -47,7 +49,11 @@ public class ImpAsset : I_Property, I_Inspectable
         else GLog.Error($"Could not find sourcefile {sourcefile}");
     }
     
-    public ImpFile Source_Get() { return _src_file_ref; }
+    public ImpFile Source_Get()
+    {
+        if (_src_file_ref == null && !string.IsNullOrEmpty(sourcefile)) Source_Reimport();
+        return _src_file_ref;
+    }
     
     public virtual void OnReimport(ImpFile src) { }
 
@@ -106,4 +112,16 @@ public class ImpAsset : I_Property, I_Inspectable
     // --------------------------------------------------
     public virtual bool Editor_UseCustomEditor() { return false; }
     public virtual void Editor_DrawEditor() { }
+
+    public Type[] File_GetFavoriteSubTypes()
+    {
+        return new[]
+        {
+            typeof(A_Texture),
+            typeof(A_Mesh),
+            typeof(A_Sound),
+            typeof(A_Scene),
+            typeof(A_Font),
+        };
+    }
 }

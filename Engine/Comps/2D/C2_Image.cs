@@ -16,6 +16,6 @@ public class C2_Image : Imp2D
     public override void OnDraw2D(double dt, EDrawFlags flags = 0)
     {
         base.OnDraw2D(dt, flags);
-        if (texture != null) texture.Draw(bounds,global_transform, image_layout, nine_slice_margins);
+        if (texture != null) texture.Draw(bounds, new TTransform2(), image_layout, nine_slice_margins);
     }
 }

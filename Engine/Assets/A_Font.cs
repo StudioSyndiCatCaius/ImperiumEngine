@@ -19,6 +19,9 @@ public class A_Font : ImpAsset
     [ImpVar] public Color outline_color=Color.Black;
 
     public Font font;
+
+    readonly List<string> _wrap_lines = new();
+    float[] _wrap_widths = Array.Empty<float>();
     
     public override void OnReimport(ImpFile src)
     {
@@ -40,15 +43,15 @@ public class A_Font : ImpAsset
         if (string.IsNullOrEmpty(text)) return Vector2.Zero;
         Font f = Resolve();
         float px = PixelSize();
-        List<string> lines = Wrap(text, f, px, max_width, wrap);
+        Wrap(text, f, px, max_width, wrap);
         float w = 0;
         float lh = LineHeight(f, px);
-        for (int i = 0; i < lines.Count; i++)
+        for (int i = 0; i < _wrap_lines.Count; i++)
         {
-            float lw = Raylib.MeasureTextEx(f, lines[i], px, spacing).X;
+            float lw = i < _wrap_widths.Length ? _wrap_widths[i] : Raylib.MeasureTextEx(f, _wrap_lines[i], px, spacing).X;
             if (lw > w) w = lw;
         }
-        return new Vector2(w, lh * lines.Count);
+        return new Vector2(w, lh * _wrap_lines.Count);
     }
 
     public void Draw(string text, TBounds2 bounds, ETextWrap wrap, TLayoutAlignment text_align) //text_align is where to align & build the text from within the bounds
@@ -65,29 +68,30 @@ public class A_Font : ImpAsset
         if (vw < 1e-4f || vh < 1e-4f) return;
 
         float lh = LineHeight(f, px);
-        List<string> lines = Wrap(text, f, px, vw, wrap);
-        if (lines.Count == 0) return;
+        Wrap(text, f, px, vw, wrap);
+        int n = _wrap_lines.Count;
+        if (n == 0) return;
 
-        float[] widths = new float[lines.Count];
+        if (_wrap_widths.Length < n) _wrap_widths = new float[n];
         float block_w = 0;
-        for (int i = 0; i < lines.Count; i++)
+        for (int i = 0; i < n; i++)
         {
-            widths[i] = Raylib.MeasureTextEx(f, lines[i], px, spacing).X;
-            if (widths[i] > block_w) block_w = widths[i];
+            _wrap_widths[i] = Raylib.MeasureTextEx(f, _wrap_lines[i], px, spacing).X;
+            if (_wrap_widths[i] > block_w) block_w = _wrap_widths[i];
         }
 
-        float block_h = lh * lines.Count;
+        float block_h = lh * n;
         float gap = 0;
-        if (text_align.align_V == ELayoutAlignment.Fill && lines.Count > 1 && block_h < vh)
-            gap = (vh - block_h) / (lines.Count - 1);
+        if (text_align.align_V == ELayoutAlignment.Fill && n > 1 && block_h < vh)
+            gap = (vh - block_h) / (n - 1);
 
-        float used_h = block_h + gap * Math.Max(0, lines.Count - 1);
+        float used_h = block_h + gap * Math.Max(0, n - 1);
         float y = Align(text_align.align_V, y0, vh, used_h);
 
-        for (int i = 0; i < lines.Count; i++)
+        for (int i = 0; i < n; i++)
         {
-            float x = Align(text_align.align_H, x0, vw, widths[i]);
-            Blit(f, lines[i], new Vector2(x, y), px);
+            float x = Align(text_align.align_H, x0, vw, _wrap_widths[i]);
+            Blit(f, _wrap_lines[i], new Vector2(x, y), px);
             y += lh + gap;
         }
     }
@@ -132,53 +136,58 @@ public class A_Font : ImpAsset
         Raylib.DrawTextEx(f, line, pos, px, spacing, color);
     }
 
-    List<string> Wrap(string text, Font f, float px, float max_w, ETextWrap wrap)
+    void Wrap(string text, Font f, float px, float max_w, ETextWrap wrap)
     {
-        List<string> lines = new();
-        string[] paras = text.Replace("\r\n", "\n").Split('\n');
+        _wrap_lines.Clear();
         bool wrap_on = wrap != ETextWrap.None && max_w > 1e-4f;
-        for (int p = 0; p < paras.Length; p++)
+        int start = 0;
+        while (start <= text.Length)
         {
-            string para = paras[p];
-            if (!wrap_on)
-            {
-                lines.Add(para);
-                continue;
-            }
-            if (para.Length == 0)
-            {
-                lines.Add("");
-                continue;
-            }
-            if (wrap == ETextWrap.Word) PackWords(para, f, px, max_w, lines);
-            else PackChars(para, f, px, max_w, lines);
+            int nl = text.IndexOf('\n', start);
+            if (nl < 0) nl = text.Length;
+            int end = nl;
+            if (end > start && text[end - 1] == '\r') end--;
+            string para = start == 0 && end == text.Length ? text : text[start..end];
+            if (!wrap_on) _wrap_lines.Add(para);
+            else if (para.Length == 0) _wrap_lines.Add("");
+            else if (wrap == ETextWrap.Word) PackWords(para, f, px, max_w, _wrap_lines);
+            else PackChars(para, f, px, max_w, _wrap_lines);
+            if (nl == text.Length) break;
+            start = nl + 1;
         }
-        return lines;
     }
 
     void PackWords(string para, Font f, float px, float max_w, List<string> lines)
     {
-        string[] words = para.Split(' ');
         string line = "";
-        for (int i = 0; i < words.Length; i++)
+        int i = 0;
+        int words = 0;
+        while (i <= para.Length)
         {
-            string word = words[i];
+            int sp = para.IndexOf(' ', i);
+            if (sp < 0) sp = para.Length;
+            string word = para[i..sp];
+            words++;
             string trial = line.Length == 0 ? word : line + " " + word;
             if (Raylib.MeasureTextEx(f, trial, px, spacing).X <= max_w)
             {
                 line = trial;
-                continue;
             }
-            if (line.Length > 0) lines.Add(line);
-            if (Raylib.MeasureTextEx(f, word, px, spacing).X <= max_w) line = word;
             else
             {
-                PackChars(word, f, px, max_w, lines);
-                line = "";
+                if (line.Length > 0) lines.Add(line);
+                if (Raylib.MeasureTextEx(f, word, px, spacing).X <= max_w) line = word;
+                else
+                {
+                    PackChars(word, f, px, max_w, lines);
+                    line = "";
+                }
             }
+            if (sp == para.Length) break;
+            i = sp + 1;
         }
         if (line.Length > 0) lines.Add(line);
-        else if (words.Length == 0) lines.Add("");
+        else if (words == 0) lines.Add("");
     }
 
     void PackChars(string s, Font f, float px, float max_w, List<string> lines)

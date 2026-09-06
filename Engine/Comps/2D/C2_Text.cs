@@ -5,7 +5,7 @@ using Engine.Structs;
 
 namespace Engine.Comps._2D;
 
-[ImpClass(Common = true)]
+[ImpClass(Common = true)][Title("Text")]
 public class C2_Text : Imp2D
 {
     // =============================================================================

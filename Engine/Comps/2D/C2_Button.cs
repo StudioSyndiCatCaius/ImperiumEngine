@@ -20,7 +20,7 @@ public enum EButtonState
 {
     Normal, Hover, Pressed,
 }
-[ImpClass(Common = true)]
+[ImpClass(Common = true)][Title("Button")]
 public class C2_Button : Imp2D
 {
     // =============================================================================
@@ -110,7 +110,7 @@ public class C2_Button : Imp2D
         if(_held) box=style.box_pressed;
         else if(_hovered) box=style.box_hover;
         
-        TBounds2 _content_bounds = box.Draw(bounds, global_transform);
+        TBounds2 _content_bounds = box.Draw(bounds, new TTransform2());
 
         TBounds2 text_bounds = _content_bounds;
         if (icon != null)
@@ -123,13 +123,19 @@ public class C2_Button : Imp2D
                 ? MathF.Abs(_content_bounds.end.Y - _content_bounds.start.Y)
                 : MathF.Abs(_content_bounds.end.X - _content_bounds.start.X);
             if (icon_size > main) icon_size = main;
-            TBounds2[] icon_text_bounds = _content_bounds.Split(
-                [icon_size, main - icon_size], false, horiz ? EUIOrentation.H : EUIOrentation.V);
-            // Split is icon-first. Flip so [0] is always text, [1] is always icon.
+            _content_bounds.Split2(icon_size, main - icon_size, false,
+                horiz ? EUIOrentation.H : EUIOrentation.V, out TBounds2 icon_first, out TBounds2 rest);
+            // Split is icon-first. Flip so text_bounds is always text.
             if (button_layout == EButtonLayout.H_Icon_Text || button_layout == EButtonLayout.V_Icon_Text)
-                Array.Reverse(icon_text_bounds);
-            text_bounds = icon_text_bounds[0];
-            icon.Draw(icon_text_bounds[1], global_transform, EImageLayout.Retain_Fit);
+            {
+                text_bounds = rest;
+                icon.Draw(icon_first, new TTransform2(), EImageLayout.Retain_Fit);
+            }
+            else
+            {
+                text_bounds = icon_first;
+                icon.Draw(rest, new TTransform2(), EImageLayout.Retain_Fit);
+            }
         }
 
         style.font.Draw(text, text_bounds, ETextWrap.Word, TLayoutAlignment.CENTER);

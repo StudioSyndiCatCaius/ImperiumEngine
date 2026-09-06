@@ -13,7 +13,7 @@ public enum EBoxFormat { Stacked, Horizontal, Vertical, }
 /*
  * Generic non-free container for other Imp2D components.
  */
-[ImpClass(Common = true)]
+[ImpClass(Common = true)][Title("Box")]
 public class C2_Box : Imp2D
 {
     // =============================================================================
@@ -21,6 +21,9 @@ public class C2_Box : Imp2D
     // =============================================================================
     [ImpVar] public UI_Box style=UI_Box.DARK; //if null, blank background
     [ImpVar] public EBoxFormat box_format;
+
+    TBounds2[] _child_slots = Array.Empty<TBounds2>();
+    bool _slots_dirty = true;
 
     // =============================================================================
     // INIT
@@ -50,31 +53,34 @@ public class C2_Box : Imp2D
     public override void OnDraw2D(double dt, EDrawFlags flags = 0)
     {
         base.OnDraw2D(dt, flags);
-        if (style != null) style.Draw(bounds, global_transform);
+        if (style != null) style.Draw(bounds, new TTransform2());
+    }
+
+    protected override void Transform_Refresh()
+    {
+        _slots_dirty = true;
+        base.Transform_Refresh();
     }
 
     public override TBounds2 Child_MakeBounds2D(ImpComp child, int index)
     {
-        Vector2 PrefSize(Imp2D c)
-        {
-            Vector2 size = c.layout.size;
-            if (c.layout.size_max != Vector2.Zero)
-                size = Vector2.Clamp(size, c.layout.size_min, c.layout.size_max);
-            else
-                size = Vector2.Max(size, c.layout.size_min);
-            return size;
-        }
+        if (_slots_dirty) RebuildSlots();
+        if ((uint)index >= (uint)_child_slots.Length) return default;
+        return _child_slots[index];
+    }
 
-        TBounds2 Place(ImpComp c, TBounds2 slot)
-        {
-            // Return the slot only. Imp2D.OnDraw2D applies the child's layout.
-            return c is Imp2D ? slot : default;
-        }
-
+    void RebuildSlots()
+    {
+        _slots_dirty = false;
+        int n = children.Count;
+        if (_child_slots.Length < n) _child_slots = new TBounds2[n];
         TBounds2 inner = ContentBounds();
-
         if (box_format == EBoxFormat.Stacked)
-            return Place(child, inner);
+        {
+            for (int i = 0; i < n; i++)
+                _child_slots[i] = children[i] is Imp2D ? inner : default;
+            return;
+        }
 
         bool horiz = box_format == EBoxFormat.Horizontal;
         float inner_main = horiz
@@ -83,7 +89,7 @@ public class C2_Box : Imp2D
 
         float preferred_total = 0;
         int fill_n = 0;
-        for (int i = 0; i < children.Count; i++)
+        for (int i = 0; i < n; i++)
         {
             if (children[i] is not Imp2D c || !c.is_visible) continue;
             Vector2 sz = PrefSize(c);
@@ -96,14 +102,11 @@ public class C2_Box : Imp2D
         if (extra < 0) extra = 0;
         float extra_each = fill_n > 0 ? extra / fill_n : 0;
 
-        // Leftover space on the main axis is not a slot of its own. Fill children
-        // eat it; otherwise the packed group is placed with the children's
-        // main-axis alignment (one Center child sits in the middle of the box).
         float leading = 0;
         if (fill_n == 0 && extra > 0)
         {
             ELayoutAlignment? group = null;
-            for (int i = 0; i < children.Count; i++)
+            for (int i = 0; i < n; i++)
             {
                 if (children[i] is not Imp2D c || !c.is_visible) continue;
                 ELayoutAlignment a = horiz ? c.layout.alignment.align_H : c.layout.alignment.align_V;
@@ -120,9 +123,13 @@ public class C2_Box : Imp2D
         float y1 = MathF.Max(inner.start.Y, inner.end.Y);
         float cursor = leading;
 
-        for (int i = 0; i < children.Count; i++)
+        for (int i = 0; i < n; i++)
         {
-            if (children[i] is not Imp2D c || !c.is_visible) continue;
+            if (children[i] is not Imp2D c || !c.is_visible)
+            {
+                _child_slots[i] = default;
+                continue;
+            }
             Vector2 sz = PrefSize(c);
             float main = horiz ? sz.X : sz.Y;
             bool fill = (horiz ? c.layout.alignment.align_H : c.layout.alignment.align_V) == ELayoutAlignment.Fill;
@@ -133,14 +140,21 @@ public class C2_Box : Imp2D
                 if (max > 0 && main > max) main = max;
             }
 
-            TBounds2 slot = horiz
+            _child_slots[i] = horiz
                 ? new TBounds2 { start = new Vector2(x0 + cursor, y0), end = new Vector2(x0 + cursor + main, y1) }
                 : new TBounds2 { start = new Vector2(x0, y0 + cursor), end = new Vector2(x1, y0 + cursor + main) };
-
-            if (c == child) return Place(child, slot);
             cursor += main;
         }
-        return default;
+    }
+
+    static Vector2 PrefSize(Imp2D c)
+    {
+        Vector2 size = c.layout.size;
+        if (c.layout.size_max != Vector2.Zero)
+            size = Vector2.Clamp(size, c.layout.size_min, c.layout.size_max);
+        else
+            size = Vector2.Max(size, c.layout.size_min);
+        return size;
     }
 }
 

@@ -1,5 +1,6 @@
 ﻿using System.Numerics;
 using Engine.Core;
+using Engine.Structs;
 
 namespace Engine.Assets;
 
@@ -27,17 +28,19 @@ public class A_MoveMode : ImpAsset
     [ImpVar][Category("Rotation")] public Vector3 velocity_rotation_rate=new(0, 360.0f, 0);
     [ImpVar][Category("Rotation")] public bool forward_adjust_rotation;
     
-    // #################################################################################
-    // STATICS
-    // #################################################################################
+    [ImpVar][Category("Animation")] public Dictionary<TLabel,bool> animgraph_vars_bool = new();
     
-    public static A_MoveMode DEFAULT => new();
-    public static A_MoveMode CROUCH => new()
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    // STATICS
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    
+    [Builtin] public static A_MoveMode DEFAULT => new();
+    [Builtin] public static A_MoveMode CROUCH => new()
     {
         speed=2.0f,
         air_control=0.5f
     };
-    public static A_MoveMode SPRINT => new()
+    [Builtin] public static A_MoveMode SPRINT => new()
     {
         speed=10.0f,
         air_control=0.5f,

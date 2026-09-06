@@ -10,6 +10,7 @@ public interface I_Property
      *  - ImpAsset (reference) : "&A_Scene:{game}/Path/To/Scene.ImpScene"
      *  - ImpAsset (inline) : "!A_Scene:{game}/Path/To/Scene.ImpScene"
      */
-    
-    public virtual void Property_DrawInspector() {}
+
+    public virtual bool Property_Inspector_Override() { return false;} //should draw a unique property editor in the inspector
+    public virtual void Property_Inspector_Draw() {} //draws the property editor
 }

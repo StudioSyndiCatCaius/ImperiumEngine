@@ -104,11 +104,9 @@ public class TInputSet
             EInputState _state = _ia.Value.GetState(player);
             player.input_action_states[_ia.Key] = _state;
 
-            foreach (var _targ in player.InputTarget_GetAll())
-            {
-                if (_targ is not I_Input iobj) continue;
-                iobj._Input_Notif_Action(player, _ia.Key, _state, _axis, dt);
-            }
+            List<ImpComp> targets = player.InputTarget_GetAll();
+            for (int i = 0; i < targets.Count; i++)
+                targets[i]._Input_Notif_Action(player, _ia.Key, _state, _axis, dt);
         }
     }
     

@@ -1,4 +1,5 @@
-﻿using Engine.Core;
+﻿using Engine.Comps._1D;
+using Engine.Core;
 using Engine.Enums;
 using Engine.Globals;
 using Engine.Structs;
@@ -15,8 +16,14 @@ public class A_Scene : ImpAsset
     // ==============================================================================================================
     // CLASS
     // ==============================================================================================================
-    [ImpVar] public A_Environment environment = new();
+    [ImpVar] public A_Environment environment = A_Environment.DEFAULT;
+    [ImpVar] public TClass<C1_GameMode> override_gamemode;
 
+    public TClass<C1_GameMode> GameMode_GetClass()
+    {
+        if (override_gamemode.Get() != null) return override_gamemode;
+        return C1_GameMode.default_gamemode;
+    }
 
     public ImpComp root;
     public Dictionary<int, string> prefab_refs = new();
@@ -47,7 +54,7 @@ public class A_Scene : ImpAsset
     {
         if (root != null)
         {
-            root.scene = this;
+            root.AssignScene(this);
             root.ProcessNotify(notify, dt);
         }
     }

@@ -36,15 +36,14 @@ public class Imp2D : ImpComp
     };
     [ImpVar] public ECursorFilter cursor_filter=ECursorFilter.Pass; //applied when cursor is in the bounds of this component
     
-    [ImpVar] public TTransform2 transform; //UNLIKE 3D, 2D transforms are relative to the parent. transform is an additional offset on top of that.
-    
     // ==========================================================================
     // vars
     // ==========================================================================
     public ImpViewport? owning_viewport; //override only (C3_UI plane, etc). otherwise inherited / scene / App.viewport_main
         
-    public TTransform2 global_transform;
     public TBounds2 bounds; //cached bounds for 2d drawing
+
+    protected override ECompProcess ProcessKinds => ECompProcess.Update | ECompProcess.Draw2D | ECompProcess.Cursor;
     
     // ==========================================================================
     // init
@@ -107,19 +106,7 @@ public class Imp2D : ImpComp
     public override void OnDraw2D(double dt, EDrawFlags flags = EDrawFlags.None)
     {
         base.OnDraw2D(dt, flags);
-        bounds = TBounds2.GetWindowBounds();
-        if (parent != null && parent.children.Contains(this))
-        {
-            if (parent is Imp2D p)
-            {
-                int _ind=p.children.IndexOf(this);
-                if (_ind >= 0)
-                {
-                    bounds = p.Child_MakeBounds2D(this, _ind);
-                }
-            }
-        }
-        bounds=layout.MakeBounds(bounds);
+        bounds = Bounds_Cache();
     }
 
     public virtual TBounds2 ContentBounds() { return bounds; }
@@ -132,51 +119,33 @@ public class Imp2D : ImpComp
 
     public virtual TBounds2 Bounds_Cache()
     {
-        TBounds2 slot = parent is Imp2D p && !p.bounds.IsEmpty
-            ? p.ContentBounds()
-            : Viewport_Get().Bounds;
-        TBounds2 b = layout.MakeBounds(slot);
-        b.start += transform.position;
-        b.end += transform.position;
-        return b;
+        TBounds2 slot;
+        if (parent is Imp2D p && !p.ChildLayout_IsFree())
+        {
+            int ind = (uint)sibling_index < (uint)p.children.Count && p.children[sibling_index] == this
+                ? sibling_index
+                : -1;
+            if (ind < 0) return bounds;
+            slot = p.Child_MakeBounds2D(this, ind);
+        }
+        else if (parent is Imp2D pp && !pp.bounds.IsEmpty)
+            slot = pp.ContentBounds();
+        else
+            slot = Viewport_Get().Bounds;
+        return layout.MakeBounds(slot);
     }
     
     public bool Contains(Vector2 point) { return bounds.IsPointInside(point); }
 
-    // ---------------------------------------
-    // Transform (Set Global)
-    // ---------------------------------------
-    public void Transform_Set(TTransform2 t, bool global = true)
-    { if (global) global_transform = t; else transform = t; Correct_Transform(global); }
-    public void Position_Set(Vector2 position, bool global = true)
-    { if (global) global_transform.position = position; else transform.position = position; Correct_Transform(global); }
-    public void Rotation_Set(float rotation, bool global = true)
-    { if (global)global_transform.rotation = rotation; else transform.rotation = rotation; Correct_Transform(global); }
-    public void Scale_Set(Vector2 scale, bool global = true) { if (global) global_transform.scale = scale; else transform.scale = scale; Correct_Transform(global); }
     protected override void Transform_Refresh()
     {
-        Correct_Transform(false);
+        bounds = Bounds_Cache();
         if (ChildLayout_IsFree()) return;
         for (int i = 0; i < children.Count; i++)
         {
             if (children[i] is Imp2D child2d)
-                child2d.bounds = Child_MakeBounds2D(child2d, i);
+                child2d.bounds = child2d.Bounds_Cache();
         }
-    }
-
-    void Correct_Transform(bool global_changed)
-    {
-        Imp2D parent2d = parent as Imp2D;
-        if (parent2d == null)
-        {
-            if (global_changed) transform = global_transform;
-            else global_transform = transform;
-        }
-        else if (global_changed) transform = TTransform2.Subtract(global_transform, parent2d.global_transform);
-        else global_transform = TTransform2.Add(parent2d.global_transform, transform);
-
-        if (parent2d == null || parent2d.ChildLayout_IsFree())
-            bounds = Bounds_Cache();
     }
     
     
@@ -192,15 +161,11 @@ public class Imp2D : ImpComp
 
     public virtual void Option_Refresh()
     {
-        I_General _dat=option_data as I_General;
-        if (_dat != null)
+        if (option_data is I_General _dat)
         {
-            string _title = _dat.getTitle().ToString();
-            string _description = _dat.getDescription().ToString();
-            A_Texture _icon = _dat.getIcon();
-            if (option_title_text != null) option_title_text.text = _title;
-            if (option_description_text != null) option_description_text.text = _description;
-            if (option_icon != null) option_icon.texture = _icon;
+            if (option_title_text != null) option_title_text.text = _dat.getTitle() ?? "";
+            if (option_description_text != null) option_description_text.text = _dat.getDescription() ?? "";
+            if (option_icon != null) option_icon.texture = _dat.getIcon();
         }
         OnOption_Refreshed();
     }

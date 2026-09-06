@@ -1,3 +1,5 @@
+using System.Reflection;
+using Engine;
 using ImGuiNET;
 
 namespace Editor.UI;
@@ -19,18 +21,15 @@ public class EUI_EnumToggle : EdUi
 
             Enum v = (Enum)values.GetValue(i)!;
             bool selected = value.Equals(v);
+            string label = v.GetType().GetField(v.ToString())?.GetCustomAttribute<TitleAttribute>()?.Name
+                           ?? v.ToString();
 
-            if (selected)
-                ImGui.PushStyleColor(ImGuiCol.Button, ImGui.GetStyle().Colors[(int)ImGuiCol.ButtonActive]);
-
-            if (ImGui.Button(v.ToString()) && !selected)
+            bool hit = EdIcons.Button("##et" + v.GetType().Name + "." + v, label, EdIcons.Enum(v), selected);
+            if (hit && !selected)
             {
                 value = v;
                 on_changed?.Invoke(v);
             }
-
-            if (selected)
-                ImGui.PopStyleColor();
         }
     }
 }

@@ -1,0 +1,34 @@
+type = "A_Scene"
+prefab_refs = {}
+
+[vars]
+root = {
+    type = "Imp3D",
+    vars = {
+        transform = {
+            position = {
+                X = 0,
+                Y = 0,
+                Z = 0,
+            },
+            rotation = {
+                X = 0,
+                Y = 0,
+                Z = 0,
+            },
+            scale = {
+                X = 1,
+                Y = 1,
+                Z = 1,
+            },
+        },
+        physics_enabled = false,
+        movement_enabled = false,
+        cast_shadows = false,
+        name = "Root",
+        is_visible = true,
+        auto_globalize = false,
+        editor_locked = false,
+    },
+    children = [],
+}

@@ -251,12 +251,11 @@ namespace rlImGui_cs
 
             ImGui.SetCurrentContext(ImGuiContext);
 
-            ImGui.GetIO().Fonts.AddFontDefault();
-
             ImGuiIOPtr io = ImGui.GetIO();
-
             if (SetupUserFonts != null)
                 SetupUserFonts(io);
+            else
+                io.Fonts.AddFontDefault();
 
             io.BackendFlags |= ImGuiBackendFlags.HasMouseCursors | ImGuiBackendFlags.HasSetMousePos | ImGuiBackendFlags.HasGamepad;
 

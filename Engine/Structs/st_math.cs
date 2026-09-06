@@ -10,6 +10,18 @@ namespace Engine.Structs;
 // 3D
 // ======================================================================================================
 
+public struct TRay3
+{
+    public Vector3 Position;
+    public Vector3 Direction;
+
+    public TRay3(Vector3 position, Vector3 direction)
+    {
+        Position = position;
+        Direction = direction;
+    }
+}
+
 public struct TTransform3 : I_Property
 {
     [ImpVar] public Vector3 position;
@@ -337,6 +349,36 @@ public struct TBounds2
             start = start - new Vector2(margins.left, margins.top),
             end = end + new Vector2(margins.right, margins.bottom),
         };
+    }
+
+    public void Split2(float size0, float size1, bool as_ratio, EUIOrentation orientation, out TBounds2 a, out TBounds2 b, TMargins margins = default)
+    {
+        float sx = start.X, sy = start.Y, ex = end.X, ey = end.Y;
+        bool horiz = orientation == EUIOrentation.H;
+        float mul = as_ratio ? (horiz ? ex - sx : ey - sy) : 1f;
+        float cursor = horiz ? sx : sy;
+        float ml = margins.left, mr = margins.right, mt = margins.top, mb = margins.bottom;
+        a = SplitSeg(ref cursor, size0 * mul, horiz, sx, sy, ex, ey, ml, mr, mt, mb);
+        b = SplitSeg(ref cursor, size1 * mul, horiz, sx, sy, ex, ey, ml, mr, mt, mb);
+    }
+
+    static TBounds2 SplitSeg(ref float cursor, float span, bool horiz,
+        float sx, float sy, float ex, float ey, float ml, float mr, float mt, float mb)
+    {
+        float next = cursor + span;
+        float x0, y0, x1, y1;
+        if (horiz)
+        {
+            x0 = cursor + ml; y0 = sy + mt; x1 = next - mr; y1 = ey - mb;
+        }
+        else
+        {
+            x0 = sx + ml; y0 = cursor + mt; x1 = ex - mr; y1 = next - mb;
+        }
+        if (x1 < x0) x1 = x0;
+        if (y1 < y0) y1 = y0;
+        cursor = next;
+        return new TBounds2 { start = new Vector2(x0, y0), end = new Vector2(x1, y1) };
     }
 
     public TBounds2[] Split(float[] sizes, bool as_ratio = false, EUIOrentation orientation = EUIOrentation.H,TMargins margins=default)

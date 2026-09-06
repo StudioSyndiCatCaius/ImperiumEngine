@@ -1,5 +1,0 @@
-type="A_Mesh"
-
-[vars]
-sourcefile="{engine}/3D/Shapes/sm_ED_shape_plane.glb"
-model_index=0
