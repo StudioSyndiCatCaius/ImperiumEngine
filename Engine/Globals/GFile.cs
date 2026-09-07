@@ -51,12 +51,25 @@ public static class GFile
             case EContentDir.Game:
                 return GetFileDir(App.game_file);
             case EContentDir.Engine:
-                Console.WriteLine("ENIGNE ROOT IS:  "+AppContext.BaseDirectory);
-#if DEBUG
-                return Path_Ascend(AppContext.BaseDirectory,4);
-#else
-                return AppContext.BaseDirectory;
-#endif
+            {
+                string start = AppContext.BaseDirectory;
+                if (Directory.Exists(Path.Combine(start, "Content")))
+                    return start;
+                DirectoryInfo? current = new DirectoryInfo(start);
+                string found = "";
+                while (current != null)
+                {
+                    if (Directory.Exists(Path.Combine(current.FullName, "Content")))
+                    {
+                        bool repo = File.Exists(Path.Combine(current.FullName, "ImperiumEngine.sln"))
+                            || Directory.Exists(Path.Combine(current.FullName, "Engine"));
+                        if (repo) return current.FullName;
+                        if (found.Length == 0) found = current.FullName;
+                    }
+                    current = current.Parent;
+                }
+                return found.Length > 0 ? found : start;
+            }
         }
         return "";
     }

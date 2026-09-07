@@ -21,3 +21,13 @@ Region types:
 | `+`    | seperate STATIC from CLASS                                              |
 | `=`    | between type declarations (ver, actions, func, etc.)                    |
 | `-`    | inside a function                                                       |
+
+
+### Credits
+
+Packages:
+* [Raylib-Cs](https://github.com/raylib-cs/raylib-cs)
+* [R3D-cs](https://github.com/graphnode/r3d-cs)
+* [rlimGui-cs](https://github.com/raylib-extras/rlImGui-cs)
+* [JoltPhysicsSharp](https://github.com/amerkoleci/JoltPhysicsSharp)
+* [Tomyln](https://github.com/xoofx/Tomlyn)

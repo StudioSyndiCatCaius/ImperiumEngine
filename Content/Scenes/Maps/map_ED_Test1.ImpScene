@@ -1,8 +1,167 @@
-﻿type = "A_Scene"
+type = "A_Scene"
 prefab_refs = {}
 
 [vars]
 root = {
     type = "Imp3D",
-    vars = {},
+    vars = {
+        transform = {
+            position = {
+                X = 0,
+                Y = 0,
+                Z = 0,
+            },
+            rotation = {
+                X = 0,
+                Y = 0,
+                Z = 0,
+            },
+            scale = {
+                X = 1,
+                Y = 1,
+                Z = 1,
+            },
+        },
+        physics_enabled = false,
+        collision_preset = "$A_CollisionPreset:",
+        movement_enabled = false,
+        name = "",
+        is_visible = true,
+        auto_globalize = false,
+        editor_locked = false,
+        id = "000000000000000F",
+    },
+    children = [
+        {
+            type = "C3_Mesh",
+            vars = {
+                mesh = "$A_Mesh:{builtin}/A_Mesh.PLANE",
+                transform = {
+                    position = {
+                        X = 0,
+                        Y = 0,
+                        Z = 0,
+                    },
+                    rotation = {
+                        X = 0,
+                        Y = 0,
+                        Z = 0,
+                    },
+                    scale = {
+                        X = 20,
+                        Y = 1,
+                        Z = 20,
+                    },
+                },
+                physics_enabled = true,
+                collision_preset = "$A_CollisionPreset:",
+                movement_enabled = false,
+                render_config = "$A_RenderConfig:{builtin}/A_RenderConfig.STATIC",
+                name = "C3_Mesh",
+                is_visible = true,
+                auto_globalize = false,
+                editor_locked = false,
+                id = "0000000000000010",
+            },
+            children = [],
+        },
+        {
+            type = "C3_PlayerStart",
+            vars = {
+                player_id = 0,
+                transform = {
+                    position = {
+                        X = -4.183962,
+                        Y = 1.0378425,
+                        Z = -3.3866153,
+                    },
+                    rotation = {
+                        X = 0,
+                        Y = 0,
+                        Z = 29.540403,
+                    },
+                    scale = {
+                        X = 1,
+                        Y = 1,
+                        Z = 1,
+                    },
+                },
+                physics_enabled = false,
+                collision_preset = "$A_CollisionPreset:",
+                movement_enabled = false,
+                name = "C3_PlayerStart",
+                is_visible = true,
+                auto_globalize = false,
+                editor_locked = false,
+                id = "0000000000000013",
+            },
+            children = [],
+        },
+        {
+            type = "C3_Mesh",
+            vars = {
+                mesh = "$A_Mesh:{builtin}/A_Mesh.CUBE",
+                transform = {
+                    position = {
+                        X = 0.36783695,
+                        Y = 0,
+                        Z = 5.9057264,
+                    },
+                    rotation = {
+                        X = 0,
+                        Y = 0,
+                        Z = 0,
+                    },
+                    scale = {
+                        X = 1,
+                        Y = 1,
+                        Z = 1,
+                    },
+                },
+                physics_enabled = true,
+                collision_preset = "$A_CollisionPreset:",
+                movement_enabled = false,
+                render_config = "$A_RenderConfig:{builtin}/A_RenderConfig.STATIC",
+                name = "C3_Mesh1",
+                is_visible = true,
+                auto_globalize = false,
+                editor_locked = false,
+                id = "000000000000001E",
+            },
+            children = [],
+        },
+        {
+            type = "C3_Mesh",
+            vars = {
+                mesh = "$A_Mesh:{builtin}/A_Mesh.CUBE",
+                transform = {
+                    position = {
+                        X = 4.9651003,
+                        Y = 0.18701029,
+                        Z = 4.116341,
+                    },
+                    rotation = {
+                        X = 0,
+                        Y = 0,
+                        Z = 0,
+                    },
+                    scale = {
+                        X = 1,
+                        Y = 2.2515807,
+                        Z = 1,
+                    },
+                },
+                physics_enabled = true,
+                collision_preset = "$A_CollisionPreset:",
+                movement_enabled = false,
+                render_config = "$A_RenderConfig:{builtin}/A_RenderConfig.STATIC",
+                name = "C3_Mesh2",
+                is_visible = true,
+                auto_globalize = false,
+                editor_locked = false,
+                id = "0000000000000021",
+            },
+            children = [],
+        },
+    ],
 }

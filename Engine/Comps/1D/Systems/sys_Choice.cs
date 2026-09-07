@@ -3,7 +3,7 @@ using Engine.Structs;
 
 namespace Engine.Comps._1D.States;
 
-public class sys_Choice : C1_System
+public class sys_Choice : C1_State
 {
    
 }

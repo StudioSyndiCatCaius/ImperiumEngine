@@ -117,23 +117,25 @@ public class A_Font : ImpAsset
         if (shadow_size > 0 || shadow_offset != Vector2.Zero)
         {
             Vector2 s = pos + shadow_offset;
+            Color sc = Imp2D.DrawTint(shadow_color);
             if (shadow_size <= 0)
-                Raylib.DrawTextEx(f, line, s, px, spacing, shadow_color);
+                Raylib.DrawTextEx(f, line, s, px, spacing, sc);
             else
                 for (int dy = -shadow_size; dy <= shadow_size; dy++)
                 for (int dx = -shadow_size; dx <= shadow_size; dx++)
-                    Raylib.DrawTextEx(f, line, s + new Vector2(dx, dy), px, spacing, shadow_color);
+                    Raylib.DrawTextEx(f, line, s + new Vector2(dx, dy), px, spacing, sc);
         }
         if (outline_size > 0)
         {
+            Color oc = Imp2D.DrawTint(outline_color);
             for (int dy = -outline_size; dy <= outline_size; dy++)
             for (int dx = -outline_size; dx <= outline_size; dx++)
             {
                 if (dx == 0 && dy == 0) continue;
-                Raylib.DrawTextEx(f, line, pos + new Vector2(dx, dy), px, spacing, outline_color);
+                Raylib.DrawTextEx(f, line, pos + new Vector2(dx, dy), px, spacing, oc);
             }
         }
-        Raylib.DrawTextEx(f, line, pos, px, spacing, color);
+        Raylib.DrawTextEx(f, line, pos, px, spacing, Imp2D.DrawTint(color));
     }
 
     void Wrap(string text, Font f, float px, float max_w, ETextWrap wrap)

@@ -1,5 +1,11 @@
 wnd_scene = {
-    right_panel_width = 392,
+    scene_debug = {
+        show_fps_stats = true,
+        comp_stats_display = "ByClass",
+        show_environment_stats = true,
+        show_all_bounds = false,
+    },
+    right_panel_width = 326,
 }
 wnd_config_game = {
     left_panel_width = 240,
@@ -15,17 +21,17 @@ file_browser_collapsed = false
 log_height = 60
 open_scenes = [
     {
-        path = "{engine}Scenes\\Maps\\map_ED_Title.ImpScene",
+        path = "{engine}Scenes\\Maps\\map_ED_Test1.ImpScene",
         view = "Mode_3D",
         cam3d_position = [
-            8.996537,
-            6.0363317,
-            11.764704,
+            -11.88698,
+            6.2688622,
+            -3.5650818,
         ],
         cam3d_target = [
-            0,
-            0.5,
-            0,
+            -1.0466928,
+            3.1917539,
+            -1.6891177,
         ],
         cam3d_up = [
             0,
@@ -34,7 +40,7 @@ open_scenes = [
         ],
         cam3d_fov = 50,
         cam3d_proj = "Perspective",
-        look_dist = 15.811291,
+        look_dist = 11.423645,
         cam2d_target = [
             960,
             540,
@@ -43,4 +49,4 @@ open_scenes = [
         cam2d_rot = 0,
     },
 ]
-active_scene = "{engine}Scenes\\Maps\\map_ED_Title.ImpScene"
+active_scene = "{engine}Scenes\\Maps\\map_ED_Test1.ImpScene"

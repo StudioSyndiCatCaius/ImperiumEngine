@@ -4,6 +4,7 @@ using Engine.Comps._2D;
 using Engine.Enums;
 using Engine.Interfaces;
 using Engine.Structs;
+using Raylib_cs;
 
 namespace Engine.Core;
 
@@ -13,6 +14,7 @@ public class Imp2D : ImpComp
     // STATIC
     // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     public static List<Imp2D> cursortrace_stack = new();
+    public static float draw_opacity = 1f;
 
     public static Imp2D GetCursorTraceHit(Vector2 point) //might need to reverse?
     {
@@ -21,6 +23,14 @@ public class Imp2D : ImpComp
             if (comp.Contains(point)) return comp;
         }
         return null;
+    }
+
+    public static Color DrawTint(Color c)
+    {
+        float a = draw_opacity;
+        if (a >= 1f) return c;
+        if (a <= 0f) return new Color(c.R, c.G, c.B, (byte)0);
+        return new Color(c.R, c.G, c.B, (byte)(c.A * a));
     }
     
     // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -34,6 +44,8 @@ public class Imp2D : ImpComp
     {
         size = {X=100,Y=100}
     };
+    [ImpVar] public float opacity=1.0f;
+    [ImpVar] public Vector2 scale=Vector2.One;
     [ImpVar] public ECursorFilter cursor_filter=ECursorFilter.Pass; //applied when cursor is in the bounds of this component
     
     // ==========================================================================
@@ -42,6 +54,8 @@ public class Imp2D : ImpComp
     public ImpViewport? owning_viewport; //override only (C3_UI plane, etc). otherwise inherited / scene / App.viewport_main
         
     public TBounds2 bounds; //cached bounds for 2d drawing
+    float _visual_op_prev;
+    bool _visual_scaled;
 
     protected override ECompProcess ProcessKinds => ECompProcess.Update | ECompProcess.Draw2D | ECompProcess.Cursor;
     
@@ -55,6 +69,13 @@ public class Imp2D : ImpComp
 
     public override void ProcessNotify(ENotifyProcess notify, double dt)
     {
+        if (notify == ENotifyProcess.Draw2D)
+        {
+            if (is_visible) Visual_Push();
+            base.ProcessNotify(notify, dt);
+            if (is_visible) Visual_Pop();
+            return;
+        }
         if (notify == ENotifyProcess.CursorStack)
         {
             if(!is_visible) return;
@@ -101,6 +122,39 @@ public class Imp2D : ImpComp
         if (parent is Imp2D p) return p.Viewport_Get();
         if (scene?.viewport != null) return scene.viewport;
         return App.viewport_main;
+    }
+
+    public void Visual_Push()
+    {
+        bounds = Bounds_Cache();
+        _visual_op_prev = draw_opacity;
+        float o = opacity;
+        if (o < 0f) o = 0f;
+        else if (o > 1f) o = 1f;
+        draw_opacity = _visual_op_prev * o;
+
+        _visual_scaled = scale.X != 1f || scale.Y != 1f;
+        if (!_visual_scaled) return;
+
+        float x0 = MathF.Min(bounds.start.X, bounds.end.X);
+        float y0 = MathF.Min(bounds.start.Y, bounds.end.Y);
+        float w = MathF.Abs(bounds.end.X - bounds.start.X);
+        float h = MathF.Abs(bounds.end.Y - bounds.start.Y);
+        Vector2 pivot = bounds.start;
+        if (!bounds.IsEmpty)
+            pivot = new Vector2(
+                x0 + (layout.anchor_normalized ? layout.anchor_position.X * w : layout.anchor_position.X),
+                y0 + (layout.anchor_normalized ? layout.anchor_position.Y * h : layout.anchor_position.Y));
+        Rlgl.PushMatrix();
+        Rlgl.Translatef(pivot.X, pivot.Y, 0);
+        Rlgl.Scalef(scale.X, scale.Y, 1);
+        Rlgl.Translatef(-pivot.X, -pivot.Y, 0);
+    }
+
+    public void Visual_Pop()
+    {
+        if (_visual_scaled) Rlgl.PopMatrix();
+        draw_opacity = _visual_op_prev;
     }
 
     public override void OnDraw2D(double dt, EDrawFlags flags = EDrawFlags.None)

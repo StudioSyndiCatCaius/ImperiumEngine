@@ -22,14 +22,16 @@ public struct TTraceResult3D
 
 public class Imp3D : ImpComp
 {
-    //==================================================================================================
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     // STATIC
-    //==================================================================================================
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     [ImpVar][Category("Anti Aliasing")][Config] public static AntiAliasingMode anti_aliasing_mode = AntiAliasingMode.Smaa;
     [ImpVar][Category("Anti Aliasing")][Config] public static AntiAliasingPreset anti_aliasing_preset = AntiAliasingPreset.High;
     
     [ImpVar][Category("Shadows")][Config] public static ShadowCastMode shadow_cast_mode = ShadowCastMode.OnAuto;
     [ImpVar][Category("Shadows")][Config] public static ShadowUpdateMode shadow_update_mode = ShadowUpdateMode.Continuous;
+
+    public static bool debug_draw_bounds;
     
     static bool _aa_applied;
     static AntiAliasingMode _aa_mode;
@@ -48,17 +50,34 @@ public class Imp3D : ImpComp
     
     
    
-    //==================================================================================================
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     // CLASS
-    //==================================================================================================
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    
+    // ============================================================
+    // ImpVars
+    // ============================================================
     [ImpVar] public TTransform3 transform = new();
     
     [ImpVar][Category("Physics")] public bool physics_enabled = false;
+    [ImpVar][Category("Physics")] public A_CollisionPreset collision_preset = A_CollisionPreset.PRESET_NONE;
     [ImpVar][Category("Physics")] public bool movement_enabled = false;
     [ImpVar][Category("Physics")] public A_MoveMode move_mode;
     
     [ImpVar][Category("Performance")] public A_RenderConfig render_config;
     [ImpVar][Category("Performance")] public A_Significance_Config significance;
+    
+    // ============================================================
+    // Actions
+    // ============================================================
+    
+    // first= self, second=other
+    [ScriptSignal] public Action<Imp3D,Imp3D> on_overlap_begin;
+    [ScriptSignal] public Action<Imp3D,Imp3D> on_overlap_end;
+    
+    // ============================================================
+    // Vars
+    // ============================================================
     
     public TTransform3 global_transform = new();
     public Quaternion world_rotation = Quaternion.Identity;
@@ -190,6 +209,22 @@ public class Imp3D : ImpComp
     // Physics
     // ---------------------------------------
     public virtual TBounds3 Bounds_Cache() { return new(); }
+
+    public override void OnDrawDebug(double dt, bool drawing_3d)
+    {
+        if (!drawing_3d || !debug_draw_bounds) return;
+        TBounds3 b = bounds.IsEmpty ? Bounds_Cache() : bounds;
+        if (b.IsEmpty) return;
+        float m = MathF.Min(b.size.X, MathF.Min(b.size.Y, b.size.Z));
+        float thick = Math.Clamp(m * 0.015f, 0.008f, 0.03f);
+        TTransform3 t = new()
+        {
+            position = b.center,
+            rotation = b.rotation,
+            scale = Vector3.One,
+        };
+        G3D.Draw3D_Box(t, b.size, thick, new Color(48, 220, 96, 210));
+    }
     
     public object Phys_GetShape()
     {
@@ -211,7 +246,71 @@ public class Imp3D : ImpComp
         
     }
     
+    // -- VIRTUALS
+    
+    public virtual void OnOverlapBegin(Imp3D other) { }
+    public virtual void OnOverlapEnd(Imp3D other) { }
+    
     // ---------------------------------------
     // EDITOR
     // ---------------------------------------
+    // OBB aligned to this object's rotation, large enough to contain this node
+    // and every descendant Imp3D's local bounds.
+    public TBounds3 Bounds_Encompass()
+    {
+        Quaternion q = world_rotation;
+        Quaternion inv = Quaternion.Inverse(q);
+        Vector3 origin = global_transform.position;
+        Vector3 min = new(float.MaxValue);
+        Vector3 max = new(float.MinValue);
+        bool any = false;
+        Span<Vector3> corners = stackalloc Vector3[8];
+        EncompassWalk(this, true, origin, inv, corners, ref min, ref max, ref any);
+        if (!any)
+        {
+            Vector3 sc = global_transform.scale;
+            return new TBounds3
+            {
+                center = origin,
+                size = new Vector3(
+                    MathF.Max(0.5f * MathF.Abs(sc.X), 0.05f),
+                    MathF.Max(0.5f * MathF.Abs(sc.Y), 0.05f),
+                    MathF.Max(0.5f * MathF.Abs(sc.Z), 0.05f)),
+                rotation = global_transform.rotation,
+            };
+        }
+        Vector3 size = max - min;
+        if (size.X < 0.05f) size.X = 0.05f;
+        if (size.Y < 0.05f) size.Y = 0.05f;
+        if (size.Z < 0.05f) size.Z = 0.05f;
+        return new TBounds3
+        {
+            center = origin + Vector3.Transform((min + max) * 0.5f, q),
+            size = size,
+            rotation = global_transform.rotation,
+        };
+    }
+
+    static void EncompassWalk(ImpComp c, bool is_root, Vector3 origin, Quaternion inv,
+        Span<Vector3> corners, ref Vector3 min, ref Vector3 max, ref bool any)
+    {
+        if (c == null || (!is_root && !c.is_visible)) return;
+        if (c is Imp3D o3)
+        {
+            TBounds3 b = o3.bounds.IsEmpty ? o3.Bounds_Cache() : o3.bounds;
+            if (!b.IsEmpty)
+            {
+                b.Corners(corners);
+                for (int k = 0; k < 8; k++)
+                {
+                    Vector3 local = Vector3.Transform(corners[k] - origin, inv);
+                    min = Vector3.Min(min, local);
+                    max = Vector3.Max(max, local);
+                }
+                any = true;
+            }
+        }
+        for (int i = 0; i < c.children.Count; i++)
+            EncompassWalk(c.children[i], false, origin, inv, corners, ref min, ref max, ref any);
+    }
 }

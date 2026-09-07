@@ -12,10 +12,30 @@ public enum EAnimatorState
     Paused,
 }
 
-// can play an A_Animation
+public struct TAnimationPlayConfig
+{
+    [ImpVar] public float speed=1.0f;
+    [ImpVar] public bool loop=false;
+    [ImpVar] public Dictionary<TLabel, TRef<ImpComp>> bindings;
+
+    public TAnimationPlayConfig()
+    {
+        
+    }
+}
+
+
+// can play an A_SkeletonAnim
 public class C1_Animator : Imp1D
 {
-    [ImpVar] public A_Animation animation;
+    [ScriptCall]
+    public static C1_Animator Play(A_Animation anim, TAnimationPlayConfig config=default,Action<bool> on_paused=null,Action on_finish=null)
+    {
+        // spawns a `C1_Animator` attached to the current scene root
+        return null;
+    }
+    
+    [ImpVar] public A_SkeletonAnim SkeletonAnim;
     [ImpVar] public Dictionary<TLabel, ImpComp> comp_bindings;
 
     public EAnimatorState state = EAnimatorState.Stopped;

@@ -1,4 +1,5 @@
 using System.Numerics;
+using Editor.Panels;
 using Editor.Windows;
 using Engine;
 using Engine.Assets;
@@ -61,10 +62,14 @@ public class EUI_Viewport3D : EdUi
             pos, pos + new Vector2(w, h),
             new Vector2(0, 1), new Vector2(1, 0));
 
+        if (selected is Imp3D sel3)
+            DrawSelectionBounds(sel3, pos, w, h);
+
         gizmo.mode = gizmo_mode;
         gizmo.orientation = gizmo_orientation;
         Imp3D? giz_target = selected is Imp3D o3 && !o3.Editor_IsLocked() ? o3 : null;
         bool giz = gizmo.OnDraw(giz_target, camera, pos, w, h, hovered);
+        WND_Scene.active?.scene_debug?.DrawOverlay(pos, new Vector2(w, h), scene, true);
         HandleInput(w, h, hovered, giz);
     }
 
@@ -108,11 +113,23 @@ public class EUI_Viewport3D : EdUi
         Raylib.EndMode2D();
         R3D.SetAspectMode(AspectMode.Expand);
         R3D.BeginPro(view);
-        if (scene?.root != null)
-            DrawTree(scene.root, Raylib.GetFrameTime(), 0, EDrawFlags.Editor);
-        R3D.End();
+        PNL_SceneDebug? dbg = WND_Scene.active?.scene_debug;
+        if (dbg != null)
+            dbg.ProfileDrawTree(DrawScene);
+        else
+            DrawScene();
+        if (dbg != null)
+            dbg.ProfileEnv(R3D.End);
+        else
+            R3D.End();
         Rlgl.SetBlendMode(Raylib_cs.BlendMode.Alpha);
         Raylib.BeginMode2D(App.camera_2d);
+
+        void DrawScene()
+        {
+            if (scene?.root != null)
+                DrawTree(scene.root, Raylib.GetFrameTime(), 0, EDrawFlags.Editor);
+        }
     }
 
     void DrawTree(ImpComp c, double dt, byte pass, EDrawFlags flags)
@@ -258,6 +275,47 @@ public class EUI_Viewport3D : EdUi
         }
         for (int i = 0; i < c.children.Count; i++)
             PickWalk(c.children[i], ray, ref best, ref best_t);
+    }
+
+    void DrawSelectionBounds(Imp3D root, Vector2 vp_min, int w, int h)
+    {
+        TBounds3 b = root.Bounds_Encompass();
+        if (b.IsEmpty) return;
+        Span<Vector3> corners = stackalloc Vector3[8];
+        b.Corners(corners);
+        Span<Vector2> screen = stackalloc Vector2[8];
+        Span<bool> ok = stackalloc bool[8];
+        for (int i = 0; i < 8; i++)
+            ok[i] = Project(corners[i], vp_min, w, h, out screen[i]);
+
+        ImDrawListPtr dl = ImGui.GetWindowDrawList();
+        dl.PushClipRect(vp_min, vp_min + new Vector2(w, h), true);
+        uint col = ImGui.ColorConvertFloat4ToU32(new Vector4(0.47f, 0.71f, 1f, 0.85f));
+        if (ok[0] && ok[1]) dl.AddLine(screen[0], screen[1], col, 1.5f);
+        if (ok[1] && ok[5]) dl.AddLine(screen[1], screen[5], col, 1.5f);
+        if (ok[5] && ok[4]) dl.AddLine(screen[5], screen[4], col, 1.5f);
+        if (ok[4] && ok[0]) dl.AddLine(screen[4], screen[0], col, 1.5f);
+        if (ok[2] && ok[3]) dl.AddLine(screen[2], screen[3], col, 1.5f);
+        if (ok[3] && ok[7]) dl.AddLine(screen[3], screen[7], col, 1.5f);
+        if (ok[7] && ok[6]) dl.AddLine(screen[7], screen[6], col, 1.5f);
+        if (ok[6] && ok[2]) dl.AddLine(screen[6], screen[2], col, 1.5f);
+        if (ok[0] && ok[2]) dl.AddLine(screen[0], screen[2], col, 1.5f);
+        if (ok[1] && ok[3]) dl.AddLine(screen[1], screen[3], col, 1.5f);
+        if (ok[4] && ok[6]) dl.AddLine(screen[4], screen[6], col, 1.5f);
+        if (ok[5] && ok[7]) dl.AddLine(screen[5], screen[7], col, 1.5f);
+        dl.PopClipRect();
+    }
+
+    bool Project(Vector3 p, Vector2 vp_min, int w, int h, out Vector2 s)
+    {
+        s = default;
+        Vector3 f = camera.Target - camera.Position;
+        if (f.LengthSquared() < 1e-8f) f = Vector3.UnitX;
+        if (Vector3.Dot(p - camera.Position, Vector3.Normalize(f)) <= 0.02f) return false;
+        Vector2 sc = Raylib.GetWorldToScreenEx(p, camera, w, h);
+        if (float.IsNaN(sc.X) || float.IsNaN(sc.Y)) return false;
+        s = vp_min + sc;
+        return true;
     }
 
     Vector3 CamFwd()

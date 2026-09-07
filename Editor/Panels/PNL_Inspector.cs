@@ -501,6 +501,9 @@ public class PNL_Inspector : EdPanel
         if (IsTClass(t))
             return DrawClassRow(label, t, ref value, apply, tools, can_revert, revert);
 
+        if (IsTRef(t))
+            return DrawRefRow(label, t, ref value, apply, tools, can_revert, revert);
+
         if (typeof(ImpAsset).IsAssignableFrom(t))
             return DrawAssetRow(label, t, ref value, apply, tools, can_revert, revert);
 
@@ -599,11 +602,12 @@ public class PNL_Inspector : EdPanel
     static bool IsList(Type t) => t.IsGenericType && t.GetGenericTypeDefinition() == typeof(List<>);
     static bool IsDict(Type t) => t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Dictionary<,>);
     static bool IsTClass(Type t) => t.IsGenericType && t.GetGenericTypeDefinition() == typeof(TClass<>);
+    static bool IsTRef(Type t) => t.IsGenericType && t.GetGenericTypeDefinition() == typeof(TRef<>);
 
     static bool IsExpandableStruct(Type t)
     {
         if (!t.IsValueType || t.IsPrimitive || t.IsEnum) return false;
-        if (IsTClass(t)) return false;
+        if (IsTClass(t) || IsTRef(t)) return false;
         return t != typeof(Color)
             && t != typeof(Vector2)
             && t != typeof(Vector3)
@@ -1073,6 +1077,52 @@ public class PNL_Inspector : EdPanel
 
         DrawTools(tools);
         return DrawRevertCol(ref value, can_revert, revert, apply);
+    }
+
+    bool DrawRefRow(string label, Type t, ref object? value, Action<object?>? apply, Action? tools = null,
+        bool can_revert = false, object? revert = null)
+    {
+        Type inner = t.GetGenericArguments()[0];
+        if (typeof(ImpAsset).IsAssignableFrom(inner))
+        {
+            object? asset = value != null ? t.GetMethod("Get")?.Invoke(value, null) : null;
+            object? revert_asset = can_revert && revert != null ? t.GetMethod("Get")?.Invoke(revert, null) : null;
+            object? next_ref = value;
+            Action<object?>? set = apply;
+            bool changed = DrawAssetRow(label, inner, ref asset, a =>
+            {
+                next_ref = a == null ? Activator.CreateInstance(t) : Activator.CreateInstance(t, a);
+                set?.Invoke(next_ref);
+            }, tools, can_revert, revert_asset);
+            value = next_ref;
+            return changed;
+        }
+
+        ImGui.TableNextRow();
+        ImGui.TableSetColumnIndex(0);
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextUnformatted(label);
+
+        ImGui.TableSetColumnIndex(1);
+        ReserveTools(tools);
+        string path = "";
+        if (value != null)
+            path = t.GetField("path")?.GetValue(value) as string ?? "";
+        object? path_obj = path;
+        bool edited = DrawEditor(typeof(string), ref path_obj);
+        DrawTools(tools);
+        object? resolved = value != null ? t.GetMethod("Get")?.Invoke(value, null) : null;
+        if (resolved is ImpComp c)
+        {
+            ImGui.SameLine();
+            ImGui.TextDisabled(string.IsNullOrEmpty(c.name) ? c.GetType().Name : c.name);
+        }
+        if (DrawRevertCol(ref value, can_revert, revert, apply)) return true;
+        if (!edited) return false;
+        object? next = Activator.CreateInstance(t, path_obj as string ?? "");
+        value = next;
+        apply?.Invoke(next);
+        return true;
     }
 
     bool DrawAssetRow(string label, Type slot, ref object? value, Action<object?>? apply, Action? tools = null,

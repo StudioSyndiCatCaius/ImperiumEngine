@@ -63,6 +63,7 @@ public class A_Texture : ImpAsset
         Vector2 pivot = new(x + origin.X, y + origin.Y);
         float rot = (float)offset.rotation;
         Color draw_tint = tint.A == 0 && tint.R == 0 && tint.G == 0 && tint.B == 0 ? Color.White : tint;
+        draw_tint = Imp2D.DrawTint(draw_tint);
 
         void Blit(Rectangle source, float tx, float ty, float w, float h)
         {
@@ -147,10 +148,15 @@ public class A_Texture : ImpAsset
     [Builtin] public static A_Texture UI_BTN = new() { sourcefile = "{engine}/2D/UI/UI_btn_D.png" };
     [Builtin] public static A_Texture UI_BOX_LIGHT = new() { sourcefile = "{engine}/2D/UI/UI_box_L_B.png" };
     [Builtin] public static A_Texture UI_BOX_DARK = new() { sourcefile = "{engine}/2D/UI/UI_box_D_B.png" };
+    [Builtin] public static A_Texture ENGINE_LOGO = new() { sourcefile = "{engine}/2D/UI/UI_Engine_Logo.png" };
     
     //S = surface
     [Builtin] public static A_Texture S_PROTO_FLOOR = new() { sourcefile = "{engine}/2D/Surface/Proto/proto_floor.png" };
     [Builtin] public static A_Texture S_PROTO_DOOR = new() { sourcefile = "{engine}/2D/Surface/Proto/proto_door.png" };
     [Builtin] public static A_Texture S_PROTO_STAIR = new() { sourcefile = "{engine}/2D/Surface/Proto/proto_stair.png" };
     [Builtin] public static A_Texture S_PROTO_WINDOW = new() { sourcefile = "{engine}/2D/Surface/Proto/proto_window.png" };
+    
+    [Builtin] public static A_Texture BKG_DAY = new() { sourcefile = "{engine}/2D/BKG/BKG_720p_day.png" };
+    [Builtin] public static A_Texture BKG_EVENING = new() { sourcefile = "{engine}/2D/BKG/BKG_720p_evening.png" };
+    
 }

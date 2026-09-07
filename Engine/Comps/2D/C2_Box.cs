@@ -184,7 +184,7 @@ public class UI_Box : ImpAsset
             if (background == null || background.texture.Id == 0)
             {
                 Vector2 origin = MathF.Abs((float)offset.rotation) > 1e-4f ? offset.position : Vector2.Zero;
-                Raylib.DrawRectanglePro(new Rectangle(x, y, w, h), origin, (float)offset.rotation, tint);
+                Raylib.DrawRectanglePro(new Rectangle(x, y, w, h), origin, (float)offset.rotation, Imp2D.DrawTint(tint));
             }
         }
         return TBounds2.Inset(visual, inner_margins);

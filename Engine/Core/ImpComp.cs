@@ -1,10 +1,12 @@
-﻿using System.Numerics;
+﻿using System.Diagnostics;
+using System.Numerics;
 using Engine.Assets;
 using Engine.Comps._2D;
 using Engine.Enums;
 using Engine.Globals;
 using Engine.Interfaces;
 using Engine.Structs;
+using Engine;
 
 namespace Engine.Core;
 
@@ -40,6 +42,61 @@ public enum ECompNotify
 
 public class ImpComp : I_Inspectable, I_Input, I_File
 {
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    // STATIC
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    
+    static readonly Dictionary<Type, Type[]> _type_chain = new();
+    static readonly ImpComp[] _none = Array.Empty<ImpComp>();
+    public static Action<ImpComp, double>? profile_update;
+    public static Action<ImpComp, double>? profile_draw;
+
+    // C3_Mesh, Imp3D, ImpComp — cached so register/unregister is a tight loop.
+    internal static Type[] TypeChain(Type t)
+    {
+        if (t == null) return Array.Empty<Type>();
+        if (_type_chain.TryGetValue(t, out Type[] chain)) return chain;
+        List<Type> list = new(4);
+        for (Type cur = t; cur != null && typeof(ImpComp).IsAssignableFrom(cur); cur = cur.BaseType)
+            list.Add(cur);
+        chain = list.ToArray();
+        _type_chain[t] = chain;
+        return chain;
+    }
+
+    // when scene is null, uses App.scene_current
+    [ScriptCall][Title("Comp - Get First Of Class")]
+    public static ImpComp GetFirstOfClass(TClass<ImpComp> Class, A_Scene scene = null)
+    {
+        HashSet<ImpComp> set = IndexOf(Class.Get(), scene);
+        if (set == null) return null;
+        foreach (ImpComp c in set)
+            return c;
+        return null;
+    }
+
+    [ScriptCall][Title("Comp - Get All Of Class")]
+    public static ImpComp[] GetAllOfClass(TClass<ImpComp> Class, A_Scene scene = null)
+    {
+        HashSet<ImpComp> set = IndexOf(Class.Get(), scene);
+        if (set == null || set.Count == 0) return _none;
+        ImpComp[] arr = new ImpComp[set.Count];
+        set.CopyTo(arr);
+        return arr;
+    }
+
+    static HashSet<ImpComp> IndexOf(Type t, A_Scene scene)
+    {
+        if (t == null) return null;
+        scene ??= App.scene_current;
+        return scene?.CompIndex_Of(t);
+    }
+    
+    
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    // CLASS
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    
     // ===========================================================================================
     // Imp Vars
     // ===========================================================================================
@@ -48,6 +105,7 @@ public class ImpComp : I_Inspectable, I_Input, I_File
     [ImpVar] public bool is_visible = true;
     [ImpVar] public bool auto_globalize = false;
     [ImpVar(Hidden = true)] public bool editor_locked = false;
+    [ImpVar(Hidden = true)] public TGuid64 id=new ();
 
     // ===========================================================================================
     // ACTIONS
@@ -64,7 +122,18 @@ public class ImpComp : I_Inspectable, I_Input, I_File
     public TScriptValue? script_instance; // bound later by C# / Vis sandbox
     public List<ImpComp> children=new();
     public ImpComp parent=null;
-    public A_Scene scene=null;
+    A_Scene _scene;
+    public A_Scene scene
+    {
+        get => _scene;
+        set
+        {
+            if (_scene == value) return;
+            _scene?.CompIndex_Unreg(this);
+            _scene = value;
+            _scene?.CompIndex_Reg(this);
+        }
+    }
     public int sibling_index;
     internal ECompProcess _subtree_kinds;
     internal bool _kinds_inited;
@@ -78,6 +147,7 @@ public class ImpComp : I_Inspectable, I_Input, I_File
     public bool is_prefab = false;
     public bool is_child_of_prefab = false;
     public bool is_builtin = false;
+    public bool is_runtime = false;
     public A_Scene prefab_scene;
     public TTable prefab_baseline;
 
@@ -86,6 +156,7 @@ public class ImpComp : I_Inspectable, I_Input, I_File
     // ===========================================================================================
     public ImpComp(IEnumerable<ImpComp> _children = null)
     {
+        id = TGuid64.New();
         if (_children != null)
         {
             foreach (ImpComp child in _children)
@@ -106,8 +177,11 @@ public class ImpComp : I_Inspectable, I_Input, I_File
             // UPDATE
             // ---------------------------------------------------------------------------------------------
             case ENotifyProcess.Update:
-                
+            {
                 if(scene==null) return;
+
+                bool prof_u = profile_update != null;
+                long t_u = prof_u ? Stopwatch.GetTimestamp() : 0;
 
                 _Notify( ECompNotify.PreUpdate, dt);
                 
@@ -147,8 +221,11 @@ public class ImpComp : I_Inspectable, I_Input, I_File
                             {
                                 App.globalized_comps.Add(name,this);
                             }
+                            if (script_instance == null)
+                                ImpSandbox.current?.Bind(this);
                             OnBegin();
                             on_begin?.Invoke(this);
+                            script_instance?.Call("OnBegin");
                             break;
                         // ---------------------------------------------------------
                         // END
@@ -161,6 +238,7 @@ public class ImpComp : I_Inspectable, I_Input, I_File
                             is_visible = false;
                             OnEnd();
                             on_end?.Invoke(this);
+                            script_instance?.Call("OnEnd");
                             break;
                         // ---------------------------------------------------------
                         // Update/Tick
@@ -175,6 +253,8 @@ public class ImpComp : I_Inspectable, I_Input, I_File
                             break;
                     }
                     OnUpdate(dt);
+                    script_instance?.Call("OnUpdate");
+                    script_instance?.Tick(dt);
                 }
 
                 if (is_visible != is_visible_pref)
@@ -184,8 +264,12 @@ public class ImpComp : I_Inspectable, I_Input, I_File
                 }
                 
                 _Notify( ECompNotify.PostUpdate, dt);
+
+                if (prof_u)
+                    profile_update?.Invoke(this, (Stopwatch.GetTimestamp() - t_u) * 1000.0 / Stopwatch.Frequency);
                 
                 break;
+            }
             // ---------------------------------------------------------------------------------------------
             // DRAW 3D
             // ---------------------------------------------------------------------------------------------
@@ -216,12 +300,12 @@ public class ImpComp : I_Inspectable, I_Input, I_File
 
     protected virtual ECompProcess ProcessKinds => ECompProcess.Update;
 
-    public void AssignScene(A_Scene s)
+    public void AssignScene(A_Scene s, bool force = false)
     {
-        if (scene == s) return;
+        if (!force && scene == s) return;
         scene = s;
         for (int i = 0; i < children.Count; i++)
-            children[i].AssignScene(s);
+            children[i].AssignScene(s, force);
     }
 
     void AfterChildrenChanged()
@@ -230,8 +314,8 @@ public class ImpComp : I_Inspectable, I_Input, I_File
         {
             ImpComp c = children[i];
             c.parent = this;
-            c.scene = scene;
             c.sibling_index = i;
+            if (c.scene != scene) c.AssignScene(scene, true);
             if (!c._kinds_inited)
             {
                 c._subtree_kinds = c.ProcessKinds;
@@ -258,6 +342,8 @@ public class ImpComp : I_Inspectable, I_Input, I_File
     {
         if (!is_visible) return;
         bool is_editor = (flags & EDrawFlags.Editor) != 0;
+        bool prof_d = profile_draw != null;
+        long t_d = prof_d ? Stopwatch.GetTimestamp() : 0;
         
         switch (pass)
         {
@@ -270,6 +356,9 @@ public class ImpComp : I_Inspectable, I_Input, I_File
                 if (is_editor) OnDrawDebug(dt, false);
                 break;
         }
+
+        if (prof_d)
+            profile_draw?.Invoke(this, (Stopwatch.GetTimestamp() - t_d) * 1000.0 / Stopwatch.Frequency);
     }
     
     public virtual void OnDrawDebug(double dt, bool drawing_3d) {}
@@ -292,8 +381,10 @@ public class ImpComp : I_Inspectable, I_Input, I_File
             children.Add(child);
             child.parent = this;
             child.is_builtin = builtin;
-            child.scene = scene;
+            child.AssignScene(scene, true);
+            if (scene != null && scene.is_running) child.is_runtime = true;
             child.sibling_index = children.Count - 1;
+            if (child.id.IsNone) child.id = TGuid64.New();
             if (!child._kinds_inited)
             {
                 child._subtree_kinds = child.ProcessKinds;
@@ -315,7 +406,8 @@ public class ImpComp : I_Inspectable, I_Input, I_File
         children.Insert(index, child);
         if (old != null && !same) old.AfterChildrenChanged();
         AfterChildrenChanged();
-        if (child.scene != scene) child.AssignScene(scene);
+        if (child.scene != scene) child.AssignScene(scene, true);
+        if (scene != null && scene.is_running) child.is_runtime = true;
     }
     
     public bool Is_ChildOf(ImpComp _parent)
@@ -338,6 +430,7 @@ public class ImpComp : I_Inspectable, I_Input, I_File
         {
             children.Remove(child);
             child.parent = null;
+            child.AssignScene(null, true);
             child.Kill();
             AfterChildrenChanged();
         }
@@ -353,6 +446,7 @@ public class ImpComp : I_Inspectable, I_Input, I_File
         for (int i = 0; i < copy.Length; i++)
         {
             copy[i].parent = null;
+            copy[i].AssignScene(null, true);
             copy[i].Kill();
         }
     }
@@ -368,6 +462,64 @@ public class ImpComp : I_Inspectable, I_Input, I_File
             if (found != null) return found;
         }
         return null;
+    }
+
+    public ImpComp Comp_Find(TGuid64 find_id)
+    {
+        if (find_id.IsNone) return null;
+        if (id.Equals(find_id)) return this;
+        for (int i = 0; i < children.Count; i++)
+        {
+            ImpComp found = children[i].Comp_Find(find_id);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    public void Id_RenewTree()
+    {
+        id = TGuid64.New();
+        for (int i = 0; i < children.Count; i++)
+            children[i].Id_RenewTree();
+    }
+
+    public static ImpComp Find(TGuid64 find_id, string scene_path = "")
+    {
+        if (find_id.IsNone) return null;
+
+        ImpComp Search(A_Scene s)
+        {
+            if (s?.root == null) return null;
+            if (!string.IsNullOrEmpty(scene_path))
+            {
+                if (string.IsNullOrEmpty(s.filepath)) return null;
+                string a = GFile.Make_Path_Local(s.filepath).Replace('\\', '/');
+                string b = GFile.Make_Path_Local(scene_path).Replace('\\', '/');
+                if (!string.Equals(a, b, StringComparison.OrdinalIgnoreCase)) return null;
+            }
+            return s.root.Comp_Find(find_id);
+        }
+
+        ImpComp hit = Search(App.scene_current);
+        if (hit != null) return hit;
+        hit = Search(App.scene_next);
+        if (hit != null) return hit;
+        if (App.scenes_global != null)
+        {
+            for (int i = 0; i < App.scenes_global.Count; i++)
+            {
+                hit = Search(App.scenes_global[i]);
+                if (hit != null) return hit;
+            }
+        }
+        foreach (var pair in App.assets)
+        {
+            if (pair.Value is not A_Scene sc) continue;
+            hit = Search(sc);
+            if (hit != null) return hit;
+        }
+        if (string.IsNullOrEmpty(scene_path)) return null;
+        return Search(GAsset.Asset_Load<A_Scene>(scene_path));
     }
     
     // ========================================================================================================
@@ -391,6 +543,8 @@ public class ImpComp : I_Inspectable, I_Input, I_File
 
         TTable vars = tbl.get_Table("vars");
         if(vars!=null) TTable.PopulateObject(vars,comp);
+        if (comp.id.IsNone) comp.id = TGuid64.New();
+        else TGuid64.Seen(comp.id);
 
         foreach (object c in tbl.get_List("children"))
         {
@@ -420,7 +574,7 @@ public class ImpComp : I_Inspectable, I_Input, I_File
         List<object> child_list = new();
         foreach (var child in children)
         {
-            if (child.is_builtin || (is_prefab && child.is_child_of_prefab)) continue;
+            if (child.is_builtin || child.is_runtime || (is_prefab && child.is_child_of_prefab)) continue;
             child_list.Add(child.To_Table(owner));
         }
         tbl.Set("children", child_list);
@@ -442,6 +596,7 @@ public class ImpComp : I_Inspectable, I_Input, I_File
         
         TTable vars = TTable.FromObject(scene.root).get_Table("vars");
         if(vars!=null) TTable.PopulateObject(vars,this);
+        id = TGuid64.New();
 
         foreach (var child in scene.root.children)
         {
@@ -567,6 +722,7 @@ public class ImpComp : I_Inspectable, I_Input, I_File
             if (kept.Contains(c)) continue;
             children.Remove(c);
             c.parent = null;
+            c.AssignScene(null, true);
             c.Kill();
         }
 
@@ -597,6 +753,7 @@ public class ImpComp : I_Inspectable, I_Input, I_File
             dst = src.prefab_scene.Instantiate();
             TTable ov = TTable.FromObject(src).get_Table("vars");
             if (ov != null) TTable.PopulateObject(ov, dst);
+            dst.id = TGuid64.New();
             foreach (var src_child in src.children)
             {
                 if (src_child.is_child_of_prefab) continue;
@@ -611,6 +768,7 @@ public class ImpComp : I_Inspectable, I_Input, I_File
             dst = Activator.CreateInstance(src.GetType()) as ImpComp ?? new();
             TTable cv = TTable.FromObject(src).get_Table("vars");
             if (cv != null) TTable.PopulateObject(cv, dst);
+            dst.id = TGuid64.New();
             foreach (var child in src.children)
             {
                 ImpComp child_clone = Prefab_CloneChild(child);

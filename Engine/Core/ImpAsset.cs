@@ -1,4 +1,6 @@
-﻿using Engine.Assets;
+﻿using System.Collections;
+using System.Reflection;
+using Engine.Assets;
 using Engine.Globals;
 using Engine.Interfaces;
 using Engine.Structs;
@@ -19,11 +21,13 @@ public class ImpAsset : I_Property, I_Inspectable, I_File
     
     private ImpFile _src_file_ref;
 
+    private ImpAsset progenitor; //used for CLONES, just to reference the original asset
+
     
     public void Save(bool force=false)
     {
         if (!force & !is_dity) return;
-        if (string.IsNullOrEmpty(filepath)) return;
+        if (!CanSave()) return;
         
         TTable _tbl=To_Table();
         string file_str=TTable.ToTOML(_tbl);
@@ -31,6 +35,11 @@ public class ImpAsset : I_Property, I_Inspectable, I_File
         File.WriteAllText(GFile.Make_Path_Absolute(filepath), file_str);
         is_dity=false;
         GLog.Info("Saved " + filepath);
+    }
+
+    public virtual bool CanSave()
+    {
+        return !string.IsNullOrEmpty(filepath);
     }
     
     // Reimports the data from the sourcefile
@@ -56,6 +65,49 @@ public class ImpAsset : I_Property, I_Inspectable, I_File
     }
     
     public virtual void OnReimport(ImpFile src) { }
+
+    public ImpAsset Clone(bool deep = false)
+    {
+        if (Activator.CreateInstance(GetType()) is not ImpAsset clone)
+            return this;
+
+        clone.From_Table(To_Table());
+        clone.sourcefile = sourcefile;
+        clone.filepath = filepath;
+        clone.is_inlined = is_inlined;
+        clone.is_dity = false;
+        clone._src_file_ref = _src_file_ref;
+        clone.progenitor = this;
+
+        foreach (FieldInfo f in GetType().GetFields(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (!f.IsDefined(typeof(ImpVarAttribute), true)) continue;
+            object val = f.GetValue(this);
+            if (val is ImpAsset nested)
+                f.SetValue(clone, deep ? nested.Clone(true) : nested);
+            else if (deep && val is IList src_list && f.GetValue(clone) is IList dst_list)
+            {
+                int n = Math.Min(src_list.Count, dst_list.Count);
+                for (int i = 0; i < n; i++)
+                    if (src_list[i] is ImpAsset item)
+                        dst_list[i] = item.Clone(true);
+            }
+            else if (deep && val is IDictionary src_map && f.GetValue(clone) is IDictionary dst_map)
+            {
+                foreach (DictionaryEntry e in src_map)
+                    if (e.Key != null && e.Value is ImpAsset item)
+                        dst_map[e.Key] = item.Clone(true);
+            }
+        }
+        return clone;
+    }
+
+    public bool Matches(ImpAsset other)
+    {
+        if(this==other) return true;
+        if(this.progenitor==other) return true;
+        return false;
+    }
 
     // --------------------------------------------------
     // Table Read/Write

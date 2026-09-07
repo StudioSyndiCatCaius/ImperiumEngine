@@ -18,11 +18,13 @@ namespace Editor.Windows;
 
 public class WND_Scene : EdWindow
 {
+    
     public static WND_Scene? active;
 
     public PNL_Inspector inspector_comp = new() { title = "Comp" };
     public PNL_Inspector inspector_scene = new() { title = "Scene" };
     public PNL_SceneTree scene_tree = new() { title = "Outliner" };
+    public PNL_SceneDebug scene_debug = new() { title = "Debug" };
 
     public List<EUI_SceneTab> scene_tabs = new();
     public EUI_SceneTab? current_scene_tab = null;
@@ -55,12 +57,13 @@ public class WND_Scene : EdWindow
                 Scene_New();
         }
 
+        scene_debug.BeginFrame();
         A_Scene? s = current_scene_tab?.scene;
         if (s == null) return;
         if (s.root != null) s.root.scene = s;
         if (s.viewport == null)
             s.viewport = new ImpViewport { size = new Vector2(EUI_Viewport2D.CanvasW, EUI_Viewport2D.CanvasH) };
-        s.ProcessNotify(ENotifyProcess.Update, dt);
+        scene_debug.ProfileUpdate(s, dt);
     }
 
     public override void OnDraw()
@@ -122,6 +125,9 @@ public class WND_Scene : EdWindow
 
         scene_tree.dock_id = outliner_dock;
         scene_tree.OnDraw();
+
+        scene_debug.dock_id = outliner_dock;
+        scene_debug.OnDraw();
 
         inspector_scene.dock_id = inspector_dock;
         inspector_scene.OnDraw();
@@ -199,6 +205,8 @@ public class WND_Scene : EdWindow
             current_scene_tab.viewport2d.scene = s;
             current_scene_tab.viewport2d.selected = selected_comp;
             current_scene_tab.viewport2d.on_select = Select;
+            current_scene_tab.script_graph.script = s?.script;
+            current_scene_tab.script_graph.on_changed = () => { if (s != null) s.is_dity = true; };
         }
     }
 
@@ -373,7 +381,7 @@ public class WND_Scene : EdWindow
         parent.Child_Add(n);
         if (parent.scene != null) parent.scene.is_dity = true;
         Editor.history.Record(
-            () => { parent.children.Remove(n); n.parent = null; },
+            () => { parent.children.Remove(n); n.parent = null; n.AssignScene(null, true); },
             () => { if (!parent.children.Contains(n)) parent.Child_Add(n); });
         Select(n);
     }
@@ -392,6 +400,7 @@ public class WND_Scene : EdWindow
             int idx = parent.children.IndexOf(s);
             parent.children.Remove(s);
             s.parent = null;
+            s.AssignScene(null, true);
             sc.is_dity = true;
             Editor.history.Record(
                 () =>
@@ -401,13 +410,14 @@ public class WND_Scene : EdWindow
                         if (idx < 0 || idx > parent.children.Count) parent.children.Add(s);
                         else parent.children.Insert(idx, s);
                         s.parent = parent;
-                        s.scene = parent.scene;
+                        s.AssignScene(parent.scene, true);
                     }
                 },
                 () =>
                 {
                     parent.children.Remove(s);
                     s.parent = null;
+                    s.AssignScene(null, true);
                 });
             Select(parent);
         });
@@ -419,6 +429,7 @@ public class WND_Scene : EdWindow
         if (s == null || sc == null || s == sc.root || s.parent == null || s.is_builtin) return;
         if (s.Editor_IsLocked() || s.parent.Editor_IsLocked()) return;
         ImpComp copy = ImpComp.From_Table(s.To_Table(sc), sc);
+        copy.Id_RenewTree();
         copy.name = UniqueName(s.parent, string.IsNullOrEmpty(s.name) ? copy.GetType().Name : s.name);
         int idx = s.parent.children.IndexOf(s);
         s.parent.Child_Add(copy);
@@ -434,14 +445,14 @@ public class WND_Scene : EdWindow
         }
         sc.is_dity = true;
         Editor.history.Record(
-            () => { s.parent.children.Remove(copy); copy.parent = null; },
+            () => { s.parent.children.Remove(copy); copy.parent = null; copy.AssignScene(null, true); },
             () =>
             {
                 if (!s.parent.children.Contains(copy))
                 {
                     s.parent.children.Insert(Math.Min(idx + 1, s.parent.children.Count), copy);
                     copy.parent = s.parent;
-                    copy.scene = sc;
+                    copy.AssignScene(sc, true);
                 }
             });
         Select(copy);
@@ -493,6 +504,7 @@ public class WND_Scene : EdWindow
         s.root.Child_Add(ground);
         s.root.Child_Add(cube);
         s.root.Child_Add(title);
+        s.script = A_Script.MakeTest();
         s.is_dity = true;
         Scene_Open(s);
     }
@@ -511,7 +523,9 @@ public class WND_Scene : EdWindow
         }
         current_scene_tab = new EUI_SceneTab { scene = scene };
         scene_tabs.Add(current_scene_tab);
-        scene.Begin();
+        // Edit mode only. Begin() starts the game mode and must not mutate the authored scene.
+        scene.Refresh();
+        if (scene.root != null) scene.root.AssignScene(scene);
         BindPanels();
         SaveSession();
     }
@@ -618,6 +632,13 @@ public class EUI_SceneTab : EdUi
 
         if (ImGui.BeginTabItem("Script"))
         {
+            if (scene != null && scene.script == null)
+            {
+                scene.script = A_Script.MakeTest();
+                scene.is_dity = true;
+            }
+            script_graph.script = scene?.script;
+            script_graph.on_changed = () => { if (scene != null) scene.is_dity = true; };
             script_graph.OnDrawPanel();
             ImGui.EndTabItem();
         }

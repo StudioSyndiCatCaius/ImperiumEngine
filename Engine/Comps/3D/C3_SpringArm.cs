@@ -21,14 +21,14 @@ public class C3_SpringArm : Imp3D
     public override void OnUpdate(double dt)
     {
         base.OnUpdate(dt);
-        if (!lag_init || (lag_position_speed <= 0 && lag_rotation_speed <= 0))
+        if (!lag_init)
         {
             lag_transform = global_transform;
             lag_init = true;
         }
         else
         {
-            if (lag_position_speed > 0)
+            if (lag_position)
             {
                 lag_transform.position = GMath.V3_Interp(
                     lag_transform.position,
@@ -41,7 +41,7 @@ public class C3_SpringArm : Imp3D
                 lag_transform.position = global_transform.position;
             }
 
-            if (lag_rotation_speed > 0)
+            if (lag_rotation)
             {
                 lag_transform.rotation = GMath.V3_Interp(
                     lag_transform.rotation,
@@ -57,6 +57,7 @@ public class C3_SpringArm : Imp3D
             lag_transform.scale = global_transform.scale;
         }
 
-        end_transform = TTransform3.Offset(lag_transform, new Vector3(length, 0, 0));
+        // Positive length pulls the view backward along local -X so the pawn stays in frame.
+        end_transform = TTransform3.Offset(lag_transform, new Vector3(-length, 0, 0));
     }
 }

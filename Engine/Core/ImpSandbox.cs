@@ -1,3 +1,4 @@
+using Engine.Assets;
 using Engine.Enums;
 using Engine.Globals;
 
@@ -28,6 +29,11 @@ public class TScriptValue
     {
         sandbox?.Call(this, name);
     }
+
+    public void Tick(double dt)
+    {
+        sandbox?.Tick(this, dt);
+    }
 }
 
 public abstract class ImpSandbox
@@ -38,15 +44,18 @@ public abstract class ImpSandbox
     public abstract void Shutdown();
     public abstract void RunGlobal(string path);
     public abstract TScriptValue? RunInstance(string path, ImpComp owner);
+    public virtual TScriptValue? RunInstance(A_Script script, ImpComp owner) => null;
     public abstract bool Has(TScriptValue inst, string name);
     public abstract void Call(TScriptValue inst, string name);
+    public virtual void Tick(TScriptValue inst, double dt) { }
 
     public void Bind(ImpComp c)
     {
         if (c == null || c.script_instance != null) return;
-        string? path = SidecarPath(c);
-        if (path == null) return;
-        TScriptValue? inst = RunInstance(path, c);
+        if (c.parent != null) return;
+        A_Script? script = c.scene?.script;
+        if (script == null || script.nodes.Count == 0) return;
+        TScriptValue? inst = RunInstance(script, c);
         if (inst != null) c.script_instance = inst;
     }
 

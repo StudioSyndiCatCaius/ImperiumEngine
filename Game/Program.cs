@@ -2,6 +2,7 @@ using Engine;
 using Engine.Core;
 using Engine.Enums;
 using Engine.Globals;
+using Engine.Sandbox;
 
 App _app=new App();
 App.name = "My Game";
@@ -10,7 +11,7 @@ TAppHooks hooks=new()
 {
     on_post_init = () =>
     {
-
+        ImpSandbox.current = new Sandbox_Vis();
     }
 };
 

@@ -290,34 +290,63 @@ public class SNC_Editor_Root : ImpComp
     {
         Play_Stop();
 
-        string exe = "";
         string name = OperatingSystem.IsWindows() ? "Game.exe" : "Game";
-        string beside = Path.Combine(AppContext.BaseDirectory, name);
-        if (File.Exists(beside)) exe = beside;
-        else
-        {
-            string root = GFile.GetDir_Root(EContentDir.Engine);
+        string root = GFile.GetDir_Root(EContentDir.Engine);
 #if DEBUG
-            string cfg = "Debug";
+        string cfg = "Debug";
 #else
-            string cfg = "Release";
+        string cfg = "Release";
 #endif
-            string tfm = "net" + Environment.Version.Major + ".0";
-            string built = Path.Combine(root, "Game", "bin", cfg, tfm, name);
-            if (File.Exists(built)) exe = built;
-            else
+        string exe = Path.Combine(AppContext.BaseDirectory, name);
+        if (!File.Exists(exe))
+            exe = Path.Combine(root, "bin", cfg, name);
+        if (!File.Exists(exe))
+        {
+            string csproj = Path.Combine(root, "Game", "Game.csproj");
+            if (!File.Exists(csproj))
             {
-                string bin = Path.Combine(root, "Game", "bin");
-                if (Directory.Exists(bin))
+                GLog.Error("Game.exe not found.");
+                return;
+            }
+            GLog.Info("Building Game...");
+            try
+            {
+                Process build = Process.Start(new ProcessStartInfo
                 {
-                    string[] hits = Directory.GetFiles(bin, name, SearchOption.AllDirectories);
-                    if (hits.Length > 0) exe = hits[0];
+                    FileName = "dotnet",
+                    Arguments = "build \"" + csproj + "\" -nologo -v q",
+                    WorkingDirectory = root,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                });
+                if (build == null)
+                {
+                    GLog.Error("dotnet build failed to start.");
+                    return;
+                }
+                string stdout = build.StandardOutput.ReadToEnd();
+                string stderr = build.StandardError.ReadToEnd();
+                build.WaitForExit();
+                if (build.ExitCode != 0)
+                {
+                    GLog.Error("Game build failed.");
+                    if (!string.IsNullOrWhiteSpace(stderr)) GLog.Error(stderr.Trim());
+                    if (!string.IsNullOrWhiteSpace(stdout)) GLog.Error(stdout.Trim());
+                    return;
                 }
             }
+            catch (Exception e)
+            {
+                GLog.Error("Game build failed: " + e.Message);
+                return;
+            }
+            exe = Path.Combine(root, "bin", cfg, name);
         }
-        if (string.IsNullOrEmpty(exe) || !File.Exists(exe))
+        if (!File.Exists(exe))
         {
-            GLog.Error("Game.exe not found. Build the Game project.");
+            GLog.Error("Game.exe not found.");
             return;
         }
         if (string.IsNullOrEmpty(App.game_file) || !File.Exists(App.game_file))

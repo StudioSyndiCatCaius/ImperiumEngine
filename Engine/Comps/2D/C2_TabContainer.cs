@@ -29,9 +29,13 @@ public class C2_TabContainer : Imp2D
     // =============================================================================
     // INIT
     // =============================================================================
+    public C2_TabContainer() {}
+
     public C2_TabContainer(IEnumerable<Imp2D> _children, int _current_tab = 0)
     {
-        children.AddRange(_children);
+        if (_children != null)
+            foreach (Imp2D child in _children)
+                Child_Add(child);
         current_tab = _current_tab;
     }
 

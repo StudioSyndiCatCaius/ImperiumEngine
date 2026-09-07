@@ -12,9 +12,9 @@ public struct TSignificanceLevelGlobalConfig
     [ImpVar] float distance;
 }
 
+[Title("Significance")]
 public class A_Significance_Config : ImpAsset
 {
-    [ImpVar][Config] public static Dictionary<ESignificanceLevel,TSignificanceLevelGlobalConfig> global_configs;
     
     // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     // CLASS
@@ -25,6 +25,29 @@ public class A_Significance_Config : ImpAsset
     // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     // STATICS
     // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    [ImpVar][Config] public static Dictionary<ESignificanceLevel,TSignificanceLevelGlobalConfig> global_configs=new ()
+    {
+        [ESignificanceLevel.Top]=new()
+        {
+            
+        },
+        [ESignificanceLevel.High]=new()
+        {
+            
+        },
+        [ESignificanceLevel.Medium]=new()
+        {
+            
+        },
+        [ESignificanceLevel.Low]=new ()
+        {
+            
+        },
+        [ESignificanceLevel.None]=new()
+        {
+            
+        }
+    };
     [Builtin] public static A_Significance_Config CHARACTER = new();
     [Builtin] public static A_Significance_Config STATIC = new();
 }

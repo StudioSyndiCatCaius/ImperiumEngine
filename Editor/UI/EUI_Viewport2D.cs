@@ -1,4 +1,5 @@
 using System.Numerics;
+using Editor.Panels;
 using Editor.Windows;
 using Engine;
 using Engine.Assets;
@@ -66,6 +67,7 @@ public class EUI_Viewport2D : EdUi
         gizmo.orientation = gizmo_orientation;
         Imp2D? giz_target = selected is Imp2D o2 && !o2.Editor_IsLocked() ? o2 : null;
         bool giz = gizmo.OnDraw(giz_target, camera, vp_min, w, h, hovered);
+        WND_Scene.active?.scene_debug?.DrawOverlay(vp_min, new Vector2(w, h), scene, false);
         HandleInput(hovered, giz);
     }
 
@@ -100,8 +102,17 @@ public class EUI_Viewport2D : EdUi
 
         DrawGrid(w, h);
 
-        if (scene?.root != null)
-            DrawTree(scene.root, Raylib.GetFrameTime(), 1, EDrawFlags.Editor);
+        PNL_SceneDebug? dbg = WND_Scene.active?.scene_debug;
+        if (dbg != null)
+            dbg.ProfileDrawTree(DrawScene);
+        else
+            DrawScene();
+
+        void DrawScene()
+        {
+            if (scene?.root != null)
+                DrawTree(scene.root, Raylib.GetFrameTime(), 1, EDrawFlags.Editor);
+        }
 
         Raylib.EndMode2D();
         DrawScreenOverlays();
@@ -208,11 +219,14 @@ public class EUI_Viewport2D : EdUi
     void DrawTree(ImpComp c, double dt, byte pass, EDrawFlags flags)
     {
         if (c == null || !c.is_visible) return;
+        Imp2D o2 = c as Imp2D;
+        if (o2 != null) o2.Visual_Push();
         EDrawFlags f = flags;
         if (c == selected) f |= EDrawFlags.Selected;
         c.Draw(dt, pass, f);
         for (int i = 0; i < c.children.Count; i++)
             DrawTree(c.children[i], dt, pass, flags);
+        if (o2 != null) o2.Visual_Pop();
     }
 
     void HandleInput(bool item_hovered, bool gizmo_block)

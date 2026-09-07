@@ -37,7 +37,11 @@ public class ImpFile
     public void Reimport()
     {
         string _path = GFile.Make_Path_Absolute(filepath);
-        if (string.IsNullOrEmpty(_path) || !File.Exists(_path)) return;
+        if (string.IsNullOrEmpty(_path) || !File.Exists(_path))
+        {
+            GLog.Error("Source file not found: " + filepath + " -> " + _path);
+            return;
+        }
         if (file_type == EFileType.DataText)
         {
             switch (Path.GetExtension(_path).ToLowerInvariant())
@@ -125,7 +129,7 @@ public class ImpFile
                         string clip = "";
                         try { clip = anims[i].Name.ToString() ?? ""; }
                         catch { }
-                        list.Add(new A_Animation
+                        list.Add(new A_SkeletonAnim
                         {
                             sourcefile = filepath,
                             source_id = i,

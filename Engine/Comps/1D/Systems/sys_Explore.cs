@@ -7,13 +7,13 @@ using Raylib_cs;
 namespace Engine.Comps._1D.Systems;
 
 
-public class sys_Explore : C1_System
+public class sys_Explore : C1_State
 {
     [ImpVar][Config][Category("Camera")] public Vector3 camera_init_rotation;
     [ImpVar][Config][Category("Camera")] public bool camera_enable_rotate_H;
     [ImpVar][Config][Category("Camera")] public bool camera_enable_rotate_V;
 
-    [ImpVar][Config][Category("States")] public TClass<C1_System> system_pause;
+    [ImpVar][Config][Category("States")] public TClass<C1_State> system_pause;
 
 
     public sys_Explore()

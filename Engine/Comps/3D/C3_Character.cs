@@ -12,6 +12,12 @@ public class C3_Character : C3_Collider
     {
         type = EColliderType.Capsule;
         move_mode=A_MoveMode.DEFAULT;
+        physics_enabled=true;
+        collision_preset = A_CollisionPreset.PRESET_CHARACTER;
+        
+        Child_Add(mesh, true);
+        Child_Add(skeleton, true);
+        Child_Add(creature, true);
     }
     
     // ==========================================================================================

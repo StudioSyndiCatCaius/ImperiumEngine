@@ -1,0 +1,45 @@
+C1_Creature = {
+    config_default = {
+        abilities = {},
+    },
+    config_per_type = {},
+}
+ImpGame = {
+    starting_scene = "{engine}Scenes\\Maps\\map_ED_Title.ImpScene",
+}
+A_GameMode = {
+    default_gamemode = "$GameMode_Common:{builtin}/GameMode_Common.THIRD_PERSON",
+}
+GameMode_Common = {
+    default_pawn = {
+        class_name = "C3_Character",
+    },
+}
+GameMode_RailMover = {
+    default_pawn = {
+        class_name = "C3_Character",
+    },
+}
+Imp3D = {
+    anti_aliasing_mode = "Smaa",
+    anti_aliasing_preset = "Ultra",
+    shadow_cast_mode = "OnAuto",
+    shadow_update_mode = "Continuous",
+}
+ImpPlayer = {
+    input_actions = {
+        actions = {},
+    },
+}
+A_Save = {
+    save_dir = "User",
+    save_game_class = {},
+    save_game_prefex = "save_",
+    save_global_class = {},
+    save_global_name = "global",
+}
+A_Significance_Config = {
+    global_configs = {
+        Top = {},
+    },
+}

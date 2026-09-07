@@ -4,7 +4,7 @@ namespace Engine.Assets;
 
 public struct TBlendSpaceKey
 {
-    public A_Animation animation;
+    public A_SkeletonAnim SkeletonAnim;
     public float x;
     public float y;
 }

@@ -5,7 +5,7 @@ namespace Engine.Comps._1D.States.Menus;
 
 
 
-public class Sys_menu_Equip : C1_System
+public class Sys_menu_Equip : C1_State
 {
     [ImpVar] public C2_OptionList list_party;
     [ImpVar] public C2_OptionList list_slots;

@@ -68,6 +68,17 @@ public struct TGuid64 : IEquatable<TGuid64>, I_Property
         return new TGuid64(v);
     }
 
+    public static void Seen(TGuid64 g)
+    {
+        if (g.value == 0) return;
+        while (true)
+        {
+            ulong cur = Volatile.Read(ref _next);
+            if (g.value <= cur) return;
+            if (Interlocked.CompareExchange(ref _next, g.value, cur) == cur) return;
+        }
+    }
+
     public bool Equals(TGuid64 other) => value == other.value;
     public override bool Equals(object? obj) => obj is TGuid64 other && Equals(other);
     public override int GetHashCode() => value.GetHashCode();

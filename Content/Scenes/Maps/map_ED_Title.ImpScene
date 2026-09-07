@@ -23,17 +23,19 @@ root = {
             },
         },
         physics_enabled = false,
+        collision_preset = "$A_CollisionPreset:",
         movement_enabled = false,
         name = "",
         is_visible = true,
         auto_globalize = false,
         editor_locked = false,
+        id = "0000000000000002",
     },
     children = [
         {
             type = "C2_Image",
             vars = {
-                texture = "$A_Texture:{builtin}/A_Texture.S_PROTO_WINDOW",
+                texture = "$A_Texture:{builtin}/A_Texture.BKG_DAY",
                 image_layout = "Retain_Fill",
                 nine_slice_margins = {
                     left = 0,
@@ -68,19 +70,25 @@ root = {
                     },
                     anchor_normalized = true,
                 },
+                opacity = 1,
+                scale = {
+                    X = 1,
+                    Y = 1,
+                },
                 cursor_filter = "Pass",
                 name = "C2_Image",
                 is_visible = true,
                 auto_globalize = false,
                 editor_locked = false,
+                id = "0000000000000003",
             },
             children = [],
         },
         {
             type = "C2_Image",
             vars = {
-                texture = "$A_Texture:{builtin}/A_Texture.S_PROTO_STAIR",
-                image_layout = "Stretch",
+                texture = "$A_Texture:{builtin}/A_Texture.ENGINE_LOGO",
+                image_layout = "Retain_Fit",
                 nine_slice_margins = {
                     left = 0,
                     right = 0,
@@ -97,8 +105,8 @@ root = {
                         Y = 353.26947,
                     },
                     size = {
-                        X = 400,
-                        Y = 400,
+                        X = 772.7892,
+                        Y = 690.1117,
                     },
                     size_min = {
                         X = 0,
@@ -114,11 +122,17 @@ root = {
                     },
                     anchor_normalized = true,
                 },
+                opacity = 1,
+                scale = {
+                    X = 1,
+                    Y = 1,
+                },
                 cursor_filter = "Pass",
                 name = "logo",
                 is_visible = true,
                 auto_globalize = true,
                 editor_locked = false,
+                id = "0000000000000004",
             },
             children = [],
         },
@@ -261,13 +275,67 @@ root = {
                     },
                     anchor_normalized = true,
                 },
+                opacity = 1,
+                scale = {
+                    X = 1,
+                    Y = 1,
+                },
                 cursor_filter = "Pass",
                 name = "options_root",
                 is_visible = true,
                 auto_globalize = false,
                 editor_locked = false,
+                id = "0000000000000005",
             },
             children = [],
         },
     ],
+}
+script = {
+    type = "A_Script",
+    vars = {
+        class_type = "ImpComp",
+        nodes = [
+            {
+                type = "VN_Hook_Enter",
+                id = "0000000000000001",
+                x = 60,
+                y = 80,
+                hook_name = "OnBegin",
+            },
+            {
+                type = "VN_Delay",
+                id = "0000000000000002",
+                x = 280,
+                y = 80,
+                duration = 1,
+            },
+            {
+                type = "VN_Func",
+                id = "0000000000000003",
+                x = 520,
+                y = 80,
+                literals = {
+                    msg = "Vis: hello",
+                    on_screen = false,
+                },
+                type_name = "GLog",
+                method_name = "Info",
+            },
+        ],
+        wires = [
+            {
+                from = "0000000000000001",
+                to = "0000000000000002",
+                from_pin = 0,
+                to_pin = 0,
+            },
+            {
+                from = "0000000000000002",
+                to = "0000000000000003",
+                from_pin = 0,
+                to_pin = 0,
+            },
+        ],
+    },
 }

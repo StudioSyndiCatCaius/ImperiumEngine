@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
 using Editor.Dialog;
@@ -298,6 +299,9 @@ public class PNL_FileBrowser : EdPanel
         if (ImGui.MenuItem("New Folder")) NewFolder();
         if (ImGui.MenuItem("New Asset")) NewAsset();
         if (ImGui.MenuItem("New Scene")) NewScene();
+        ImGui.Separator();
+        if (ImGui.MenuItem("Show in Explorer"))
+            ShowInExplorer(root_path);
     }
 
     void DrawFolderMenu(string path)
@@ -316,6 +320,9 @@ public class PNL_FileBrowser : EdPanel
                 SetFolderColor(path, null);
             ImGui.EndMenu();
         }
+        ImGui.Separator();
+        if (ImGui.MenuItem("Show in Explorer"))
+            ShowInExplorer(path);
     }
 
     void DrawFileMenu(string path, EEditorFileType type)
@@ -328,6 +335,28 @@ public class PNL_FileBrowser : EdPanel
             DuplicateFile(path);
         if (type == EEditorFileType.SourceFile && ImGui.MenuItem("Create Assets"))
             EDLG_CreateAsset.Run(path);
+        ImGui.Separator();
+        if (ImGui.MenuItem("Show in Explorer"))
+            ShowInExplorer(path);
+    }
+
+    static void ShowInExplorer(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return;
+        try { path = Path.GetFullPath(path); }
+        catch { return; }
+        bool file = File.Exists(path);
+        if (!file && !Directory.Exists(path)) return;
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = file ? "/select,\"" + path + "\"" : "\"" + path + "\"",
+                UseShellExecute = true
+            });
+        }
+        catch { }
     }
 
     void NewFolder()

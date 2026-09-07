@@ -19,6 +19,7 @@ public struct TCursorData
     }
 }
 
+[Title("Player")]
 public class ImpPlayer
 {
     const EInputKey KEY_DRAG_START_KM=EInputKey.Mouse_Left;
@@ -28,6 +29,8 @@ public class ImpPlayer
     // ==============================================================================================================
     [ImpVar][Config] public static TInputSet input_actions = new();
 
+    public static Action<ImpPlayer> on_player_connect;
+    public static Action<ImpPlayer> on_player_disconnect;
     public static Action<int,EInputKey,EInputState> on_input_key_event;
     
     public static ImpPlayer Get(int id = 0)

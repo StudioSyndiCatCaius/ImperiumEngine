@@ -82,6 +82,12 @@ public class App
     private static A_Scene scene_prev = null;
     
     // ========================================================================================
+    // Save
+    // ========================================================================================
+    public static A_Save_Game save_game = new();
+    public static A_Save_Global save_global = new();
+    
+    // ========================================================================================
     // Command Line Args
     // ========================================================================================
     private static Dictionary<string,string> args = new();
@@ -220,10 +226,7 @@ public class App
             {
                 A_Scene starting_scene = GAsset.Asset_Load<A_Scene>(first_scene_path);
                 if (starting_scene != null)
-                {
-                    starting_scene.is_running = true;
-                    scene_current = starting_scene;
-                }
+                    scene_current = starting_scene.Clone() as A_Scene ?? starting_scene;
             }
         }
         // ========================================================================================----------------------------
@@ -248,7 +251,6 @@ public class App
             else if (scene_state == EAppSceneState.Loading)
             {
                 scene_state = EAppSceneState.Idle;
-                scene_current.is_running = true;
                 scene_current?.Begin();
                 Hooks.scene_change_end?.Invoke();
             }
@@ -317,6 +319,7 @@ public class App
         // Shutdown
         // -----------------------------------------------------
         
+        scene_current?.End();
         hooks.on_shutdown?.Invoke();
         ImpSandbox.current?.Shutdown();
         

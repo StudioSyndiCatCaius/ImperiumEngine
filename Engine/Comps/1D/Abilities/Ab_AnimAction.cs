@@ -12,7 +12,7 @@ public class Ab_AnimAction : C1_Ability
         base.OnAbility_Activate(Context);
         if (owning_creature.skeleton != null)
         {
-            A_Animation anim = null; //get from context somehow
+            A_SkeletonAnim anim = null; //get from context somehow
             owning_creature.skeleton.PlayAnimation(anim, (n) =>
             {
                 if (n == "impact")

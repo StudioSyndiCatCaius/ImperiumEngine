@@ -18,9 +18,9 @@ public struct TCreatureConfig
 // Creature is an advanced component for handling common gameplay functions for an entity (E.G, Attribute, Abilities, Equipment, Inventory, etc.)  
 public class C1_Creature : Imp1D
 {
-    // ================================================================================================================
+    // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     // Static
-    // ================================================================================================================
+    // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     [ImpVar][Config] public static TCreatureConfig config_default;
     [ImpVar][Config] public static Dictionary<TClass<Imp3D>,TCreatureConfig> config_per_type = new();
 
@@ -29,17 +29,17 @@ public class C1_Creature : Imp1D
         return config_per_type.TryGetValue(type, out TCreatureConfig config) ? config : config_default;
     }
     
-    // ================================================================================================================
+    // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     // Class
-    // ================================================================================================================
+    // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     [ImpVar] public Imp3D creature_root; // intended to be the rootmost comp of this scene.
     [ImpVar] public C3_Skeleton skeleton;
+    [ImpVar] public A_CreatureData data;
+    [ImpVar] public AG_Faction faction;
     
     private List<C1_Aura> _auras;
     private List<C1_Ability> _abilities;
     public List<Object> _modifiers;
-    public A_CreatureData data;
-    public AG_Faction faction;
 
 
     public override void OnBegin()
