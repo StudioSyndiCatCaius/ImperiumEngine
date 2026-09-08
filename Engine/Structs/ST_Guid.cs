@@ -4,6 +4,63 @@ using Engine.Interfaces;
 
 namespace Engine.Structs;
 
+public struct TGuid16 : IEquatable<TGuid16>, I_Property
+{
+    static int _next;
+    [ImpVar] public ushort value;
+
+    public TGuid16(ushort value) => this.value = value;
+
+    public static TGuid16 None => default;
+    public bool IsNone => value == 0;
+
+    public static TGuid16 New()
+    {
+        int v = Interlocked.Increment(ref _next);
+        if ((ushort)v == 0) v = Interlocked.Increment(ref _next);
+        return new TGuid16(unchecked((ushort)v));
+    }
+
+    public static void Seen(TGuid16 g)
+    {
+        if (g.value == 0) return;
+        while (true)
+        {
+            int cur = Volatile.Read(ref _next);
+            if (g.value <= cur) return;
+            if (Interlocked.CompareExchange(ref _next, g.value, cur) == cur) return;
+        }
+    }
+
+    public bool Equals(TGuid16 other) => value == other.value;
+    public override bool Equals(object? obj) => obj is TGuid16 other && Equals(other);
+    public override int GetHashCode() => value;
+    public override string ToString() => value.ToString("X4", CultureInfo.InvariantCulture);
+
+    public static bool operator ==(TGuid16 a, TGuid16 b) => a.value == b.value;
+    public static bool operator !=(TGuid16 a, TGuid16 b) => a.value != b.value;
+    public static implicit operator ushort(TGuid16 g) => g.value;
+    public static implicit operator TGuid16(ushort v) => new(v);
+
+    public bool Property_IsCustomParse() => true;
+    public void Property_Read(object raw)
+    {
+        switch (raw)
+        {
+            case string s when ushort.TryParse(s, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ushort hex):
+                value = hex; break;
+            case string s when ushort.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out ushort dec):
+                value = dec; break;
+            case int i: value = unchecked((ushort)i); break;
+            case long l: value = unchecked((ushort)l); break;
+            case uint u: value = unchecked((ushort)u); break;
+            case ushort us: value = us; break;
+            default: value = 0; break;
+        }
+    }
+    public object Property_Write() => ToString();
+}
+
 public struct TGuid32 : IEquatable<TGuid32>, I_Property
 {
     static uint _next;

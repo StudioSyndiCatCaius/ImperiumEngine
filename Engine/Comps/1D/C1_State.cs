@@ -15,6 +15,17 @@ public abstract class C1_State : Imp1D
     [ImpVar] public TTagSet system_tags;
     [ImpVar] public TTagSet blocked_system_tags;
 
-    [ImpVar] public C1_StateManager substates=new();
+    [ImpVar] public C1_StateManager substates = new();
 
+    public override void OnBegin()
+    {
+        base.OnBegin();
+        ImpPlayer.Get().input_targets.Add(this);
+    }
+
+    public override void OnEnd()
+    {
+        base.OnEnd();
+        ImpPlayer.Get().input_targets.Remove(this);
+    }
 }

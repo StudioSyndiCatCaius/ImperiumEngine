@@ -10,12 +10,44 @@ public class C1_StateManager : Imp1D
     
     private C1_State _current_state;
 
+    public override void OnBegin()
+    {
+        base.OnBegin();
+        State_Start(starting_state);
+    }
+
     public C1_State State_Start(TClass<C1_State> state)
     {
-        return null;
+        Type type = state.Get();
+        if (type == null)
+        {
+            State_Update();
+            return _current_state;
+        }
+        if (_current_state != null)
+        {
+            Child_Remove(_current_state);
+            _current_state = null;
+        }
+        C1_State st = Activator.CreateInstance(type) as C1_State;
+        _current_state = st;
+        if (st != null) Child_Add(st);
+        return st;
     }
     public void State_Stop() // stop current state
     {
-        
+        if (_current_state != null)
+        {
+            Child_Remove(_current_state);
+            _current_state = null;
+        }
+        State_Update();
+    }
+    
+    public void State_Update()
+    {
+        if (_current_state != null) return;
+        if (fallback_state.Get() == null) return;
+        State_Start(fallback_state);
     }
 }

@@ -3,6 +3,7 @@ using Engine.Assets;
 using Engine.Enums;
 using Engine.Globals;
 using Engine.Structs;
+using JoltPhysicsSharp;
 using R3D_cs;
 using Raylib_cs;
 
@@ -84,6 +85,9 @@ public class Imp3D : ImpComp
     public TBounds3 bounds;
     
     public Vector3 velocity = Vector3.Zero;
+    public bool is_grounded;
+
+    internal Vector3 _move_wish;
 
     TTransform3 _local_seen;
     uint _world_ver;
@@ -93,16 +97,23 @@ public class Imp3D : ImpComp
 
     protected override ECompProcess ProcessKinds => ECompProcess.Update | ECompProcess.Draw3D;
 
+    public override void OnBegin()
+    {
+        base.OnBegin();
+        if (physics_enabled) ImpPhysics.Ensure(this);
+    }
+
+    public override void OnEnd()
+    {
+        ImpPhysics.Unregister(this);
+        base.OnEnd();
+    }
+
     public override void OnUpdate(double dt)
     {
         base.OnUpdate(dt);
-        if (physics_enabled)
-        {
-            if (movement_enabled)
-            {
-                
-            }
-        }
+        if (physics_enabled && scene != null && scene.is_running)
+            ImpPhysics.Ensure(this);
     }
 
     // ---------------------------------------
@@ -226,24 +237,42 @@ public class Imp3D : ImpComp
         G3D.Draw3D_Box(t, b.size, thick, new Color(48, 220, 96, 210));
     }
     
-    public object Phys_GetShape()
+    public virtual Shape? Phys_GetShape()
     {
-        return null;
+        TBounds3 b = bounds.IsEmpty ? Bounds_Cache() : bounds;
+        if (b.IsEmpty) return null;
+        return ImpPhysics.MakeBox(b.size * 0.5f);
     }
     
     public void Phys_Move(Vector3 axis, float scale = 1.0f)
     {
-        
+        Vector3 wish = axis * scale;
+        wish.Y = 0f;
+        _move_wish = wish;
     }
     
+    //applies movement to velocity, but does so relative to an input rotation. E.G., commonly you feed in camera rotation (or ImpPlayer.control_rotation)
     public void Phys_MoveByRot(Vector3 axis, Vector3 rotation)
     {
-        
+        Vector3 wish = GMath.V3_Rotate(axis, rotation);
+        wish.Y = 0f;
+        _move_wish = wish;
     }
 
     public void Phys_Launch(Vector3 vector, bool override_velocity_H = false, bool override_velocity_v = false)
     {
-        
+        if (override_velocity_H)
+        {
+            velocity.X = vector.X;
+            velocity.Z = vector.Z;
+        }
+        else
+        {
+            velocity.X += vector.X;
+            velocity.Z += vector.Z;
+        }
+        if (override_velocity_v) velocity.Y = vector.Y;
+        else velocity.Y += vector.Y;
     }
     
     // -- VIRTUALS

@@ -282,7 +282,7 @@ public static class G3D
     public static TTraceResult3D Trace3D_Line(Vector3 start, Vector3 end, ECollisionChannel channel,
         Func<Imp3D, bool> filter = null)
     {
-        return default;
+        return ImpPhysics.Trace(start, end, filter);
     }
 
     public static bool Ray_Plane(TRay3 ray, Vector3 plane_p, Vector3 plane_n, out Vector3 hit)

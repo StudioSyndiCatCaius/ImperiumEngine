@@ -70,11 +70,19 @@ public class App
     public static TVector2i render_size = TVector2i.p1440;
     
     // ========================================================================================
+    // Comp
+    // ========================================================================================
+
+    // public static Dictionary<ENotifyProcess, List<ImpComp>> comp_updates = new(); //NOT USING RIGHT NOW. look into implementatior DOD optimization
+    
+    // ========================================================================================
     // Scene
     // ========================================================================================
     
     public static A_Scene scene_current = null;
     public static A_Scene scene_next = null;
+    public static A_Scene scene_persistent = null;
+    
     public static List<A_Scene> scenes_global=new();
     public static EAppSceneState scene_state = EAppSceneState.Idle;
     public static Dictionary<TLabel,ImpComp> globalized_comps=new(); // comps manually given a global comp binding
@@ -114,8 +122,7 @@ public class App
     public void Run(TAppHooks hooks=default, bool as_game=false, string force_game_path="")
     {
         app = this;
-        G.A = this;
-        
+
         // ========================================================================================-----------
         // ---- Parse Command Line Args
         
@@ -208,7 +215,7 @@ public class App
         if (imgui_enabled) rlImGui.Setup(true,true);
         
         // ---- IMP
-        //ImpPhys.Init();
+        ImpPhysics.Init();
         //ImpPlayer.Init();
         
         hooks.on_post_init?.Invoke();
@@ -216,6 +223,7 @@ public class App
 
         ImpSandbox.current?.Init();
         Hooks.app_post_init?.Invoke();
+        scene_persistent?.Begin();
 
         if (as_game)
         {
@@ -264,6 +272,7 @@ public class App
             foreach (ImpPlayer player in players) player.Update(dt);
 
             ProcessUpdate(ENotifyProcess.Update, dt);
+            ImpPhysics.Step((float)dt);
             
             // -----------------------------------------------------
             // Draw
@@ -322,6 +331,7 @@ public class App
         scene_current?.End();
         hooks.on_shutdown?.Invoke();
         ImpSandbox.current?.Shutdown();
+        ImpPhysics.Shutdown();
         
         R3D.Close();
         if (imgui_enabled) rlImGui.Shutdown();
@@ -332,6 +342,7 @@ public class App
     private void ProcessUpdate(ENotifyProcess notify, double dt)
     {
         if(notify==ENotifyProcess.CursorStack) Imp2D.cursortrace_stack.Clear();
+        scene_persistent?.ProcessNotify(notify, dt);
         foreach (A_Scene scene in scenes_global) scene.ProcessNotify(notify, dt);
         scene_current?.ProcessNotify(notify, dt);
         dialog_current?.ProcessNotify(notify, dt);

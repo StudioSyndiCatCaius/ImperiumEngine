@@ -1,4 +1,6 @@
 using Engine;
+using Engine.Assets;
+using Engine.Comps._1D;
 using Engine.Core;
 using Engine.Enums;
 using Engine.Globals;
@@ -12,6 +14,13 @@ TAppHooks hooks=new()
     on_post_init = () =>
     {
         ImpSandbox.current = new Sandbox_Vis();
+        App.scene_persistent = new A_Scene()
+        {
+            root = new C1_GlobalScene()
+            {
+                
+            }
+        };
     }
 };
 

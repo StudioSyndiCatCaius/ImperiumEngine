@@ -24,20 +24,130 @@ public class SCN_Editor : A_Scene
     }
 }
 
+public struct TEdMainAction
+{
+    public string name;
+    public string icon;
+    public Action action;
+    public EInputKey hotkey;
+    public bool hotkey_req_ctrl=true;
+    public bool hotkey_req_shift;
+    public bool hotkey_req_alt;
+    public bool selected;
+
+    public TEdMainAction()
+    {
+        name = null;
+        icon = null;
+        action = null;
+        hotkey = EInputKey.None;
+        hotkey_req_shift = false;
+        hotkey_req_alt = false;
+    }
+
+    public string Hotkey_GetLabel()
+    {
+        if (hotkey == EInputKey.None) return null;
+        string key = hotkey.ToString();
+        if (key.StartsWith("Key_")) key = key[4..];
+        string s = "";
+        if (hotkey_req_ctrl) s += "Ctrl+";
+        if (hotkey_req_shift) s += "Shift+";
+        if (hotkey_req_alt) s += "Alt+";
+        return s + key;
+    }
+
+    public void Draw_MainButton()
+    {
+        if (string.IsNullOrEmpty(name))
+        {
+            ImGui.TextDisabled("|");
+            return;
+        }
+        string ico = string.IsNullOrEmpty(icon) ? name : icon;
+        if (EdIcons.Button("##mb_" + name, name, EdIcons.Main(ico), selected, true))
+            action?.Invoke();
+        if (ImGui.IsItemHovered())
+        {
+            string hk = Hotkey_GetLabel();
+            if (!string.IsNullOrEmpty(hk))
+                ImGui.SetTooltip(name + " (" + hk + ")");
+        }
+    }
+
+    public void Draw_PopupItem()
+    {
+        if (string.IsNullOrEmpty(name))
+        {
+            ImGui.Separator();
+            return;
+        }
+        if (ImGui.MenuItem(name, Hotkey_GetLabel(), selected, action != null) && action != null)
+            action.Invoke();
+    }
+
+    public void Tick()
+    {
+        if (hotkey == EInputKey.None || action == null) return;
+        ImGuiIOPtr io = ImGui.GetIO();
+        if (io.WantTextInput) return;
+        if (io.KeyCtrl != hotkey_req_ctrl) return;
+        if (io.KeyShift != hotkey_req_shift) return;
+        if (io.KeyAlt != hotkey_req_alt) return;
+        ImGuiKey ik = ToImGuiKey(hotkey);
+        if (ik == ImGuiKey.None || !ImGui.IsKeyPressed(ik)) return;
+        action.Invoke();
+    }
+
+    static ImGuiKey ToImGuiKey(EInputKey key)
+    {
+        int v = (int)key;
+        if (v >= (int)EInputKey.Key_A && v <= (int)EInputKey.Key_Z)
+            return (ImGuiKey)((int)ImGuiKey.A + (v - (int)EInputKey.Key_A));
+        if (v >= (int)EInputKey.Key_0 && v <= (int)EInputKey.Key_9)
+            return (ImGuiKey)((int)ImGuiKey._0 + (v - (int)EInputKey.Key_0));
+        if (v >= (int)EInputKey.Key_F1 && v <= (int)EInputKey.Key_F12)
+            return (ImGuiKey)((int)ImGuiKey.F1 + (v - (int)EInputKey.Key_F1));
+        return ImGuiKey.None;
+    }
+}
+
 
 public class SNC_Editor_Root : ImpComp
 {
+    // ==================================================================
+    // Main Actions
+    // ==================================================================
+    static SNC_Editor_Root? Root => App.scene_current?.root as SNC_Editor_Root;
+
+    public TEdMainAction[] main_actions =
+    {
+        new() { name = "New Scene", icon = "scene", hotkey = EInputKey.Key_N, hotkey_req_ctrl = true, action = () => Root?.wnd_scene.Scene_New() },
+        new() { name = "New Asset", icon = "asset", hotkey = EInputKey.Key_A, hotkey_req_ctrl = true },
+        new(),
+        new() { name = "Save", icon = "save", hotkey = EInputKey.Key_S, hotkey_req_ctrl = true, action = () => Root?.Save(0) },
+        new() { name = "Save As", icon = "save_as", hotkey = EInputKey.Key_S, hotkey_req_ctrl = true, hotkey_req_shift = true, action = () => Root?.Save(1) },
+        new() { name = "Save All", icon = "save_all", hotkey = EInputKey.Key_S, hotkey_req_ctrl = true, hotkey_req_alt = true, action = () => Root?.Save(2) },
+        new(),
+        new() { name = "Play", icon = "play", hotkey = EInputKey.Key_F5, hotkey_req_ctrl = false, action = () => Root?.Play_Start(false) },
+        new() { name = "Play All", icon = "play_start", hotkey = EInputKey.Key_F6, hotkey_req_ctrl = false, action = () => Root?.Play_Start(true) },
+        new() { name = "Stop", icon = "stop", action = Play_Stop },
+    };
+    
+    // ==================================================================
+    // UIS
+    // ==================================================================
     public WND_Scene wnd_scene = new();
     public WND_Assets wnd_assets = new();
     public WND_ConfigGame wnd_config_game = new();
     public WND_ConfigEditor wnd_config_editor = new();
     public PNL_FileBrowser file_browser = new();
     public PNL_Log log_panel = new();
-
+    private EdWindow active_window;
+    
     static Process? _play_proc;
     static IntPtr _play_job;
 
-    private EdWindow active_window;
     [EdConfig] public float file_browser_width = 280f;
     [EdConfig] public bool file_browser_collapsed;
     [EdConfig] public float log_height = 140f;
@@ -81,24 +191,22 @@ public class SNC_Editor_Root : ImpComp
             ImGuiWindowFlags.NoDocking |
             ImGuiWindowFlags.MenuBar;
         ImGui.Begin("##editor", host_flags);
+
+        bool playing = Play_IsRunning();
+        for (int i = 0; i < main_actions.Length; i++)
+        {
+            if (main_actions[i].name == "Stop")
+                main_actions[i].selected = playing;
+        }
+
         // ------------------------------------------------------------------------------------------------------------
         // Menu Bar
         // ------------------------------------------------------------------------------------------------------------
         ImGui.BeginMainMenuBar();
         if (ImGui.BeginMenu("File"))
         {
-            if (ImGui.MenuItem("New Scene"))
-            {
-                wnd_scene.Scene_New();
-            }
-            if (ImGui.MenuItem("New Asset"))
-            {
-                
-            }
-            ImGui.Separator();
-            if (ImGui.MenuItem("Save", "Ctrl+S")) Save(0);
-            if (ImGui.MenuItem("Save As", "Ctrl+Shift+S")) Save(1);
-            if (ImGui.MenuItem("Save All", "Ctrl+Alt+S")) Save(2);
+            for (int i = 0; i < main_actions.Length; i++)
+                main_actions[i].Draw_PopupItem();
             ImGui.EndMenu();
         }
 
@@ -122,39 +230,12 @@ public class SNC_Editor_Root : ImpComp
         // Main Buttons
         // ------------------------------------------------------------------------------------------------------------
         ImGui.Separator();
-
-        bool playing = Play_IsRunning();
-        bool MainBtn(string id, string label, bool selected = false)
+        for (int i = 0; i < main_actions.Length; i++)
         {
-            return EdIcons.Button("##mb_" + id, label, EdIcons.Main(id), selected, true);
+            if (i > 0) ImGui.SameLine();
+            main_actions[i].Draw_MainButton();
         }
 
-        if (MainBtn("scene", "New Scene"))
-            wnd_scene.Scene_New();
-        ImGui.SameLine();
-        if (MainBtn("asset", "New Asset"))
-        {
-        }
-        ImGui.SameLine();
-        ImGui.TextDisabled("|");
-        ImGui.SameLine();
-        if (MainBtn("save", "Save")) Save(0);
-        ImGui.SameLine();
-        if (MainBtn("save_as", "Save As")) Save(1);
-        ImGui.SameLine();
-        if (MainBtn("save_all", "Save All")) Save(2);
-        ImGui.SameLine();
-        ImGui.TextDisabled("|");
-        ImGui.SameLine();
-        if (MainBtn("play", "Play"))
-            Play_Start(false);
-        ImGui.SameLine();
-        if (MainBtn("play_start", "Play (From Start)"))
-            Play_Start(true);
-        ImGui.SameLine();
-        if (MainBtn("stop", "Stop", playing))
-            Play_Stop();
-        
         // ------------------------------------------------------------------------------------------------------------
         // File Browser (global left) + Main Tabs
         // ------------------------------------------------------------------------------------------------------------
@@ -222,7 +303,7 @@ public class SNC_Editor_Root : ImpComp
         EDLG_Confirm.DrawPending();
         EDLG_PickAsset.DrawPending();
         EDLG_PickClass.DrawPending();
-        EDLG_SaveAsset.DrawPending();
+        EDLG_FileAction.DrawPending();
         EDLG_CreateAsset.DrawPending();
 
         // ------------------------------------------------------------------------------------------------------------
@@ -235,9 +316,9 @@ public class SNC_Editor_Root : ImpComp
             if (ImGui.IsKeyPressed(ImGuiKey.Z) && !shift) Editor.history.Undo();
             if ((ImGui.IsKeyPressed(ImGuiKey.Z) && shift) || ImGui.IsKeyPressed(ImGuiKey.Y))
                 Editor.history.Redo();
-            if (ImGui.IsKeyPressed(ImGuiKey.S))
-                wnd_scene.current_scene_tab?.scene?.Save(true);
         }
+        for (int i = 0; i < main_actions.Length; i++)
+            main_actions[i].Tick();
     }
 
     public override void OnUpdate(double dt)
@@ -253,37 +334,47 @@ public class SNC_Editor_Root : ImpComp
 
     public ImpAsset GetCurrentEditedAsset()
     {
-        return null;
+        if (active_window == wnd_assets)
+            return wnd_assets.current_asset;
+        return wnd_scene.current_scene_tab?.scene;
     }
 
     //0=save | 1=save as | 2=save all
     public void Save(int type)
     {
-        ImpAsset _ast = GetCurrentEditedAsset();
-        if (_ast != null)
+        if (type == 2)
         {
-            if (type == 1 || (type == 0 && _ast.filepath == null))
-            {
-                EDLG_SaveAsset.Run(_ast, (s) =>
-                {
-                    SaveConfirmation(_ast);
-                });
-            }
-            else if (type == 0)
-            {
-                SaveConfirmation(_ast);
-            }
-            //save all
-            if (type == 2)
-            {
-                
-            }
+            SaveAll();
+            return;
         }
+
+        ImpAsset ast = GetCurrentEditedAsset();
+        if (ast == null) return;
+        if (type == 1 || string.IsNullOrEmpty(ast.filepath))
+            EDLG_FileAction.SaveAsset(ast);
+        else
+            ast.Save(true);
     }
 
-    private void SaveConfirmation(ImpAsset asset)
+    void SaveAll()
     {
-        
+        ImpAsset? untitled = null;
+        for (int i = 0; i < wnd_scene.scene_tabs.Count; i++)
+        {
+            A_Scene? s = wnd_scene.scene_tabs[i].scene;
+            if (s == null) continue;
+            if (string.IsNullOrEmpty(s.filepath)) untitled ??= s;
+            else s.Save(true);
+        }
+        for (int i = 0; i < wnd_assets.open_asset_tabs.Count; i++)
+        {
+            ImpAsset? a = wnd_assets.open_asset_tabs[i].asset;
+            if (a == null) continue;
+            if (string.IsNullOrEmpty(a.filepath)) untitled ??= a;
+            else a.Save(true);
+        }
+        if (untitled != null)
+            EDLG_FileAction.SaveAsset(untitled);
     }
 
     public void Play_Start(bool from_start)

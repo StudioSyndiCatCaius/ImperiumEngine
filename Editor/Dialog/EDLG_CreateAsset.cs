@@ -5,7 +5,6 @@ using Engine;
 using Engine.Core;
 using Engine.Enums;
 using Engine.Globals;
-using Engine.Structs;
 using ImGuiNET;
 
 namespace Editor.Dialog;
@@ -233,14 +232,7 @@ public class EDLG_CreateAsset : EdDialog
                 string stem = Sanitize(it.stem);
                 if (string.IsNullOrEmpty(stem)) continue;
                 string abs = DestAbs(g, stem, it.asset);
-                string? dir = Path.GetDirectoryName(abs);
-                if (!string.IsNullOrEmpty(dir))
-                    Directory.CreateDirectory(dir);
-                string local = GFile.Make_Path_Local(abs);
-                it.asset.filepath = local;
-                it.asset.is_inlined = false;
-                App.assets[new TFile(local)] = it.asset;
-                it.asset.Save(true);
+                EDLG_FileAction.WriteAsset(it.asset, abs);
                 it.asset.Source_Reimport();
             }
         }

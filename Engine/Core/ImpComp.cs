@@ -30,17 +30,17 @@ public enum ECompProcess : byte
     Cursor = 1 << 3,
 }
 
-enum ECompLifeState
+enum ECompLifeState : byte
 {
     Starting, Life, Ending,
 }
 
-public enum ECompNotify
+public enum ECompNotify : byte
 {
     PreUpdate, PostUpdate,
 }
 
-public class ImpComp : I_Inspectable, I_Input, I_File
+public class ImpComp : I_Inspectable, I_Input, I_File 
 {
     // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     // STATIC
@@ -152,7 +152,7 @@ public class ImpComp : I_Inspectable, I_Input, I_File
     public TTable prefab_baseline;
 
     // ===========================================================================================
-    // INIT
+    // INIT / DISPOSE
     // ===========================================================================================
     public ImpComp(IEnumerable<ImpComp> _children = null)
     {
@@ -879,6 +879,7 @@ public class ImpComp : I_Inspectable, I_Input, I_File
     [ScriptHook] public virtual void Input_Pressed(ImpPlayer player,TLabel ia,Vector3 axis) { }
     [ScriptHook] public virtual void Input_Released(ImpPlayer player,TLabel ia, Vector3 axis) { }
     [ScriptHook] public virtual void Input_Down(ImpPlayer player,TLabel ia,Vector3 axis, double dt) { }
+
 }
 
 public class Imp1D : ImpComp { }

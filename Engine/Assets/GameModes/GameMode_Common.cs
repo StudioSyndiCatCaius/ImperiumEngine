@@ -29,9 +29,9 @@ public class GameMode_Common : A_GameMode
     [ImpVar][Category("Player")] public bool pawn_can_move_Sideways=true;
     
     [ImpVar][Category("Camera")] public TClass<C3_Camera> default_camera = new(typeof(C3_Camera));
-    [ImpVar][Category("Camera")] public float cam_distance=10;
+    [ImpVar][Category("Camera")] public float cam_distance=3;
     [ImpVar][Category("Camera")] public float cam_height=1.6f;
-    [ImpVar][Category("Camera")] public float cam_fov=80;
+    [ImpVar][Category("Camera")] public float cam_fov=70;
     [ImpVar][Category("Camera")] public Vector3 cam_start_rotation=new(0,0,0);
     [ImpVar][Category("Camera")] public bool cam_start_rotation_is_global=false; //if the starting rotation is global or local to the player
     [ImpVar][Category("Camera")] public bool cam_can_rotate_H=false;

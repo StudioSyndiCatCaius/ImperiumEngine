@@ -81,14 +81,17 @@ public class A_Scene : ImpAsset
             root.AssignScene(this);
             ImpSandbox.current?.Bind(root);
         }
-        A_GameMode _gm = GameMode_GetAsset();
-        if (_gm != null)
+        if (this != App.scene_persistent)
         {
-            gamemode_instance = _gm.Clone() as A_GameMode ?? _gm;
-            gamemode_instance.OnStart(this, gamemode_instance);
-            foreach (var p in App.players) _PlayerSpawn(p);
+            A_GameMode _gm = GameMode_GetAsset();
+            if (_gm != null)
+            {
+                gamemode_instance = _gm.Clone() as A_GameMode ?? _gm;
+                gamemode_instance.OnStart(this, gamemode_instance);
+                foreach (var p in App.players) _PlayerSpawn(p);
+            }
+            ImpPlayer.on_player_connect += _PlayerSpawn;
         }
-        ImpPlayer.on_player_connect += _PlayerSpawn;
     }
 
     private void _PlayerSpawn(ImpPlayer p)
@@ -116,7 +119,11 @@ public class A_Scene : ImpAsset
     public void End()
     {
         if (!is_running) return;
-        ImpPlayer.on_player_connect -= _PlayerSpawn;
+        if (this != App.scene_persistent)
+        {
+            ImpPlayer.on_player_connect -= _PlayerSpawn;
+            ImpPhysics.Clear();
+        }
         if (gamemode_instance != null)
         {
             gamemode_instance.OnEnd(this, gamemode_instance);

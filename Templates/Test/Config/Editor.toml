@@ -1,6 +1,7 @@
 wnd_scene = {
     scene_debug = {
         show_fps_stats = true,
+        show_object_count = false,
         comp_stats_display = "ByClass",
         show_environment_stats = true,
         show_all_bounds = false,
@@ -24,14 +25,14 @@ open_scenes = [
         path = "{engine}Scenes\\Maps\\map_ED_Test1.ImpScene",
         view = "Mode_3D",
         cam3d_position = [
-            -11.88698,
-            6.2688622,
-            -3.5650818,
+            -4.175529,
+            3.3157673,
+            2.99184,
         ],
         cam3d_target = [
-            -1.0466928,
-            3.1917539,
-            -1.6891177,
+            4.5223374,
+            -1.578238,
+            -2.5665674,
         ],
         cam3d_up = [
             0,
@@ -40,7 +41,7 @@ open_scenes = [
         ],
         cam3d_fov = 50,
         cam3d_proj = "Perspective",
-        look_dist = 11.423645,
+        look_dist = 11.423662,
         cam2d_target = [
             960,
             540,

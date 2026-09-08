@@ -1289,7 +1289,7 @@ public class PNL_Inspector : EdPanel
         if (save)
         {
             ImpAsset save_target = asset;
-            EDLG_SaveAsset.Run(save_target, _ => apply?.Invoke(save_target));
+            EDLG_FileAction.SaveAsset(save_target, _ => apply?.Invoke(save_target));
         }
         if (change) EDLG_PickAsset.Run(slot, a => apply?.Invoke(a));
         if (clear)

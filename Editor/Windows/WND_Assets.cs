@@ -10,6 +10,7 @@ public class WND_Assets : EdWindow
     public static bool request_focus;
 
     public List<EUI_Asset> open_asset_tabs = new();
+    public ImpAsset? current_asset;
     int _focus_tab = -1;
 
     public WND_Assets()
@@ -43,6 +44,7 @@ public class WND_Assets : EdWindow
 
         if (open_asset_tabs.Count == 0)
         {
+            current_asset = null;
             ImGui.TextDisabled("No asset open");
             return;
         }
@@ -50,6 +52,7 @@ public class WND_Assets : EdWindow
         if (!ImGui.BeginTabBar("##asset_tabs", ImGuiTabBarFlags.Reorderable | ImGuiTabBarFlags.AutoSelectNewTabs))
             return;
 
+        ImpAsset? visible = current_asset;
         for (int i = 0; i < open_asset_tabs.Count; i++)
         {
             EUI_Asset tab = open_asset_tabs[i];
@@ -73,6 +76,7 @@ public class WND_Assets : EdWindow
                 continue;
             }
 
+            visible = a;
             tab.OnDraw();
             ImGui.EndTabItem();
             if (!open)
@@ -82,6 +86,7 @@ public class WND_Assets : EdWindow
             }
         }
 
+        current_asset = visible;
         _focus_tab = -1;
         ImGui.EndTabBar();
     }

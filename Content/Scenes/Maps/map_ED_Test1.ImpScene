@@ -165,3 +165,51 @@ root = {
         },
     ],
 }
+script = {
+    type = "A_Script",
+    vars = {
+        class_type = "ImpComp",
+        nodes = [
+            {
+                type = "VN_Hook_Enter",
+                id = "0000000000000028",
+                x = 46,
+                y = 27,
+                hook_name = "OnBegin",
+            },
+            {
+                type = "VN_Delay",
+                id = "0000000000000029",
+                x = 246,
+                y = 136,
+                duration = 1.8,
+            },
+            {
+                type = "VN_Func",
+                id = "000000000000002A",
+                x = 538,
+                y = 103,
+                literals = {
+                    msg = "tango",
+                    on_screen = false,
+                },
+                type_name = "GLog",
+                method_name = "Info",
+            },
+        ],
+        wires = [
+            {
+                from = "0000000000000028",
+                to = "0000000000000029",
+                from_pin = 0,
+                to_pin = 0,
+            },
+            {
+                from = "0000000000000029",
+                to = "000000000000002A",
+                from_pin = 0,
+                to_pin = 0,
+            },
+        ],
+    },
+}

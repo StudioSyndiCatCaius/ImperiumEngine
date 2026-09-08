@@ -378,7 +378,7 @@ public class PNL_FileBrowser : EdPanel
             if (t == null || t.IsAbstract) return;
             if (Activator.CreateInstance(t) is not ImpAsset a) return;
             string dest = UniqueInDir(dir, t.Name, a.GetFileExtension());
-            WriteAsset(a, dest);
+            EDLG_FileAction.WriteAsset(a, dest);
             _selected_path = dest;
         });
     }
@@ -396,7 +396,7 @@ public class PNL_FileBrowser : EdPanel
             root.scene = s;
             s.root = root;
             string dest = UniqueInDir(dir, "NewScene", s.GetFileExtension());
-            WriteAsset(s, dest);
+            EDLG_FileAction.WriteAsset(s, dest);
             _selected_path = dest;
             on_open?.Invoke(dest);
         });
@@ -647,18 +647,6 @@ public class PNL_FileBrowser : EdPanel
             else
                 CommitRename(_rename_buf);
         }
-    }
-
-    static void WriteAsset(ImpAsset asset, string abs)
-    {
-        string? dir = Path.GetDirectoryName(abs);
-        if (!string.IsNullOrEmpty(dir))
-            Directory.CreateDirectory(dir);
-        string local = GFile.Make_Path_Local(abs);
-        asset.filepath = local;
-        asset.is_inlined = false;
-        App.assets[new TFile(local)] = asset;
-        asset.Save(true);
     }
 
     static void ForgetFile(string abs)
