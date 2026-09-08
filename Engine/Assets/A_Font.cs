@@ -32,8 +32,7 @@ public class A_Font : ImpAsset
     public Font Resolve()
     {
         if (font.Texture.Id != 0) return font;
-        if (!string.IsNullOrEmpty(sourcefile) && Source_Get() == null)
-            Source_Reimport();
+        if (!string.IsNullOrEmpty(sourcefile)) Source_Get();
         if (font.Texture.Id != 0) return font;
         return Raylib.GetFontDefault();
     }

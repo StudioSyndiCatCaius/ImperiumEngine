@@ -234,7 +234,12 @@ public class ImpPhysics
         };
 
         PoseOf(o, actor.mover, out Vector3 pos, out Quaternion rot);
-        if (rot.LengthSquared() < 1e-8f) rot = Quaternion.Identity;
+        if (!float.IsFinite(pos.X) || !float.IsFinite(pos.Y) || !float.IsFinite(pos.Z))
+            pos = Vector3.Zero;
+        if (rot.LengthSquared() < 1e-8f
+            || !float.IsFinite(rot.X) || !float.IsFinite(rot.Y)
+            || !float.IsFinite(rot.Z) || !float.IsFinite(rot.W))
+            rot = Quaternion.Identity;
         else rot = Quaternion.Normalize(rot);
         actor.last_pos = pos;
         actor.last_rot = rot;

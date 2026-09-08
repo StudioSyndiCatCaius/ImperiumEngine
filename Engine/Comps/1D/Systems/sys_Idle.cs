@@ -1,6 +1,6 @@
 ﻿namespace Engine.Comps._1D.Systems;
 
-public class sys_Interact : C1_State
+public class sys_Idle : C1_GameSystem
 {
     
 }

@@ -1,5 +1,6 @@
 ﻿using System.Numerics;
 using Engine.Assets;
+using Engine.Comps._3D;
 using Engine.Enums;
 using Engine.Globals;
 using Engine.Interfaces;
@@ -32,6 +33,7 @@ public class ImpPlayer
     public static Action<ImpPlayer> on_player_connect;
     public static Action<ImpPlayer> on_player_disconnect;
     public static Action<int,EInputKey,EInputState> on_input_key_event;
+    static readonly EInputKey[] AllKeys = Enum.GetValues<EInputKey>();
     
     public static ImpPlayer Get(int id = 0)
     {
@@ -50,24 +52,20 @@ public class ImpPlayer
     // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     // Class
     // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    public TCursorData cursor_data = new();
+    public Vector3 control_rotation = Vector3.Zero;
     public int id;
     public Imp3D pawn;
-    public Vector3 control_rotation = Vector3.Zero;
-    public TCursorData cursor_data = new();
+    public C3_Camera camera;
     
     public Dictionary<EInputKey, EInputState> input_key_states = new();
     public Dictionary<TLabel, EInputState> input_action_states = new();
     public List<ImpComp> input_targets=new ();
     readonly List<ImpComp> _dialog_targets = new(1);
-
-    // ===============================================================
-    // Actions
-    // ===============================================================
     
     // -------------------------------------------------------------
     // INPUT
     // -------------------------------------------------------------
-    static readonly EInputKey[] AllKeys = Enum.GetValues<EInputKey>();
 
     public EInputState Key_GetState(EInputKey key)
     {
@@ -214,6 +212,33 @@ public class ImpPlayer
 
         return Vector3.Zero;
     }
+    
+    // -------------------------------------------------------------
+    // Spawn
+    // -------------------------------------------------------------
+    public void SpawnPawn()
+    {
+        if (App.game_mode == null) return;
+        TTransform3 spawn_point = new();
+        C3_PlayerStart match = null;
+        C3_PlayerStart fallback = null;
+        HashSet<ImpComp> starts = App.scene_current.CompIndex_Of(typeof(C3_PlayerStart));
+        if (starts != null)
+        {
+            foreach (ImpComp c in starts)
+            {
+                if (c is not C3_PlayerStart ps) continue;
+                if (ps.player_id == id) match = ps;
+                else if (ps.player_id == 0) fallback = ps;
+                if (match != null && (fallback != null || id == 0)) break;
+            }
+        }
+        if (match != null) spawn_point = match.global_transform;
+        else if (fallback != null) spawn_point = fallback.global_transform;
+        App.game_mode.OnPlayerStart(this, spawn_point, App.scene_current, App.game_mode);
+        Console.WriteLine($"Player {id} spawned at {spawn_point}");
+    }
+    
     
     // -------------------------------------------------------------
     // ???

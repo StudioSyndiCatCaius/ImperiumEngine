@@ -14,6 +14,18 @@ using Environment = System.Environment;
 
 namespace Engine;
 
+public struct TAppConfig
+{
+    public Action on_pre_init;
+    public Action on_post_init;
+    public Action on_shutdown;
+    public Action on_draw_begin;
+    public Action on_draw_end;
+
+    public bool use_game_mode;
+}
+
+// Old Game.exe still references this name after the TAppConfig rename.
 public struct TAppHooks
 {
     public Action on_pre_init;
@@ -21,6 +33,7 @@ public struct TAppHooks
     public Action on_shutdown;
     public Action on_draw_begin;
     public Action on_draw_end;
+    public bool use_game_mode;
 }
 
 public enum EAppSceneState
@@ -113,15 +126,31 @@ public class App
     public static TTable game_data = new();
     public static Dictionary<TFile,ImpAsset> assets = new();
     public static Dictionary<TFile,ImpFile> files = new();
+    public static A_GameMode game_mode=null; //active game mode instance
     
     // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     // Class
     // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    
+
     [System.STAThread]
-    public void Run(TAppHooks hooks=default, bool as_game=false, string force_game_path="")
+    public void Run(TAppConfig config=default, bool as_game=false, string force_game_path="")
     {
         app = this;
+        CrashLog.Install();
+        try
+        {
+            RunApp(config, as_game, force_game_path);
+        }
+        catch (Exception ex)
+        {
+            CrashLog.Write(ex);
+            throw;
+        }
+    }
+
+
+    void RunApp(TAppConfig config, bool as_game, string force_game_path)
+    {
 
         // ========================================================================================-----------
         // ---- Parse Command Line Args
@@ -185,7 +214,7 @@ public class App
             game_data = TTable.FromTOML(GFile.LoadAs_String(game_file));
         }
         
-        hooks.on_pre_init?.Invoke();
+        config.on_pre_init?.Invoke();
         Hooks.app_pre_init?.Invoke();
         GConfig.LoadGame();
         
@@ -218,7 +247,7 @@ public class App
         ImpPhysics.Init();
         //ImpPlayer.Init();
         
-        hooks.on_post_init?.Invoke();
+        config.on_post_init?.Invoke();
         RefreshWindow();
 
         ImpSandbox.current?.Init();
@@ -227,9 +256,9 @@ public class App
 
         if (as_game)
         {
+            // Assign starting scene
             string first_scene_path = getArg_String("scene");
-            if (string.IsNullOrEmpty(first_scene_path))
-                first_scene_path = game_data.get_String("starting_scene");
+            if (string.IsNullOrEmpty(first_scene_path)) first_scene_path = game_data.get_String("starting_scene");
             if (!string.IsNullOrEmpty(first_scene_path))
             {
                 A_Scene starting_scene = GAsset.Asset_Load<A_Scene>(first_scene_path);
@@ -253,6 +282,13 @@ public class App
             {
                 Hooks.scene_change_begin?.Invoke();
                 scene_prev?.End();
+                //stop game mode
+                if(config.use_game_mode && game_mode!=null)
+                {
+                    game_mode.OnEnd(scene_prev, game_mode);
+                    game_mode = null;
+                }
+                
                 scene_state = EAppSceneState.Loading;
                 scene_prev = scene_current;
             }
@@ -260,9 +296,32 @@ public class App
             {
                 scene_state = EAppSceneState.Idle;
                 scene_current?.Begin();
+                
+                //change game mode
+                if (config.use_game_mode)
+                {
+                    A_GameMode _gm = scene_current.GameMode_GetAsset();
+                    if (_gm != null)
+                    {
+                        game_mode = _gm.Clone() as A_GameMode ?? _gm;
+                        Console.WriteLine("Starting Game Mode: " + game_mode.filepath);
+                        game_mode.OnStart(scene_current, game_mode);
+                        foreach (var p in App.players) p.SpawnPawn();
+                    }
+                    //ImpPlayer.on_player_connect += _PlayerSpawn;
+                }
                 Hooks.scene_change_end?.Invoke();
             }
             if(dialog_current!=null) { dialog_current.scene=scene_prev;}
+
+            
+            // -----------------------------------------------------
+            // Game Mode
+            // -----------------------------------------------------
+            if (config.use_game_mode && game_mode != null)
+            {
+                game_mode.OnUpdate(scene_current, game_mode, dt);
+            }
             
             // -----------------------------------------------------
             // Player/Input update
@@ -275,13 +334,16 @@ public class App
             ImpPhysics.Step((float)dt);
             
             // -----------------------------------------------------
-            // Draw
+            // Draw STUP
             // -----------------------------------------------------
             Raylib.BeginDrawing();
             Raylib.ClearBackground(Color.Black);
             if (imgui_enabled) rlImGui.Begin();
-            hooks.on_draw_begin?.Invoke();
+            config.on_draw_begin?.Invoke();
 
+            // -----------------------------------------------------
+            // Get 3D Camera
+            // -----------------------------------------------------
             if (view_target != null && view_target.ViewTarget_Enabled())
             {
                 camera_view = view_target.ViewTarget_GetData();
@@ -298,7 +360,9 @@ public class App
             }
             view_target_data=R3D.CameraToRL(camera_view);
             
-            // ---------- Draw 3D
+            // -----------------------------------------------------
+            // Draw 3D
+            // -----------------------------------------------------
             R3D.BeginEx(camera_view); 
             ProcessUpdate(ENotifyProcess.Draw3D, dt);
             // R3D_End is the actual 3D submit + post-process to the default framebuffer.
@@ -319,7 +383,7 @@ public class App
             ProcessUpdate(ENotifyProcess.Draw2D, dt);
             Raylib.EndMode2D();
 
-            hooks.on_draw_end?.Invoke();
+            config.on_draw_end?.Invoke();
             if (imgui_enabled) rlImGui.End();
             Raylib.EndDrawing();
         }
@@ -329,7 +393,7 @@ public class App
         // -----------------------------------------------------
         
         scene_current?.End();
-        hooks.on_shutdown?.Invoke();
+        config.on_shutdown?.Invoke();
         ImpSandbox.current?.Shutdown();
         ImpPhysics.Shutdown();
         
@@ -388,6 +452,7 @@ public class App
             Console.SetError(new StreamWriter(Console.OpenStandardError(), enc) { AutoFlush = true });
         }
         catch { }
+        CrashLog.HookConsole();
     }
 
     [DllImport("kernel32.dll")] static extern IntPtr GetConsoleWindow();

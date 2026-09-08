@@ -1,5 +1,6 @@
 using System.Numerics;
 using Engine.Assets;
+using Engine.Assets.Flow;
 using Engine.Enums;
 using Engine.Globals;
 using Engine.Structs;
@@ -59,6 +60,8 @@ public class Imp3D : ImpComp
     // ImpVars
     // ============================================================
     [ImpVar] public TTransform3 transform = new();
+    
+    [ImpVar][Category("Events")] public Flow_Event event_flow;
     
     [ImpVar][Category("Physics")] public bool physics_enabled = false;
     [ImpVar][Category("Physics")] public A_CollisionPreset collision_preset = A_CollisionPreset.PRESET_NONE;

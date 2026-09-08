@@ -1,11 +1,11 @@
 ﻿using Engine.Comps._2D;
 using Engine.Core;
 
-namespace Engine.Comps._1D.States.Menus;
+namespace Engine.Comps._1D.Systems.Menus;
 
 
 
-public class Sys_menu_Equip : C1_State
+public class Sys_menu_Equip : C1_GameSystem
 {
     [ImpVar] public C2_OptionList list_party;
     [ImpVar] public C2_OptionList list_slots;

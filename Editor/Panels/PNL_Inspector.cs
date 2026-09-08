@@ -1329,7 +1329,7 @@ public class PNL_Inspector : EdPanel
         if (asset is A_Texture tex)
         {
             if (tex.texture.Id == 0 && !string.IsNullOrEmpty(tex.sourcefile))
-                tex.Source_Reimport();
+                tex.Source_Get();
             if (tex.texture.Id != 0)
             {
                 Vector2 pad = new(2, 2);

@@ -4,6 +4,7 @@ using Engine.Assets;
 using Engine.Globals;
 using Engine.Interfaces;
 using Engine.Structs;
+using Engine;
 
 namespace Engine.Core;
 
@@ -42,17 +43,18 @@ public class ImpAsset : I_Property, I_Inspectable, I_File
         return !string.IsNullOrEmpty(filepath);
     }
     
-    // Reimports the data from the sourcefile
+    // Reload native data from disk. GFile.Import already loads new files;
+    // calling Reimport on first bind double-loads R3D models and can AV in LoadModelEx.
     [CallInEditor]
     [Title("Reimport")]
     public void Source_Reimport()
     {
-        //get or import sourcefile if not already 
         if (string.IsNullOrEmpty(sourcefile)) return;
+        bool already = _src_file_ref != null || App.files.ContainsKey(new TFile(sourcefile));
         _src_file_ref = GFile.Import<ImpFile>(sourcefile);
         if (_src_file_ref != null)
         {
-            _src_file_ref.Reimport();
+            if (already) _src_file_ref.Reimport();
             OnReimport(_src_file_ref);
         }
         else GLog.Error($"Could not find sourcefile {sourcefile}");
@@ -60,7 +62,12 @@ public class ImpAsset : I_Property, I_Inspectable, I_File
     
     public ImpFile Source_Get()
     {
-        if (_src_file_ref == null && !string.IsNullOrEmpty(sourcefile)) Source_Reimport();
+        if (_src_file_ref == null && !string.IsNullOrEmpty(sourcefile))
+        {
+            _src_file_ref = GFile.Import<ImpFile>(sourcefile);
+            if (_src_file_ref != null) OnReimport(_src_file_ref);
+            else GLog.Error($"Could not find sourcefile {sourcefile}");
+        }
         return _src_file_ref;
     }
     

@@ -39,7 +39,7 @@ public class A_Texture : ImpAsset
     public void Draw(TBounds2 bounds, TTransform2 offset, EImageLayout layout = EImageLayout.Stretch, 
         TMargins nine_slice = default, TMargins clip_margins=default, bool clip_margins_as_ratio=false, Color tint = default)
     {
-        if (texture.Id == 0 && !string.IsNullOrEmpty(sourcefile)) Source_Reimport();
+        if (texture.Id == 0 && !string.IsNullOrEmpty(sourcefile)) Source_Get();
         if (texture.Id == 0 || bounds.IsEmpty) return;
 
         float x = MathF.Min(bounds.start.X, bounds.end.X);

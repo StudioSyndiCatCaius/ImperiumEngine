@@ -1,6 +1,4 @@
-﻿using Engine.Comps._1D;
-using Engine.Comps._3D;
-using Engine.Core;
+﻿using Engine.Core;
 using Engine.Enums;
 using Engine.Globals;
 using Engine.Structs;
@@ -31,8 +29,11 @@ public class A_Scene : ImpAsset
     public Dictionary<int, string> prefab_refs = new();
     public bool is_running = false;
     public ImpViewport? viewport; // null = App.viewport_main. not serialized.
-    public A_GameMode gamemode_instance=null;
 
+    // ====================================================================================
+    // Comps
+    // ====================================================================================
+    
     // Type -> live comps in this scene. A C3_Mesh is stored under C3_Mesh, Imp3D, and ImpComp
     // so GetAllOfClass(base) is a hash lookup, not a tree walk.
     internal readonly Dictionary<Type, HashSet<ImpComp>> comps_by_type = new();
@@ -71,6 +72,10 @@ public class A_Scene : ImpAsset
         return set;
     }
 
+    // ====================================================================================
+    // Life
+    // ====================================================================================
+    
     public void Begin()
     {
         if (is_running) return;
@@ -81,54 +86,13 @@ public class A_Scene : ImpAsset
             root.AssignScene(this);
             ImpSandbox.current?.Bind(root);
         }
-        if (this != App.scene_persistent)
-        {
-            A_GameMode _gm = GameMode_GetAsset();
-            if (_gm != null)
-            {
-                gamemode_instance = _gm.Clone() as A_GameMode ?? _gm;
-                gamemode_instance.OnStart(this, gamemode_instance);
-                foreach (var p in App.players) _PlayerSpawn(p);
-            }
-            ImpPlayer.on_player_connect += _PlayerSpawn;
-        }
-    }
-
-    private void _PlayerSpawn(ImpPlayer p)
-    {
-        if (gamemode_instance == null) return;
-        TTransform3 spawn_point = new();
-        C3_PlayerStart match = null;
-        C3_PlayerStart fallback = null;
-        HashSet<ImpComp> starts = CompIndex_Of(typeof(C3_PlayerStart));
-        if (starts != null)
-        {
-            foreach (ImpComp c in starts)
-            {
-                if (c is not C3_PlayerStart ps) continue;
-                if (ps.player_id == p.id) match = ps;
-                else if (ps.player_id == 0) fallback = ps;
-                if (match != null && (fallback != null || p.id == 0)) break;
-            }
-        }
-        if (match != null) spawn_point = match.global_transform;
-        else if (fallback != null) spawn_point = fallback.global_transform;
-        gamemode_instance.OnPlayerStart(p, spawn_point, this, gamemode_instance);
     }
 
     public void End()
     {
         if (!is_running) return;
         if (this != App.scene_persistent)
-        {
-            ImpPlayer.on_player_connect -= _PlayerSpawn;
             ImpPhysics.Clear();
-        }
-        if (gamemode_instance != null)
-        {
-            gamemode_instance.OnEnd(this, gamemode_instance);
-            gamemode_instance = null;
-        }
         if (root != null) StripRuntimeComps(root);
         is_running = false;
     }

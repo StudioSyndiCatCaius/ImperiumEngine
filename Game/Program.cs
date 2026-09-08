@@ -9,7 +9,7 @@ using Engine.Sandbox;
 App _app=new App();
 App.name = "My Game";
 
-TAppHooks hooks=new()
+TAppConfig config=new()
 {
     on_post_init = () =>
     {
@@ -21,7 +21,8 @@ TAppHooks hooks=new()
                 
             }
         };
-    }
+    },
+    use_game_mode = true,
 };
 
 string force = "";
@@ -37,4 +38,4 @@ if (!has_game)
     string test = Path.Combine(GFile.GetDir_Root(EContentDir.Engine), "Templates", "Test", "Test.ImpGame");
     if (File.Exists(test)) force = test;
 }
-_app.Run(hooks, true, force);
+_app.Run(config, true, force);

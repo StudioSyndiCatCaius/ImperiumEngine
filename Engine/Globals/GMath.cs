@@ -11,6 +11,10 @@ public static class GMath
     public static readonly Vector3 WORLD_UP = new(0, 1, 0);
     public static readonly Vector3 WORLD_FORWARD = new(1, 0, 0);
     public static readonly Vector3 WORLD_LEFT = new(0, 0, 1);
+    
+    public static readonly Vector3 NO_UP = new(1, 0, 1);
+    public static readonly Vector3 NO_FORWARD = new(0, 1, 0);
+    public static readonly Vector3 NO_LEFT = new(1, 0, 0);
 
     [ScriptCall][Category("Math")][Title("Vector3 - Interp")]
     public static Vector3 V3_Interp(Vector3 current, Vector3 target, double dt, double speed, bool constant = false)

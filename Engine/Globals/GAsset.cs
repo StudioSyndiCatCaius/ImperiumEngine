@@ -69,7 +69,7 @@ public static class GAsset
         App.assets.Add(pth, asset);
         asset.filepath = filepath;
         asset.From_Table(_tbl);
-        asset.Source_Reimport();
+        asset.Source_Get();
         return asset;
     }
     
@@ -102,7 +102,7 @@ public static class GAsset
         asset.sourcefile = file.filepath;
         asset.filepath = asset_path;
         App.assets[pth] = asset;
-        asset.Source_Reimport();
+        asset.Source_Get();
         return asset;
     }
     

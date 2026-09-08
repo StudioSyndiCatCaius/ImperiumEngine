@@ -7,6 +7,12 @@ using R3D_cs;
 
 namespace Engine.Comps._3D;
 
+public enum ECameraTargetMode
+{
+    LookAt,
+    Follow,
+}
+
 public class C3_Camera : Imp3D
 {
     [ImpVar] public float fov = 60;
@@ -14,8 +20,10 @@ public class C3_Camera : Imp3D
     [ImpVar] public float far_plane = 1000;
     [ImpVar] public bool is_orthographic = false;
     
-    [ImpVar] public Imp3D? look_target;
-    [ImpVar] public float look_speed = 5;
+    [ImpVar] public ECameraTargetMode target_mode = ECameraTargetMode.LookAt;
+    [ImpVar] public Imp3D? cam_target;
+    [ImpVar] public float target_interp_speed = 5;
+    
     
     public C3_SpringArm camera_boom=new ();
 
@@ -33,10 +41,18 @@ public class C3_Camera : Imp3D
     public override void OnUpdate(double dt)
     {
         base.OnUpdate(dt);
-        if (look_target != null)
+        if (cam_target != null)
         {
-            Vector3 look_rotation = GMath.V3_LookAt(global_transform.position, look_target.global_transform.position);
-            Rotation_Set(GMath.V3_Interp(global_transform.rotation, look_rotation, dt, look_speed));
+            switch (target_mode)
+            {
+                case ECameraTargetMode.LookAt:
+                    Vector3 look_rotation = GMath.V3_LookAt(global_transform.position, cam_target.global_transform.position);
+                    Rotation_Set(GMath.V3_Interp(global_transform.rotation, look_rotation, dt, target_interp_speed));
+                    break;
+                case ECameraTargetMode.Follow:
+                    Position_Set(GMath.V3_Interp(global_transform.position, cam_target.global_transform.position, dt, target_interp_speed));
+                    break;
+            }
         }
     }
 

@@ -37,7 +37,7 @@ public sealed class TTagSet : IEnumerable<TTag>, IEquatable<TTagSet>, I_Property
 
     public IEnumerator<TTag> GetEnumerator()
     {
-        throw new NotImplementedException();
+        return _tags.GetEnumerator();
     }
 
     IEnumerator IEnumerable.GetEnumerator()

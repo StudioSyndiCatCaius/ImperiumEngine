@@ -10,10 +10,11 @@ public class A_GameMode : ImpAsset
 {
     [ImpVar][Config] public static A_GameMode default_gamemode;
     
-    public virtual TClass<C1_State>? GetState_Default() { return null; }
-    public virtual TClass<C1_State>? GetState_Fallback() { return null; }
+    public virtual TClass<C1_GameSystem>? GetState_Default() { return null; }
+    public virtual TClass<C1_GameSystem>? GetState_Fallback() { return null; }
 
     public virtual void OnStart(A_Scene scene, A_GameMode instance) { }
+    public virtual void OnUpdate(A_Scene scene, A_GameMode instance, double delta) { }
     public virtual void OnEnd(A_Scene scene, A_GameMode instance) { }
     
     public virtual void OnPlayerStart(ImpPlayer player, TTransform3 start, A_Scene scene, A_GameMode instance) { }

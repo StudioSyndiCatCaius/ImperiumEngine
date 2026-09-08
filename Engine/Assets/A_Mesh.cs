@@ -18,7 +18,9 @@ public class A_Mesh : ImpAsset
 
     public Model getModel()
     {
-        return Source_Get().get_Model(model_index);
+        ImpFile src = Source_Get();
+        if (src == null) return default;
+        return src.get_Model(model_index);
     }
 
     public TBounds3 GetBounds()

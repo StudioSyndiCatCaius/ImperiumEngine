@@ -89,6 +89,14 @@ public class ImpFile
 
     public void Invalidate()
     {
+        for (int i = 0; i < src_models.Count; i++)
+            R3D.UnloadModel(src_models[i], true);
+        for (int i = 0; i < src_textures.Count; i++)
+            if (src_textures[i].Id != 0) Raylib.UnloadTexture(src_textures[i]);
+        for (int i = 0; i < src_sounds.Count; i++)
+            Raylib.UnloadSound(src_sounds[i]);
+        for (int i = 0; i < src_fonts.Count; i++)
+            if (src_fonts[i].Texture.Id != 0) Raylib.UnloadFont(src_fonts[i]);
         data = new();
         src_textures.Clear(); src_sounds.Clear(); src_models.Clear(); src_fonts.Clear(); src_anims.Clear();
     }

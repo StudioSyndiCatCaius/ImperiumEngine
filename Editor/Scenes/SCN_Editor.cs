@@ -131,7 +131,7 @@ public class SNC_Editor_Root : ImpComp
         new(),
         new() { name = "Play", icon = "play", hotkey = EInputKey.Key_F5, hotkey_req_ctrl = false, action = () => Root?.Play_Start(false) },
         new() { name = "Play All", icon = "play_start", hotkey = EInputKey.Key_F6, hotkey_req_ctrl = false, action = () => Root?.Play_Start(true) },
-        new() { name = "Stop", icon = "stop", action = Play_Stop },
+        new() { name = "Stop", icon = "stop", hotkey = EInputKey.Key_Escape, hotkey_req_shift = true, hotkey_req_ctrl = false,action = Play_Stop },
     };
     
     // ==================================================================
@@ -596,13 +596,24 @@ public class SNC_Editor_Root : ImpComp
 
     void OpenFromBrowser(string path)
     {
-        if (string.IsNullOrEmpty(path)) return;
+        if (string.IsNullOrEmpty(path) || !File.Exists(path)) return;
         string ext = Path.GetExtension(path);
-        if (!ext.Equals(".ImpScene", StringComparison.OrdinalIgnoreCase)) return;
-
         string local = GFile.Make_Path_Local(path);
-        A_Scene? scene = GAsset.Asset_Load<A_Scene>(local);
-        if (scene == null) return;
-        wnd_scene.Scene_Open(scene);
+
+        if (ext.Equals(".ImpScene", StringComparison.OrdinalIgnoreCase))
+        {
+            A_Scene? scene = GAsset.Asset_Load<A_Scene>(local);
+            if (scene == null) return;
+            wnd_scene.Scene_Open(scene);
+            return;
+        }
+
+        if (!ext.Equals(".ImpAsset", StringComparison.OrdinalIgnoreCase)
+            && !ext.Equals(".ImpScript", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        ImpAsset? asset = GAsset.Asset_Load(local);
+        if (asset == null) return;
+        WND_Assets.Open(asset);
     }
 }

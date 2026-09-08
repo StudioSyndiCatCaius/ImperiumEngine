@@ -154,16 +154,16 @@ public class ImpComp : I_Inspectable, I_Input, I_File
     // ===========================================================================================
     // INIT / DISPOSE
     // ===========================================================================================
-    public ImpComp(IEnumerable<ImpComp> _children = null)
+    public ImpComp()
     {
         id = TGuid64.New();
-        if (_children != null)
-        {
-            foreach (ImpComp child in _children)
-            {
-                Child_Add(child);
-            }
-        }
+    }
+
+    public ImpComp(IEnumerable<ImpComp> _children) : this()
+    {
+        if (_children == null) return;
+        foreach (ImpComp child in _children)
+            Child_Add(child);
     }
     
     // ===========================================================================================

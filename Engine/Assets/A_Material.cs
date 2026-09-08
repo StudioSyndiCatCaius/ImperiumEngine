@@ -42,7 +42,7 @@ public struct TMaterialCommons
     public static Texture2D Gpu(A_Texture tex)
     {
         if (tex == null) return default;
-        if (tex.texture.Id == 0 && !string.IsNullOrEmpty(tex.sourcefile)) tex.Source_Reimport();
+        if (tex.texture.Id == 0 && !string.IsNullOrEmpty(tex.sourcefile)) tex.Source_Get();
         return tex.texture;
     }
 }

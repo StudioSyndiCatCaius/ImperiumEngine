@@ -125,9 +125,9 @@ public class TInputSet
                 keys =new()
                 {
                     [EInputKey.Key_W]=new(){axis_scale=GMath.WORLD_FORWARD},
-                    [EInputKey.Key_A]=new(){axis_scale=GMath.WORLD_LEFT},
+                    [EInputKey.Key_A]=new(){axis_scale=-GMath.WORLD_LEFT},
                     [EInputKey.Key_S]=new(){axis_scale=-GMath.WORLD_FORWARD},
-                    [EInputKey.Key_D]=new(){axis_scale=-GMath.WORLD_LEFT},
+                    [EInputKey.Key_D]=new(){axis_scale=GMath.WORLD_LEFT},
                     
                     [EInputKey.Pad_LeftStickX]=new(){axis_scale=GMath.WORLD_FORWARD,deadzone = DEADZONE},
                     [EInputKey.Pad_LeftStickY]=new(){axis_scale=GMath.WORLD_LEFT,deadzone = DEADZONE}

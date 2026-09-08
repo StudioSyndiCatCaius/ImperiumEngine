@@ -327,6 +327,8 @@ public class PNL_FileBrowser : EdPanel
 
     void DrawFileMenu(string path, EEditorFileType type)
     {
+        if (type == EEditorFileType.Asset && ImGui.MenuItem("Open"))
+            on_open?.Invoke(path);
         if (ImGui.MenuItem("Rename", "F2"))
             BeginRename(path);
         if (ImGui.MenuItem("Delete"))

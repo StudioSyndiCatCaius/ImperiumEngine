@@ -1,6 +1,6 @@
 ﻿namespace Engine.Assets.Flow;
 
-public class Flow_Dialogue : A_Flow
+public class Flow_Event : A_Flow
 {
 
 }

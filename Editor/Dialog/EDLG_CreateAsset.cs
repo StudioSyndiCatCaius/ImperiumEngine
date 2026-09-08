@@ -233,7 +233,7 @@ public class EDLG_CreateAsset : EdDialog
                 if (string.IsNullOrEmpty(stem)) continue;
                 string abs = DestAbs(g, stem, it.asset);
                 EDLG_FileAction.WriteAsset(it.asset, abs);
-                it.asset.Source_Reimport();
+                it.asset.Source_Get();
             }
         }
         Close();
